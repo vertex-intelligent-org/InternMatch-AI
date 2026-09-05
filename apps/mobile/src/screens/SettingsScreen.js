@@ -20,6 +20,7 @@ import { signOut, getCurrentUser, sendPasswordResetEmail } from '../services/aut
 import { PASSWORD_RESET_REDIRECT_URL } from '../services/passwordRecovery';
 import { useProfile } from '../context/ProfileContext';
 import { useRevenueCat } from '../context/RevenueCatProvider';
+import { useSubscription } from '../context/SubscriptionProvider';
 import { getSubscriptionSnapshot, normalizeAccountType } from '../services/subscriptionService';
 import haptics from '../services/haptics';
 import { useTranslation } from 'react-i18next';
@@ -101,6 +102,7 @@ export default function SettingsScreen({ navigation }) {
   const [signingOut, setSigningOut] = useState(false);
   const { profile, clearProfile } = useProfile();
   const { candidateState } = useRevenueCat();
+  const { backendSubscription } = useSubscription();
   const { t } = useTranslation();
   const { locale, isRTL, setLocale } = useLocalization();
   const [languagePickerVisible, setLanguagePickerVisible] = useState(false);
@@ -114,7 +116,8 @@ export default function SettingsScreen({ navigation }) {
   const isEmployer = accountType === 'employer';
   const subscriptionSnapshot = getSubscriptionSnapshot(
     profile?.preferences?.account_type,
-    candidateState
+    candidateState,
+    backendSubscription
   );
   const currentPlanLabel = t(subscriptionSnapshot.currentPlan.badgeKey);
 

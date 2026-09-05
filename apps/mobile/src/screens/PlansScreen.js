@@ -19,6 +19,7 @@ import PlanBadge from '../components/PlanBadge';
 import { useProfile } from '../context/ProfileContext';
 import { useLocalization } from '../localization/LocalizationContext';
 import { useRevenueCat } from '../context/RevenueCatProvider';
+import { useSubscription } from '../context/SubscriptionProvider';
 import { getSubscriptionSnapshot } from '../services/subscriptionService';
 import haptics from '../services/haptics';
 
@@ -35,9 +36,11 @@ export default function PlansScreen({ navigation }) {
     restorePurchases,
   } = useRevenueCat();
 
+  const { backendSubscription } = useSubscription();
   const subscriptionSnapshot = getSubscriptionSnapshot(
     profile?.preferences?.account_type,
-    candidateState
+    candidateState,
+    backendSubscription
   );
   const {
     accountType,

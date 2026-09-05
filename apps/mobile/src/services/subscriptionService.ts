@@ -34,6 +34,11 @@ export interface SubscriptionSnapshot {
   dynamicPriceString?: string | null;
 }
 
+export interface BackendSubscriptionState {
+  plan: 'free' | 'pro_student';
+  is_active: boolean;
+}
+
 export const CANDIDATE_FREE_PLAN: PlanInfo = {
   id: 'free',
   accountType: 'intern',
@@ -135,11 +140,12 @@ export function getBaselineEntitlements(accountType: AccountType): string[] {
 
 /**
  * Central pure domain subscription snapshot provider.
- * Maps account type and normalized candidate RevenueCat state into an immutable subscription snapshot.
+ * Maps account type, RevenueCat purchase metadata, and backend-authoritative access state into an immutable subscription snapshot.
  */
 export function getSubscriptionSnapshot(
   rawAccountType?: string | null,
-  candidateRevenueCatState?: CandidateRevenueCatState | null
+  candidateRevenueCatState?: CandidateRevenueCatState | null,
+  backendSubscriptionState?: BackendSubscriptionState | null
 ): SubscriptionSnapshot {
   const accountType = normalizeAccountType(rawAccountType);
 
@@ -161,57 +167,46 @@ export function getSubscriptionSnapshot(
     };
   }
 
-  // Candidate path
-  if (candidateRevenueCatState) {
-    const providerVerified = Boolean(candidateRevenueCatState.providerVerified);
-    const purchasesAvailable = Boolean(candidateRevenueCatState.purchasesAvailable);
-    const isPro = providerVerified && Boolean(candidateRevenueCatState.proStudentActive);
+  // Candidate purchase availability and localized price come from RevenueCat.
+  // Product authorization comes only from backend subscription state.
+  const providerVerified = Boolean(
+    candidateRevenueCatState?.providerVerified
+  );
+  const purchasesAvailable = Boolean(
+    candidateRevenueCatState?.purchasesAvailable
+  );
+  const isPro =
+    backendSubscriptionState?.plan === 'pro_student' &&
+    backendSubscriptionState?.is_active === true;
 
-    const purchaseState: PurchaseState = {
-      provider: 'revenuecat',
-      providerVerified,
-      purchasesAvailable,
-      mode: 'revenuecat',
-    };
-
-    const freePlan: PlanInfo = {
-      ...CANDIDATE_FREE_PLAN,
-      isCurrent: !isPro,
-    };
-
-    const proPlan: PlanInfo = {
-      ...CANDIDATE_PRO_PLAN,
-      isCurrent: isPro,
-    };
-
-    const entitlements = isPro
-      ? [...getBaselineEntitlements('intern'), 'pro_student']
-      : getBaselineEntitlements('intern');
-
-    return {
-      accountType: 'intern',
-      currentPlan: isPro ? proPlan : freePlan,
-      availablePlans: [freePlan, proPlan],
-      entitlements,
-      purchaseState,
-      dynamicPriceString: candidateRevenueCatState.priceString || null,
-    };
-  }
-
-  // Unverified preview fallback
   const purchaseState: PurchaseState = {
     provider: 'revenuecat',
-    providerVerified: false,
-    purchasesAvailable: false,
-    mode: 'preview',
+    providerVerified,
+    purchasesAvailable,
+    mode: candidateRevenueCatState ? 'revenuecat' : 'preview',
   };
+
+  const freePlan: PlanInfo = {
+    ...CANDIDATE_FREE_PLAN,
+    isCurrent: !isPro,
+  };
+
+  const proPlan: PlanInfo = {
+    ...CANDIDATE_PRO_PLAN,
+    isCurrent: isPro,
+  };
+
+  const entitlements = isPro
+    ? [...getBaselineEntitlements('intern'), 'pro_student']
+    : getBaselineEntitlements('intern');
 
   return {
     accountType: 'intern',
-    currentPlan: CANDIDATE_FREE_PLAN,
-    availablePlans: [CANDIDATE_FREE_PLAN, CANDIDATE_PRO_PLAN],
-    entitlements: getBaselineEntitlements('intern'),
+    currentPlan: isPro ? proPlan : freePlan,
+    availablePlans: [freePlan, proPlan],
+    entitlements,
     purchaseState,
-    dynamicPriceString: null,
+    dynamicPriceString:
+      candidateRevenueCatState?.priceString || null,
   };
 }

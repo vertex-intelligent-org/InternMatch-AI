@@ -837,3 +837,72 @@ export async function discardApplicationDraft(
     }
   );
 }
+// -----------------------------------------------------------------------------
+// Backend-authoritative Student subscription + AI usage state
+// -----------------------------------------------------------------------------
+
+export type BackendSubscriptionResponse = {
+  plan: 'free' | 'pro_student';
+  entitlement_id: string;
+  is_active: boolean;
+  status: string;
+  will_renew: boolean;
+  expires_at: string | null;
+  product_id: string | null;
+  environment: string | null;
+  store: string | null;
+  last_event_type: string | null;
+};
+
+export type AIQuotaFeatureResponse = {
+  feature_key:
+    | 'cv_analysis'
+    | 'match_explanation'
+    | 'application_support'
+    | 'interview_prep';
+  display_name: string;
+  limit: number;
+  used: number;
+  remaining: number;
+  reset_policy: string;
+  period_started_at: string;
+  reset_at: string;
+};
+
+export type AIUsageResponse = {
+  plan: 'free' | 'pro_student';
+  features: AIQuotaFeatureResponse[];
+};
+
+export type SubscriptionReconciliationResponse = {
+  outcome: string;
+  subscription: BackendSubscriptionResponse;
+};
+
+/**
+ * Product authorization source of truth.
+ * RevenueCat remains the billing/purchase provider, while access decisions
+ * are read from the authenticated backend.
+ */
+export async function getMySubscription(): Promise<BackendSubscriptionResponse> {
+  return apiRequest<BackendSubscriptionResponse>('/me/subscription');
+}
+
+/**
+ * Backend-controlled user-facing AI quota snapshot.
+ */
+export async function getMyAIUsage(): Promise<AIUsageResponse> {
+  return apiRequest<AIUsageResponse>('/me/ai-usage');
+}
+
+/**
+ * Refresh backend subscription state from RevenueCat after purchase/restore.
+ */
+export async function reconcileMySubscription(): Promise<SubscriptionReconciliationResponse> {
+  return apiRequest<SubscriptionReconciliationResponse>(
+    '/me/subscription/reconcile',
+    {
+      method: 'POST',
+    }
+  );
+}

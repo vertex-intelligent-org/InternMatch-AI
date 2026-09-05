@@ -6,6 +6,7 @@ import { ProfileProvider } from './src/context/ProfileContext';
 import { SavedInternshipsProvider } from './src/context/SavedInternshipsContext';
 import { LocalizationProvider } from './src/localization/LocalizationContext';
 import { RevenueCatProvider } from './src/context/RevenueCatProvider';
+import { SubscriptionProvider } from './src/context/SubscriptionProvider';
 
 export default function App() {
   return (
@@ -13,11 +14,13 @@ export default function App() {
       <StatusBar barStyle="dark-content" />
       <LocalizationProvider>
         <RevenueCatProvider>
+          <SubscriptionProvider>
           <ProfileProvider>
             <SavedInternshipsProvider>
               <RootNavigator />
             </SavedInternshipsProvider>
           </ProfileProvider>
+          </SubscriptionProvider>
         </RevenueCatProvider>
       </LocalizationProvider>
     </SafeAreaProvider>
