@@ -20,7 +20,12 @@ from app.repositories.processing_job import ProcessingJobRepository
 from app.repositories.student_profile import StudentProfileRepository
 from app.services.ai_quota import FEATURE_CV_ANALYSIS
 from app.services.ai_quota_integration import (
+    acquire_job_ai_quota_lock,
+    build_cv_request_fingerprint,
+    get_http_idempotent_job_ai_quota,
+    is_retryable_released_job_ai_quota,
     release_job_ai_quota_if_present,
+    reserve_http_idempotent_job_ai_quota,
     reserve_job_ai_quota,
 )
 from app.services.avatar_storage import (
@@ -42,7 +47,7 @@ from app.services.cv_storage import (
     store_candidate_cv,
 )
 from app.services.match_enqueue import enqueue_match_calculation
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, Header, HTTPException, UploadFile, status
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy.orm import Session
 
@@ -298,6 +303,12 @@ def upsert_my_profile(
 @router.post("/cv", response_model=CVProcessingResponse, status_code=status.HTTP_202_ACCEPTED)
 async def upload_candidate_cv(
     file: UploadFile = File(...),
+    idempotency_key: str | None = Header(
+        default=None,
+        alias="Idempotency-Key",
+        min_length=1,
+        max_length=200,
+    ),
     current_user: AuthenticatedUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -322,6 +333,41 @@ async def upload_candidate_cv(
             ),
         )
 
+    cv_request_fingerprint = build_cv_request_fingerprint(
+        content=content,
+        filename=file.filename or "",
+        content_type=file.content_type or "",
+    )
+
+    # Fast-path duplicate retries before storage I/O.
+    if idempotency_key is not None:
+        existing_request = get_http_idempotent_job_ai_quota(
+            db,
+            user_id=current_user.user_id,
+            feature_key=FEATURE_CV_ANALYSIS,
+            raw_idempotency_key=idempotency_key,
+            request_fingerprint=cv_request_fingerprint,
+        )
+
+        if (
+            existing_request is not None
+            and not is_retryable_released_job_ai_quota(
+                existing_request["operation"]
+            )
+        ):
+            existing_job = existing_request["job"]
+            db.rollback()
+
+            return CVProcessingResponse(
+                job_id=existing_job.id,
+                status="queued",
+                message="CV processing request already exists.",
+                estimated_seconds=15,
+            )
+
+        # Do not keep a read transaction open during external storage I/O.
+        db.rollback()
+
     # 3. Validate MIME/extension/signature and upload to private Supabase Storage
     try:
         stored_cv = store_candidate_cv(
@@ -336,24 +382,99 @@ async def upload_candidate_cv(
             detail=format_error_payload("BAD_REQUEST", str(exc)),
         )
 
-    # 3. Create durable ProcessingJob record and commit BEFORE enqueue
+    # 4. Create/reuse durable ProcessingJob and commit BEFORE enqueue.
     try:
-        job = ProcessingJobRepository.create(
-            db=db,
-            user_id=current_user.user_id,
-            job_type="cv_extraction",
-        )
-        reserve_job_ai_quota(
-            db,
-            user_id=current_user.user_id,
-            feature_key=FEATURE_CV_ANALYSIS,
-            job_id=job.id,
-        )
+        if idempotency_key is not None:
+            # Re-check under the same feature advisory lock. This closes the
+            # race where two identical HTTP requests both missed the fast path.
+            acquire_job_ai_quota_lock(
+                db,
+                user_id=current_user.user_id,
+                feature_key=FEATURE_CV_ANALYSIS,
+            )
+
+            existing_request = get_http_idempotent_job_ai_quota(
+                db,
+                user_id=current_user.user_id,
+                feature_key=FEATURE_CV_ANALYSIS,
+                raw_idempotency_key=idempotency_key,
+                request_fingerprint=cv_request_fingerprint,
+            )
+
+            if existing_request is not None:
+                existing_operation = existing_request["operation"]
+                existing_job = existing_request["job"]
+
+                if not is_retryable_released_job_ai_quota(
+                    existing_operation
+                ):
+                    db.rollback()
+
+                    try:
+                        delete_candidate_cv(
+                            user_id=current_user.user_id,
+                            storage_path=stored_cv.storage_path,
+                        )
+                    except Exception:
+                        pass
+
+                    return CVProcessingResponse(
+                        job_id=existing_job.id,
+                        status="queued",
+                        message="CV processing request already exists.",
+                        estimated_seconds=15,
+                    )
+
+                job = existing_job
+                job.status = "queued"
+                job.progress_percent = 0
+                job.result = None
+                job.error = None
+
+                reserve_http_idempotent_job_ai_quota(
+                    db,
+                    user_id=current_user.user_id,
+                    feature_key=FEATURE_CV_ANALYSIS,
+                    job_id=job.id,
+                    raw_idempotency_key=idempotency_key,
+                    request_fingerprint=cv_request_fingerprint,
+                )
+            else:
+                job = ProcessingJobRepository.create(
+                    db=db,
+                    user_id=current_user.user_id,
+                    job_type="cv_extraction",
+                )
+
+                reserve_http_idempotent_job_ai_quota(
+                    db,
+                    user_id=current_user.user_id,
+                    feature_key=FEATURE_CV_ANALYSIS,
+                    job_id=job.id,
+                    raw_idempotency_key=idempotency_key,
+                    request_fingerprint=cv_request_fingerprint,
+                )
+        else:
+            job = ProcessingJobRepository.create(
+                db=db,
+                user_id=current_user.user_id,
+                job_type="cv_extraction",
+            )
+
+            reserve_job_ai_quota(
+                db,
+                user_id=current_user.user_id,
+                feature_key=FEATURE_CV_ANALYSIS,
+                job_id=job.id,
+            )
+
         db.commit()
         db.refresh(job)
+
     except Exception:
         db.rollback()
-        # Best-effort cleanup of uploaded object if DB persistence fails
+
+        # Best-effort cleanup of uploaded object if DB persistence fails.
         try:
             delete_candidate_cv(
                 user_id=current_user.user_id,
@@ -361,6 +482,7 @@ async def upload_candidate_cv(
             )
         except Exception:
             pass
+
         raise
 
     # 4. Enqueue background extraction task to RQ

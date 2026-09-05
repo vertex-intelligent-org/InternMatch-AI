@@ -13,8 +13,14 @@ from app.api.router import api_router
 from app.api.v1.endpoints.health import HealthResponse, get_liveness
 from app.core.config import settings, validate_production_config
 from app.core.logging import logger
-from app.services.ai_quota import AIQuotaExceededError
-from app.services.ai_quota_integration import format_ai_quota_exceeded_payload
+from app.services.ai_quota import (
+    AIQuotaExceededError,
+    AIQuotaIdempotencyConflictError,
+)
+from app.services.ai_quota_integration import (
+    format_ai_idempotency_conflict_payload,
+    format_ai_quota_exceeded_payload,
+)
 
 
 @asynccontextmanager
@@ -49,6 +55,19 @@ async def handle_ai_quota_exceeded(
     return JSONResponse(
         status_code=402,
         content=format_ai_quota_exceeded_payload(exc),
+    )
+
+
+@app.exception_handler(AIQuotaIdempotencyConflictError)
+async def handle_ai_idempotency_conflict(
+    _request: Request,
+    _exc: AIQuotaIdempotencyConflictError,
+) -> JSONResponse:
+    """Reject reuse of an HTTP idempotency key for different input."""
+
+    return JSONResponse(
+        status_code=409,
+        content=format_ai_idempotency_conflict_payload(),
     )
 
 # CORS Configuration

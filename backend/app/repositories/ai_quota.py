@@ -136,6 +136,67 @@ class AIQuotaRepository:
         return db.scalar(stmt)
 
     @staticmethod
+    def get_latest_operation_by_idempotency_key(
+        db: Session,
+        *,
+        user_id: UUID,
+        feature_key: str,
+        idempotency_key: str,
+        for_update: bool = False,
+    ) -> AIQuotaOperation | None:
+        """Return the newest operation for one durable HTTP idempotency key."""
+
+        stmt = (
+            select(AIQuotaOperation)
+            .where(
+                AIQuotaOperation.user_id == user_id,
+                AIQuotaOperation.feature_key == feature_key,
+                AIQuotaOperation.idempotency_key == idempotency_key,
+            )
+            .order_by(
+                AIQuotaOperation.created_at.desc(),
+                AIQuotaOperation.id.desc(),
+            )
+            .limit(1)
+        )
+
+        if for_update:
+            stmt = stmt.with_for_update()
+
+        return db.scalar(stmt)
+
+    @staticmethod
+    def list_stale_sync_reservations(
+        db: Session,
+        *,
+        user_id: UUID,
+        feature_key: str,
+        reserved_before: datetime,
+    ) -> list[AIQuotaOperation]:
+        """Return expired synchronous reservations only.
+
+        Async operations have a ProcessingJob and must never be released
+        merely because wall-clock time passed.
+        """
+
+        stmt = (
+            select(AIQuotaOperation)
+            .where(
+                AIQuotaOperation.user_id == user_id,
+                AIQuotaOperation.feature_key == feature_key,
+                AIQuotaOperation.status == "reserved",
+                AIQuotaOperation.processing_job_id.is_(None),
+                AIQuotaOperation.reserved_at <= reserved_before,
+            )
+            .order_by(
+                AIQuotaOperation.reserved_at.asc(),
+                AIQuotaOperation.id.asc(),
+            )
+        )
+
+        return list(db.scalars(stmt).all())
+
+    @staticmethod
     def get_operation_by_processing_job(
         db: Session,
         *,

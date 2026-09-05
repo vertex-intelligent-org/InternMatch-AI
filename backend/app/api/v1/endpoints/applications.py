@@ -25,12 +25,17 @@ from app.schemas.application import (
 from app.schemas.interview_prep import InterviewPrepResponse
 from app.services.ai_quota import FEATURE_APPLICATION_SUPPORT
 from app.services.ai_quota_integration import (
+    acquire_job_ai_quota_lock,
+    build_ai_request_fingerprint,
+    get_http_idempotent_job_ai_quota,
+    is_retryable_released_job_ai_quota,
     release_job_ai_quota_if_present,
+    reserve_http_idempotent_job_ai_quota,
     reserve_job_ai_quota,
 )
 from app.services.application_enqueue import enqueue_application_generation
 from app.services.interview_prep import get_or_create_interview_prep
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, status
 from sqlalchemy.orm import Session
 
 router = APIRouter()
@@ -155,6 +160,12 @@ def discard_saved_application_draft(
 )
 def generate_application(
     payload: ApplicationGenerateRequest,
+    idempotency_key: str | None = Header(
+        default=None,
+        alias="Idempotency-Key",
+        min_length=1,
+        max_length=200,
+    ),
     current_user: AuthenticatedUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -181,19 +192,95 @@ def generate_application(
             detail="Match not found.",
         )
 
+    application_request_fingerprint = build_ai_request_fingerprint(
+        {
+            "match_id": str(payload.match_id),
+            "tone": payload.tone,
+            "content_locale": payload.content_locale,
+        }
+    )
+
     try:
-        processing_job = ProcessingJobRepository.create(
-            db=db,
-            user_id=current_user.user_id,
-            job_type="application_generation",
-        )
-        reserve_job_ai_quota(
-            db,
-            user_id=current_user.user_id,
-            feature_key=FEATURE_APPLICATION_SUPPORT,
-            job_id=processing_job.id,
-        )
+        if idempotency_key is not None:
+            # Ownership has already been verified. Serialize the idempotency
+            # lookup and job creation with the same per-user feature lock.
+            acquire_job_ai_quota_lock(
+                db,
+                user_id=current_user.user_id,
+                feature_key=FEATURE_APPLICATION_SUPPORT,
+            )
+
+            existing_request = get_http_idempotent_job_ai_quota(
+                db,
+                user_id=current_user.user_id,
+                feature_key=FEATURE_APPLICATION_SUPPORT,
+                raw_idempotency_key=idempotency_key,
+                request_fingerprint=application_request_fingerprint,
+            )
+
+            if existing_request is not None:
+                existing_operation = existing_request["operation"]
+                existing_job = existing_request["job"]
+
+                if not is_retryable_released_job_ai_quota(
+                    existing_operation
+                ):
+                    db.rollback()
+
+                    return ApplicationGenerateAcceptedResponse(
+                        job_id=existing_job.id,
+                        status="queued",
+                        message=(
+                            "Personalized application generation "
+                            "request already exists."
+                        ),
+                    )
+
+                processing_job = existing_job
+                processing_job.status = "queued"
+                processing_job.progress_percent = 0
+                processing_job.result = None
+                processing_job.error = None
+
+                reserve_http_idempotent_job_ai_quota(
+                    db,
+                    user_id=current_user.user_id,
+                    feature_key=FEATURE_APPLICATION_SUPPORT,
+                    job_id=processing_job.id,
+                    raw_idempotency_key=idempotency_key,
+                    request_fingerprint=application_request_fingerprint,
+                )
+            else:
+                processing_job = ProcessingJobRepository.create(
+                    db=db,
+                    user_id=current_user.user_id,
+                    job_type="application_generation",
+                )
+
+                reserve_http_idempotent_job_ai_quota(
+                    db,
+                    user_id=current_user.user_id,
+                    feature_key=FEATURE_APPLICATION_SUPPORT,
+                    job_id=processing_job.id,
+                    raw_idempotency_key=idempotency_key,
+                    request_fingerprint=application_request_fingerprint,
+                )
+        else:
+            processing_job = ProcessingJobRepository.create(
+                db=db,
+                user_id=current_user.user_id,
+                job_type="application_generation",
+            )
+
+            reserve_job_ai_quota(
+                db,
+                user_id=current_user.user_id,
+                feature_key=FEATURE_APPLICATION_SUPPORT,
+                job_id=processing_job.id,
+            )
+
         db.commit()
+
     except Exception:
         db.rollback()
         raise
