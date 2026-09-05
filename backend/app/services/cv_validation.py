@@ -12,6 +12,7 @@ from google.genai import types
 from pydantic import BaseModel, Field
 
 from app.core.config import settings
+from app.services.ai_telemetry import create_tracked_gemini_client
 
 
 class InvalidCVDocumentError(ValueError):
@@ -128,7 +129,11 @@ def validate_cv_document(
         )
 
     try:
-        client = genai.Client(api_key=settings.GEMINI_API_KEY)
+        client = create_tracked_gemini_client(
+            genai.Client,
+            "cv_validation",
+            api_key=settings.GEMINI_API_KEY,
+        )
         system_prompt = _build_validation_system_prompt(content_locale=content_locale or "en")
 
         sample_text = clean_text[:4000]
@@ -198,7 +203,11 @@ def validate_cv_document_multimodal(
         )
 
     try:
-        client = genai.Client(api_key=settings.GEMINI_API_KEY)
+        client = create_tracked_gemini_client(
+            genai.Client,
+            "cv_validation",
+            api_key=settings.GEMINI_API_KEY,
+        )
         system_prompt = _build_validation_system_prompt(content_locale=content_locale or "en")
 
         doc_part = types.Part.from_bytes(data=content, mime_type="application/pdf")

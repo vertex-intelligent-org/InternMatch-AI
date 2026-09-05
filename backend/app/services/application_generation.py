@@ -12,6 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.core.config import settings
 from app.db.models import InternshipListing, Match, StudentProfile
+from app.services.ai_telemetry import create_tracked_gemini_client
 
 
 class LLMCoverLetter(BaseModel):
@@ -84,7 +85,11 @@ def generate_grounded_cover_letter(
             "GEMINI_API_KEY configuration is missing or placeholder value"
         )
 
-    client = genai.Client(api_key=settings.GEMINI_API_KEY)
+    client = create_tracked_gemini_client(
+        genai.Client,
+        "application_support",
+        api_key=settings.GEMINI_API_KEY,
+    )
     system_prompt = _build_system_prompt(content_locale=content_locale or "en")
 
     # Extract match skills and details safely from Match model

@@ -16,6 +16,7 @@ from google.genai import types
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.core.config import settings
+from app.services.ai_telemetry import create_tracked_gemini_client
 
 logger = logging.getLogger(__name__)
 
@@ -114,7 +115,11 @@ def _call_gemini_translation(
     user_content = "\n\n".join(user_lines)
 
     try:
-        client = genai.Client(api_key=settings.GEMINI_API_KEY)
+        client = create_tracked_gemini_client(
+            genai.Client,
+            "content_translation",
+            api_key=settings.GEMINI_API_KEY,
+        )
         system_prompt = _build_translation_prompt(target_locale)
 
         response = client.models.generate_content(

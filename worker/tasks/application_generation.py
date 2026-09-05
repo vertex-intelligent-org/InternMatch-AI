@@ -18,6 +18,10 @@ from app.services.ai_quota_integration import (
     release_job_ai_quota_if_present,
     settle_job_ai_quota_if_present,
 )
+from app.services.ai_telemetry import (
+    activate_ai_telemetry_context,
+    reset_ai_telemetry_context,
+)
 from app.services.application_generation import generate_grounded_cover_letter
 
 
@@ -61,6 +65,7 @@ def run_application_generation(
 
     db = SessionLocal()
     job_validated = False
+    telemetry_token = None
 
     try:
         job = ProcessingJobRepository.get_by_id(db, norm_job_id)
@@ -110,6 +115,16 @@ def run_application_generation(
             user_id=norm_user_id,
             feature_key=FEATURE_APPLICATION_SUPPORT,
             job_id=norm_job_id,
+        )
+
+        telemetry_token = activate_ai_telemetry_context(
+            user_id=norm_user_id,
+            processing_job_id=norm_job_id,
+            quota_operation_id=(
+                quota_state["operation"].id
+                if quota_state is not None
+                else None
+            ),
         )
 
         if (
@@ -233,4 +248,8 @@ def run_application_generation(
 
         raise
     finally:
+        if telemetry_token is not None:
+            reset_ai_telemetry_context(
+                telemetry_token
+            )
         db.close()

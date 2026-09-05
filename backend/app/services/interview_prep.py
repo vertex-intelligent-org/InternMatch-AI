@@ -30,6 +30,10 @@ from app.services.ai_quota_integration import (
     reserve_sync_ai_quota,
     settle_sync_ai_quota,
 )
+from app.services.ai_telemetry import (
+    ai_telemetry_context,
+    create_tracked_gemini_client,
+)
 
 CACHE_VERSION = "v1"
 CACHE_TTL_SECONDS = 60 * 60 * 24 * 30
@@ -342,19 +346,23 @@ STRICT GROUNDING RULES:
         raise
 
     try:
-        client = genai.Client(
+        client = create_tracked_gemini_client(genai.Client, 'interview_prep',
             api_key=settings.GEMINI_API_KEY,
         )
 
-        response = client.models.generate_content(
-            model=settings.LLM_MODEL_NAME,
-            contents=user_content,
-            config=types.GenerateContentConfig(
-                system_instruction=system_prompt,
-                response_mime_type="application/json",
-                response_json_schema=LLMInterviewPrep.model_json_schema(),
-            ),
-        )
+        with ai_telemetry_context(
+            user_id=user_id,
+            quota_operation_id=quota_operation_id,
+        ):
+            response = client.models.generate_content(
+                model=settings.LLM_MODEL_NAME,
+                contents=user_content,
+                config=types.GenerateContentConfig(
+                    system_instruction=system_prompt,
+                    response_mime_type="application/json",
+                    response_json_schema=LLMInterviewPrep.model_json_schema(),
+                ),
+            )
 
         raw_text = getattr(response, "text", None)
 

@@ -11,6 +11,7 @@ from google import genai
 from google.genai import types
 
 from app.core.config import settings
+from app.services.ai_telemetry import create_tracked_gemini_client
 
 
 def generate_embedding(text: str) -> List[float]:
@@ -29,7 +30,11 @@ def generate_embedding(text: str) -> List[float]:
     if not api_key or "placeholder" in api_key.lower():
         raise ValueError("GEMINI_API_KEY configuration is missing or empty")
 
-    client = genai.Client(api_key=settings.GEMINI_API_KEY)
+    client = create_tracked_gemini_client(
+        genai.Client,
+        "embedding",
+        api_key=settings.GEMINI_API_KEY,
+    )
     response = client.models.embed_content(
         model=settings.EMBEDDING_MODEL_NAME,
         contents=text,

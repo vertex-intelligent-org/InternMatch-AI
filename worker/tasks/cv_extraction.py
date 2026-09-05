@@ -20,6 +20,10 @@ from app.services.ai_quota_integration import (
     release_job_ai_quota_if_present,
     settle_job_ai_quota_if_present,
 )
+from app.services.ai_telemetry import (
+    activate_ai_telemetry_context,
+    reset_ai_telemetry_context,
+)
 from app.services.candidate_embedding import (
     generate_and_persist_candidate_embedding,
 )
@@ -158,6 +162,7 @@ def run_cv_extraction(
 
     db = SessionLocal()
     job_validated = False
+    telemetry_token = None
 
     try:
         job = ProcessingJobRepository.get_by_id(db, norm_job_id)
@@ -213,6 +218,16 @@ def run_cv_extraction(
             user_id=norm_user_id,
             feature_key=FEATURE_CV_ANALYSIS,
             job_id=norm_job_id,
+        )
+
+        telemetry_token = activate_ai_telemetry_context(
+            user_id=norm_user_id,
+            processing_job_id=norm_job_id,
+            quota_operation_id=(
+                quota_state["operation"].id
+                if quota_state is not None
+                else None
+            ),
         )
 
         if (
@@ -501,4 +516,8 @@ def run_cv_extraction(
 
         raise
     finally:
+        if telemetry_token is not None:
+            reset_ai_telemetry_context(
+                telemetry_token
+            )
         db.close()

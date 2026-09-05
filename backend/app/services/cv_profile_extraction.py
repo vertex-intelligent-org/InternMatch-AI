@@ -13,6 +13,7 @@ from google.genai import types
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.core.config import settings
+from app.services.ai_telemetry import create_tracked_gemini_client
 
 
 class ExtractedSkill(BaseModel):
@@ -147,7 +148,11 @@ def extract_structured_candidate_profile(
     if not api_key or "placeholder" in api_key.lower():
         raise ValueError("GEMINI_API_KEY configuration is missing or placeholder value")
 
-    client = genai.Client(api_key=settings.GEMINI_API_KEY)
+    client = create_tracked_gemini_client(
+        genai.Client,
+        "cv_profile_extraction",
+        api_key=settings.GEMINI_API_KEY,
+    )
     system_prompt = _build_system_prompt(content_locale=content_locale or "en")
 
     response = client.models.generate_content(
@@ -203,7 +208,11 @@ def extract_structured_candidate_profile_multimodal(
     if not api_key or "placeholder" in api_key.lower():
         raise ValueError("GEMINI_API_KEY configuration is missing or placeholder value")
 
-    client = genai.Client(api_key=settings.GEMINI_API_KEY)
+    client = create_tracked_gemini_client(
+        genai.Client,
+        "cv_profile_extraction",
+        api_key=settings.GEMINI_API_KEY,
+    )
     system_prompt = _build_system_prompt(content_locale=content_locale or "en")
 
     doc_part = types.Part.from_bytes(data=content, mime_type="application/pdf")

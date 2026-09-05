@@ -4,6 +4,7 @@ Maps public schema tables defined by database/migrations/001_initial_schema.sql.
 """
 
 from datetime import date, datetime, timezone
+from decimal import Decimal
 from typing import Any, Dict, List, Optional
 from uuid import UUID, uuid4
 
@@ -20,6 +21,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Integer,
+    Numeric,
     String,
     Text,
     UniqueConstraint,
@@ -705,6 +707,150 @@ class AIQuotaOperation(Base):
         default=lambda: datetime.now(timezone.utc),
         onupdate=lambda: datetime.now(timezone.utc),
         nullable=False,
+    )
+
+
+
+class AIUsageEvent(Base):
+    """Internal server-side telemetry for one Gemini provider invocation."""
+
+    __tablename__ = "ai_usage_events"
+    __table_args__ = (
+        CheckConstraint(
+            "provider IN ('gemini')",
+            name="ck_ai_usage_events_provider",
+        ),
+        CheckConstraint(
+            "status IN ('success', 'error')",
+            name="ck_ai_usage_events_status",
+        ),
+        CheckConstraint(
+            "latency_ms >= 0",
+            name="ck_ai_usage_events_latency_nonnegative",
+        ),
+        CheckConstraint(
+            "input_tokens IS NULL OR input_tokens >= 0",
+            name="ck_ai_usage_events_input_tokens_nonnegative",
+        ),
+        CheckConstraint(
+            "output_tokens IS NULL OR output_tokens >= 0",
+            name="ck_ai_usage_events_output_tokens_nonnegative",
+        ),
+        CheckConstraint(
+            "total_tokens IS NULL OR total_tokens >= 0",
+            name="ck_ai_usage_events_total_tokens_nonnegative",
+        ),
+        CheckConstraint(
+            "candidate_tokens IS NULL OR candidate_tokens >= 0",
+            name="ck_ai_usage_events_candidate_tokens_nonnegative",
+        ),
+        CheckConstraint(
+            "thought_tokens IS NULL OR thought_tokens >= 0",
+            name="ck_ai_usage_events_thought_tokens_nonnegative",
+        ),
+        CheckConstraint(
+            "cached_input_tokens IS NULL OR cached_input_tokens >= 0",
+            name="ck_ai_usage_events_cached_tokens_nonnegative",
+        ),
+        CheckConstraint(
+            "estimated_cost_usd IS NULL OR estimated_cost_usd >= 0",
+            name="ck_ai_usage_events_cost_nonnegative",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid4,
+    )
+    user_id: Mapped[Optional[UUID]] = mapped_column(
+        PG_UUID(as_uuid=True),
+        nullable=True,
+        index=True,
+    )
+    processing_job_id: Mapped[Optional[UUID]] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey(
+            "processing_jobs.id",
+            ondelete="SET NULL",
+        ),
+        nullable=True,
+        index=True,
+    )
+    quota_operation_id: Mapped[Optional[UUID]] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey(
+            "ai_quota_operations.id",
+            ondelete="SET NULL",
+        ),
+        nullable=True,
+        index=True,
+    )
+    provider: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+        default="gemini",
+    )
+    operation: Mapped[str] = mapped_column(
+        String(128),
+        nullable=False,
+        index=True,
+    )
+    model: Mapped[str] = mapped_column(
+        String(255),
+        nullable=False,
+        index=True,
+    )
+    status: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+        index=True,
+    )
+    input_tokens: Mapped[Optional[int]] = mapped_column(
+        Integer,
+        nullable=True,
+    )
+    output_tokens: Mapped[Optional[int]] = mapped_column(
+        Integer,
+        nullable=True,
+    )
+    total_tokens: Mapped[Optional[int]] = mapped_column(
+        Integer,
+        nullable=True,
+    )
+    candidate_tokens: Mapped[Optional[int]] = mapped_column(
+        Integer,
+        nullable=True,
+    )
+    thought_tokens: Mapped[Optional[int]] = mapped_column(
+        Integer,
+        nullable=True,
+    )
+    cached_input_tokens: Mapped[Optional[int]] = mapped_column(
+        Integer,
+        nullable=True,
+    )
+    estimated_cost_usd: Mapped[Optional[Decimal]] = mapped_column(
+        Numeric(18, 10),
+        nullable=True,
+    )
+    pricing_version: Mapped[Optional[str]] = mapped_column(
+        String(128),
+        nullable=True,
+    )
+    latency_ms: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+    )
+    error_type: Mapped[Optional[str]] = mapped_column(
+        String(255),
+        nullable=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+        index=True,
     )
 
 

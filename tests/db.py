@@ -2,6 +2,7 @@
 from app.db.models import (  # noqa: F401
     AIQuotaOperation,
     AIQuotaPeriod,
+    AIUsageEvent,
     Application,
     ApplicationStatusEvent,
     EducationEntry,

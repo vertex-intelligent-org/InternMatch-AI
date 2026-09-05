@@ -32,6 +32,10 @@ from app.services.ai_quota_integration import (
     reserve_sync_ai_quota,
     settle_sync_ai_quota,
 )
+from app.services.ai_telemetry import (
+    ai_telemetry_context,
+    create_tracked_gemini_client,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -186,7 +190,11 @@ def generate_grounded_match_explanation(
             "GEMINI_API_KEY configuration is missing or placeholder value"
         )
 
-    client = genai.Client(api_key=settings.GEMINI_API_KEY)
+    client = create_tracked_gemini_client(
+        genai.Client,
+        "match_explanation",
+        api_key=settings.GEMINI_API_KEY,
+    )
     system_prompt = _build_system_prompt(content_locale=content_locale or "en")
 
     cand_skills_str = (
@@ -535,18 +543,22 @@ def get_or_create_match_explanation(
             raise
 
         try:
-            explanation = generate_grounded_match_explanation(
-                profile=profile,
-                internship=internship,
-                overall_score=match.overall_score,
-                matching_skills=matching_skills,
-                missing_skills=missing_skills,
-                candidate_skills=candidate_skills,
-                education_entries=edu_list,
-                experience_entries=exp_list,
-                project_entries=proj_list,
-                content_locale="en",
-            )
+            with ai_telemetry_context(
+                user_id=user_id,
+                quota_operation_id=quota_operation_id,
+            ):
+                explanation = generate_grounded_match_explanation(
+                    profile=profile,
+                    internship=internship,
+                    overall_score=match.overall_score,
+                    matching_skills=matching_skills,
+                    missing_skills=missing_skills,
+                    candidate_skills=candidate_skills,
+                    education_entries=edu_list,
+                    experience_entries=exp_list,
+                    project_entries=proj_list,
+                    content_locale="en",
+                )
 
             # Persist English narrative and quota settlement atomically.
             match.why_you_match = explanation.why_you_match
@@ -780,18 +792,22 @@ def get_or_create_match_explanation(
         raise
 
     try:
-        explanation = generate_grounded_match_explanation(
-            profile=profile,
-            internship=internship,
-            overall_score=match.overall_score,
-            matching_skills=matching_skills,
-            missing_skills=missing_skills,
-            candidate_skills=candidate_skills,
-            education_entries=edu_list,
-            experience_entries=exp_list,
-            project_entries=proj_list,
-            content_locale=content_locale,
-        )
+        with ai_telemetry_context(
+            user_id=user_id,
+            quota_operation_id=quota_operation_id,
+        ):
+            explanation = generate_grounded_match_explanation(
+                profile=profile,
+                internship=internship,
+                overall_score=match.overall_score,
+                matching_skills=matching_skills,
+                missing_skills=missing_skills,
+                candidate_skills=candidate_skills,
+                education_entries=edu_list,
+                experience_entries=exp_list,
+                project_entries=proj_list,
+                content_locale=content_locale,
+            )
     except Exception as gen_err:
         db.rollback()
 

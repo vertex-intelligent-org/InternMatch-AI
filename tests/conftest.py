@@ -52,6 +52,16 @@ def override_get_db():
 
 
 @pytest.fixture(autouse=True)
+def route_ai_telemetry_to_test_database(monkeypatch):
+    """Route best-effort AI telemetry writes to shared SQLite tests."""
+
+    monkeypatch.setattr(
+        "app.services.ai_telemetry.SessionLocal",
+        TestingSessionLocal,
+    )
+
+
+@pytest.fixture(autouse=True)
 def configure_test_jwt_settings():
     """Configure shared test Supabase URL and publishable key for all test modules."""
     original_url = settings.SUPABASE_URL
