@@ -40,7 +40,9 @@ class Settings(BaseSettings):
     SKILL_FUZZY_THRESHOLD: int = 85
 
     # RevenueCat Integration Credentials
+    REVENUECAT_PROJECT_ID: str = ""
     REVENUECAT_SECRET_KEY: str = ""
+    REVENUECAT_ENVIRONMENT: str = "sandbox"
 
     # RevenueCat webhook security.
     # AUTH_TOKEN is the server-only token configured in RevenueCat's

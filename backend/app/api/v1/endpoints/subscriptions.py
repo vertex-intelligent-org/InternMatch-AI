@@ -1,12 +1,17 @@
-"""Authenticated subscription state endpoint."""
+﻿"""Authenticated subscription state endpoints."""
 
 from datetime import datetime
 from typing import Optional
 
 from app.core.security import AuthenticatedUser, get_current_user
 from app.db.session import get_db
+from app.services.revenuecat_reconciliation import (
+    RevenueCatReconciliationConfigurationError,
+    RevenueCatReconciliationProviderError,
+    reconcile_student_subscription,
+)
 from app.services.subscription import get_student_subscription_snapshot
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -28,6 +33,13 @@ class SubscriptionResponse(BaseModel):
     last_event_type: Optional[str] = None
 
 
+class SubscriptionReconciliationResponse(BaseModel):
+    """Result of one backend-to-RevenueCat reconciliation."""
+
+    outcome: str
+    subscription: SubscriptionResponse
+
+
 @router.get("/subscription", response_model=SubscriptionResponse)
 def get_my_subscription(
     current_user: AuthenticatedUser = Depends(get_current_user),
@@ -41,3 +53,34 @@ def get_my_subscription(
             user_id=current_user.user_id,
         )
     )
+
+
+@router.post(
+    "/subscription/reconcile",
+    response_model=SubscriptionReconciliationResponse,
+)
+def reconcile_my_subscription(
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Refresh the authenticated user's subscription from RevenueCat."""
+
+    try:
+        result = reconcile_student_subscription(
+            db,
+            user_id=current_user.user_id,
+        )
+    except RevenueCatReconciliationConfigurationError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Subscription reconciliation is not configured.",
+        ) from exc
+    except RevenueCatReconciliationProviderError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Subscription provider is temporarily unavailable.",
+        ) from exc
+
+    return SubscriptionReconciliationResponse(**result)

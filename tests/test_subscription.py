@@ -358,3 +358,496 @@ def test_older_event_cannot_override_newer_entitlement_state(
     assert body["plan"] == "pro_student"
     assert body["is_active"] is True
     assert body["status"] == "active"
+
+
+def _revenuecat_v2_subscription(
+    *,
+    user_id,
+    gives_access: bool,
+    status: str,
+    auto_renewal_status: str,
+    ends_at_ms: int,
+) -> dict:
+    internal_product_id = "prod_test_student_monthly"
+
+    return {
+        "object": "subscription",
+        "id": f"sub-{user_id}",
+        "customer_id": str(user_id),
+        "original_customer_id": str(user_id),
+        "product_id": internal_product_id,
+        "starts_at": ends_at_ms - 60_000,
+        "current_period_starts_at": ends_at_ms - 60_000,
+        "current_period_ends_at": ends_at_ms,
+        "ends_at": ends_at_ms,
+        "gives_access": gives_access,
+        "pending_payment": False,
+        "auto_renewal_status": auto_renewal_status,
+        "status": status,
+        "entitlements": {
+            "object": "list",
+            "items": [
+                {
+                    "state": "active",
+                    "object": "entitlement",
+                    "id": "entl-test-pro-student",
+                    "lookup_key": "pro_student",
+                    "display_name": "Pro Student",
+                    "products": {
+                        "object": "list",
+                        "items": [
+                            {
+                                "state": "active",
+                                "object": "product",
+                                "id": internal_product_id,
+                                "store_identifier": (
+                                    "internmatch_pro_student_monthly"
+                                ),
+                                "type": "subscription",
+                            }
+                        ],
+                        "next_page": None,
+                        "url": "/test/products",
+                    },
+                }
+            ],
+            "next_page": None,
+            "url": "/test/entitlements",
+        },
+        "environment": "sandbox",
+        "store": "test_store",
+    }
+
+
+def _active_pro_student_entitlement(
+    *,
+    expires_at_ms: int,
+) -> dict:
+    return {
+        "object": "customer.active_entitlement",
+        "entitlement_id": "entl-test-pro-student",
+        "expires_at": expires_at_ms,
+    }
+
+
+def test_revenuecat_v2_requests_are_environment_scoped(
+    monkeypatch,
+):
+    from app.services import revenuecat_reconciliation
+
+    user_id = uuid4()
+    requested_urls = []
+
+    monkeypatch.setattr(
+        settings,
+        "REVENUECAT_PROJECT_ID",
+        "proj_test",
+    )
+    monkeypatch.setattr(
+        settings,
+        "REVENUECAT_SECRET_KEY",
+        "sk_test",
+    )
+    monkeypatch.setattr(
+        settings,
+        "REVENUECAT_ENVIRONMENT",
+        "sandbox",
+    )
+
+    def fake_request_json(*, url, api_key):
+        requested_urls.append(url)
+
+        if "/subscriptions" in url:
+            return {
+                "object": "list",
+                "items": [],
+                "next_page": None,
+            }
+
+        raise AssertionError(
+            "active_entitlements should not be fetched "
+            "without a Test Store subscription."
+        )
+
+    monkeypatch.setattr(
+        revenuecat_reconciliation,
+        "_request_json",
+        fake_request_json,
+    )
+
+    subscriptions, active_entitlements, _ = (
+        revenuecat_reconciliation._fetch_revenuecat_subscriptions(
+            user_id=user_id,
+        )
+    )
+
+    assert subscriptions == []
+    assert active_entitlements == []
+    assert len(requested_urls) == 1
+    assert (
+        requested_urls[0].endswith(
+            "/subscriptions?environment=sandbox"
+        )
+    )
+
+
+def test_reconciliation_rejects_invalid_environment(
+    client,
+    mock_supabase_auth,
+    monkeypatch,
+):
+    from app.services import revenuecat_reconciliation
+
+    user_id = uuid4()
+
+    monkeypatch.setattr(
+        settings,
+        "REVENUECAT_PROJECT_ID",
+        "proj_test",
+    )
+    monkeypatch.setattr(
+        settings,
+        "REVENUECAT_SECRET_KEY",
+        "sk_test",
+    )
+    monkeypatch.setattr(
+        settings,
+        "REVENUECAT_ENVIRONMENT",
+        "invalid",
+    )
+    monkeypatch.setattr(
+        revenuecat_reconciliation,
+        "RECONCILIATION_MIN_INTERVAL_SECONDS",
+        0,
+    )
+
+    response = client.post(
+        "/api/v1/me/subscription/reconcile",
+        headers=_auth_headers(user_id),
+    )
+
+    assert response.status_code == 503
+
+
+def test_reconciliation_requires_v2_server_configuration(
+    client,
+    mock_supabase_auth,
+    monkeypatch,
+):
+    from app.services import revenuecat_reconciliation
+
+    user_id = uuid4()
+
+    monkeypatch.setattr(settings, "REVENUECAT_PROJECT_ID", "")
+    monkeypatch.setattr(settings, "REVENUECAT_SECRET_KEY", "")
+    monkeypatch.setattr(
+        settings,
+        "REVENUECAT_ENVIRONMENT",
+        "sandbox",
+    )
+
+    monkeypatch.setattr(
+        revenuecat_reconciliation,
+        "RECONCILIATION_MIN_INTERVAL_SECONDS",
+        0,
+    )
+
+    response = client.post(
+        "/api/v1/me/subscription/reconcile",
+        headers=_auth_headers(user_id),
+    )
+
+    assert response.status_code == 503
+
+
+def test_reconciliation_recovers_lost_purchase(
+    client,
+    mock_supabase_auth,
+    monkeypatch,
+):
+    from app.services import revenuecat_reconciliation
+
+    user_id = uuid4()
+    now_ms = int(time.time() * 1000)
+    future_expiry_ms = int(
+        (datetime.now(timezone.utc) + timedelta(days=30)).timestamp() * 1000
+    )
+
+    subscription = _revenuecat_v2_subscription(
+        user_id=user_id,
+        gives_access=True,
+        status="active",
+        auto_renewal_status="will_renew",
+        ends_at_ms=future_expiry_ms,
+    )
+
+    monkeypatch.setattr(
+        revenuecat_reconciliation,
+        "_fetch_revenuecat_subscriptions",
+        lambda *, user_id: (
+            [subscription],
+            [
+                _active_pro_student_entitlement(
+                    expires_at_ms=future_expiry_ms,
+                )
+            ],
+            now_ms,
+        ),
+    )
+
+    response = client.post(
+        "/api/v1/me/subscription/reconcile",
+        headers=_auth_headers(user_id),
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+
+    assert body["outcome"] == "reconciled"
+    assert body["subscription"]["plan"] == "pro_student"
+    assert body["subscription"]["is_active"] is True
+    assert body["subscription"]["status"] == "active"
+    assert body["subscription"]["will_renew"] is True
+    assert (
+        body["subscription"]["product_id"]
+        == "internmatch_pro_student_monthly"
+    )
+    assert body["subscription"]["environment"] == "SANDBOX"
+    assert body["subscription"]["store"] == "TEST_STORE"
+
+
+def test_reconciliation_revokes_stale_pro_state(
+    client,
+    mock_supabase_auth,
+    monkeypatch,
+):
+    from app.services import revenuecat_reconciliation
+
+    user_id = uuid4()
+    now_ms = int(time.time() * 1000)
+
+    future_expiry_ms = int(
+        (datetime.now(timezone.utc) + timedelta(days=30)).timestamp() * 1000
+    )
+
+    initial = _event_payload(
+        user_id=user_id,
+        event_id=f"initial-{uuid4()}",
+        event_type="INITIAL_PURCHASE",
+        event_timestamp_ms=now_ms,
+        expiration_at_ms=future_expiry_ms,
+    )
+
+    assert _post_webhook(client, initial).status_code == 200
+
+    expired_ms = int(
+        (datetime.now(timezone.utc) - timedelta(minutes=1)).timestamp() * 1000
+    )
+
+    subscription = _revenuecat_v2_subscription(
+        user_id=user_id,
+        gives_access=True,
+        status="active",
+        auto_renewal_status="will_not_renew",
+        ends_at_ms=expired_ms,
+    )
+
+    monkeypatch.setattr(
+        revenuecat_reconciliation,
+        "_fetch_revenuecat_subscriptions",
+        lambda *, user_id: (
+            [subscription],
+            [],
+            now_ms + 10_000,
+        ),
+    )
+
+    with TestingSessionLocal() as db:
+        result = revenuecat_reconciliation.reconcile_student_subscription(
+            db,
+            user_id=user_id,
+            min_interval_seconds=0,
+        )
+
+    assert result["outcome"] == "reconciled"
+    assert result["subscription"]["plan"] == "free"
+    assert result["subscription"]["is_active"] is False
+    assert result["subscription"]["status"] == "expired"
+    assert result["subscription"]["will_renew"] is False
+
+
+def test_webhook_older_than_reconciliation_snapshot_is_ignored(
+    client,
+    mock_supabase_auth,
+    monkeypatch,
+):
+    from app.services import revenuecat_reconciliation
+
+    user_id = uuid4()
+    now_ms = int(time.time() * 1000)
+    reconciliation_ms = now_ms + 20_000
+
+    expired_ms = int(
+        (datetime.now(timezone.utc) - timedelta(minutes=1)).timestamp() * 1000
+    )
+
+    subscription = _revenuecat_v2_subscription(
+        user_id=user_id,
+        gives_access=False,
+        status="expired",
+        auto_renewal_status="will_not_renew",
+        ends_at_ms=expired_ms,
+    )
+
+    monkeypatch.setattr(
+        revenuecat_reconciliation,
+        "_fetch_revenuecat_subscriptions",
+        lambda *, user_id: (
+            [subscription],
+            [],
+            reconciliation_ms,
+        ),
+    )
+
+    with TestingSessionLocal() as db:
+        revenuecat_reconciliation.reconcile_student_subscription(
+            db,
+            user_id=user_id,
+            min_interval_seconds=0,
+        )
+
+    delayed_renewal_expiry_ms = int(
+        (datetime.now(timezone.utc) + timedelta(days=30)).timestamp() * 1000
+    )
+
+    delayed_renewal = _event_payload(
+        user_id=user_id,
+        event_id=f"delayed-renewal-{uuid4()}",
+        event_type="RENEWAL",
+        event_timestamp_ms=reconciliation_ms - 1,
+        expiration_at_ms=delayed_renewal_expiry_ms,
+    )
+
+    response = _post_webhook(client, delayed_renewal)
+
+    assert response.status_code == 200
+    assert response.json()["outcome"] == "ignored_stale"
+
+    subscription_state = client.get(
+        "/api/v1/me/subscription",
+        headers=_auth_headers(user_id),
+    ).json()
+
+    assert subscription_state["plan"] == "free"
+    assert subscription_state["is_active"] is False
+
+
+def test_reconciliation_is_throttled_when_state_is_recent(
+    client,
+    mock_supabase_auth,
+    monkeypatch,
+):
+    from app.services import revenuecat_reconciliation
+
+    user_id = uuid4()
+    now_ms = int(time.time() * 1000)
+    future_expiry_ms = int(
+        (datetime.now(timezone.utc) + timedelta(days=30)).timestamp() * 1000
+    )
+
+    subscription = _revenuecat_v2_subscription(
+        user_id=user_id,
+        gives_access=True,
+        status="active",
+        auto_renewal_status="will_renew",
+        ends_at_ms=future_expiry_ms,
+    )
+
+    calls = {"count": 0}
+
+    def fake_fetch(*, user_id):
+        calls["count"] += 1
+        return (
+            [subscription],
+            [
+                _active_pro_student_entitlement(
+                    expires_at_ms=future_expiry_ms,
+                )
+            ],
+            now_ms,
+        )
+
+    monkeypatch.setattr(
+        revenuecat_reconciliation,
+        "_fetch_revenuecat_subscriptions",
+        fake_fetch,
+    )
+
+    first = client.post(
+        "/api/v1/me/subscription/reconcile",
+        headers=_auth_headers(user_id),
+    )
+    second = client.post(
+        "/api/v1/me/subscription/reconcile",
+        headers=_auth_headers(user_id),
+    )
+
+    assert first.status_code == 200
+    assert first.json()["outcome"] == "reconciled"
+
+    assert second.status_code == 200
+    assert second.json()["outcome"] == "skipped_recent"
+
+    assert calls["count"] == 1
+
+def test_active_entitlement_does_not_override_provider_denial(
+    client,
+    mock_supabase_auth,
+    monkeypatch,
+):
+    from app.services import revenuecat_reconciliation
+
+    user_id = uuid4()
+    now_ms = int(time.time() * 1000)
+    future_expiry_ms = int(
+        (
+            datetime.now(timezone.utc)
+            + timedelta(days=30)
+        ).timestamp()
+        * 1000
+    )
+
+    subscription = _revenuecat_v2_subscription(
+        user_id=user_id,
+        gives_access=False,
+        status="in_billing_retry",
+        auto_renewal_status="will_renew",
+        ends_at_ms=future_expiry_ms,
+    )
+
+    monkeypatch.setattr(
+        revenuecat_reconciliation,
+        "_fetch_revenuecat_subscriptions",
+        lambda *, user_id: (
+            [subscription],
+            [
+                _active_pro_student_entitlement(
+                    expires_at_ms=future_expiry_ms,
+                )
+            ],
+            now_ms,
+        ),
+    )
+
+    response = client.post(
+        "/api/v1/me/subscription/reconcile",
+        headers=_auth_headers(user_id),
+    )
+
+    assert response.status_code == 200
+
+    body = response.json()["subscription"]
+
+    assert body["plan"] == "free"
+    assert body["is_active"] is False
+    assert body["status"] == "billing_issue"
