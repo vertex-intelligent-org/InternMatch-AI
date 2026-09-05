@@ -1,10 +1,14 @@
-﻿"""Authenticated subscription state endpoints."""
+"""Authenticated subscription state endpoints."""
 
 from datetime import datetime
 from typing import Optional
 
 from app.core.security import AuthenticatedUser, get_current_user
 from app.db.session import get_db
+from app.services.ai_quota import (
+    AIQuotaConfigurationError,
+    get_ai_usage_snapshot,
+)
 from app.services.revenuecat_reconciliation import (
     RevenueCatReconciliationConfigurationError,
     RevenueCatReconciliationProviderError,
@@ -16,6 +20,26 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 router = APIRouter()
+
+
+class AIQuotaFeatureResponse(BaseModel):
+    """User-facing quota snapshot for one AI feature."""
+
+    feature_key: str
+    display_name: str
+    limit: int
+    used: int
+    remaining: int
+    reset_policy: str
+    period_started_at: datetime
+    reset_at: datetime
+
+
+class AIUsageResponse(BaseModel):
+    """Backend-authoritative Student AI usage policy snapshot."""
+
+    plan: str
+    features: list[AIQuotaFeatureResponse]
 
 
 class SubscriptionResponse(BaseModel):
@@ -53,6 +77,30 @@ def get_my_subscription(
             user_id=current_user.user_id,
         )
     )
+
+
+@router.get(
+    "/ai-usage",
+    response_model=AIUsageResponse,
+)
+def get_my_ai_usage(
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Return backend-controlled Student AI limits and remaining usage."""
+
+    try:
+        snapshot = get_ai_usage_snapshot(
+            db,
+            user_id=current_user.user_id,
+        )
+    except AIQuotaConfigurationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="AI usage policy is temporarily unavailable.",
+        ) from exc
+
+    return AIUsageResponse(**snapshot)
 
 
 @router.post(
