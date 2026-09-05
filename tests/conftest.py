@@ -26,10 +26,12 @@ from app.db.models import (  # noqa: E402,F401
     Match,
     ProcessingJob,
     ProjectEntry,
+    RevenueCatWebhookEvent,
     SavedInternship,
     Skill,
     StudentProfile,
     StudentSkill,
+    SubscriptionEntitlement,
 )
 from app.db.session import Base, get_db  # noqa: E402
 from app.main import app  # noqa: E402
@@ -134,6 +136,8 @@ def setup_test_database():
         "project_entries",
         "internship_listings",
         "processing_jobs",
+        "subscription_entitlements",
+        "revenuecat_webhook_events",
         "matches",
         "applications",
         "application_status_events",

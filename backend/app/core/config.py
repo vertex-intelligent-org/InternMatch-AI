@@ -42,6 +42,13 @@ class Settings(BaseSettings):
     # RevenueCat Integration Credentials
     REVENUECAT_SECRET_KEY: str = ""
 
+    # RevenueCat webhook security.
+    # AUTH_TOKEN is the server-only token configured in RevenueCat's
+    # webhook Authorization header.
+    # SIGNING_SECRET enables HMAC verification when signing is enabled.
+    REVENUECAT_WEBHOOK_AUTH_TOKEN: str = ""
+    REVENUECAT_WEBHOOK_SIGNING_SECRET: str = ""
+
     # Security & CORS Origins Configuration
     ALLOWED_ORIGINS: str = "http://localhost:3000,http://localhost:8000,http://localhost:19006"
 

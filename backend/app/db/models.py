@@ -13,6 +13,7 @@ from pgvector.sqlalchemy import VECTOR
 from sqlalchemy import (
     ARRAY,
     JSON,
+    BigInteger,
     Boolean,
     CheckConstraint,
     Date,
@@ -449,3 +450,84 @@ class SavedInternship(Base):
 
     student_profile: Mapped["StudentProfile"] = relationship("StudentProfile")
     internship: Mapped["InternshipListing"] = relationship("InternshipListing")
+
+class SubscriptionEntitlement(Base):
+    """Server-authoritative RevenueCat entitlement state for an authenticated user."""
+
+    __tablename__ = "subscription_entitlements"
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id",
+            "entitlement_id",
+            name="uq_subscription_entitlements_user_entitlement",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, default=uuid4
+    )
+    user_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=False, index=True
+    )
+    entitlement_id: Mapped[str] = mapped_column(String, nullable=False)
+    product_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(String, nullable=False, default="inactive")
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    will_renew: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    current_period_started_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    expires_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    environment: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    store: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    original_transaction_id: Mapped[Optional[str]] = mapped_column(
+        Text, nullable=True
+    )
+    cancellation_reason: Mapped[Optional[str]] = mapped_column(
+        String, nullable=True
+    )
+    expiration_reason: Mapped[Optional[str]] = mapped_column(
+        String, nullable=True
+    )
+    last_event_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    last_event_type: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    last_event_timestamp_ms: Mapped[Optional[int]] = mapped_column(
+        BigInteger, nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+
+class RevenueCatWebhookEvent(Base):
+    """Minimal RevenueCat event ledger used for idempotent webhook processing."""
+
+    __tablename__ = "revenuecat_webhook_events"
+
+    event_id: Mapped[str] = mapped_column(Text, primary_key=True)
+    user_id: Mapped[Optional[UUID]] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=True, index=True
+    )
+    event_type: Mapped[str] = mapped_column(String, nullable=False)
+    event_timestamp_ms: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    outcome: Mapped[str] = mapped_column(
+        String, nullable=False, default="received"
+    )
+    received_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+    processed_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )

@@ -12,6 +12,8 @@ from app.api.v1.endpoints import (
     matches,
     profile,
     saved_internships,
+    subscriptions,
+    webhooks,
 )
 from fastapi import APIRouter
 
@@ -23,6 +25,19 @@ api_v1_router.include_router(health.router, tags=["Health Operations"])
 # Register authentication router
 api_v1_router.include_router(
     auth.router, prefix="/auth", tags=["Authentication Operations"]
+)
+# Backend-authoritative authenticated subscription state
+api_v1_router.include_router(
+    subscriptions.router,
+    prefix="/me",
+    tags=["Subscription Operations"],
+)
+
+# External provider webhook ingress
+api_v1_router.include_router(
+    webhooks.router,
+    prefix="/webhooks",
+    tags=["Webhook Operations"],
 )
 
 # Register protected candidate profile router

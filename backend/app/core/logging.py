@@ -16,6 +16,8 @@ class SecretMaskingFormatter(logging.Formatter):
         "SUPABASE_SERVICE_ROLE_KEY",
         "GEMINI_API_KEY",
         "REVENUECAT_SECRET_KEY",
+        "REVENUECAT_WEBHOOK_AUTH_TOKEN",
+        "REVENUECAT_WEBHOOK_SIGNING_SECRET",
         "Bearer ",
     ]
 
@@ -26,6 +28,8 @@ class SecretMaskingFormatter(logging.Formatter):
             settings.SUPABASE_SERVICE_ROLE_KEY,
             settings.GEMINI_API_KEY,
             settings.REVENUECAT_SECRET_KEY,
+            settings.REVENUECAT_WEBHOOK_AUTH_TOKEN,
+            settings.REVENUECAT_WEBHOOK_SIGNING_SECRET,
         ]:
             if secret_val and len(secret_val) > 4 and secret_val in formatted:
                 formatted = formatted.replace(secret_val, "***REDACTED_SECRET***")
@@ -58,4 +62,3 @@ def get_logger(name: str = "internmatch_backend") -> logging.Logger:
     """Retrieve logger instance with secret masking formatter configured."""
     setup_logging()
     return logging.getLogger(name)
-

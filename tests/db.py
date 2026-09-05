@@ -8,10 +8,12 @@ from app.db.models import (  # noqa: F401
     Match,
     ProcessingJob,
     ProjectEntry,
+    RevenueCatWebhookEvent,
     SavedInternship,
     Skill,
     StudentProfile,
     StudentSkill,
+    SubscriptionEntitlement,
 )
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
