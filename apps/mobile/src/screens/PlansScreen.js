@@ -23,6 +23,25 @@ import { useSubscription } from '../context/SubscriptionProvider';
 import { getSubscriptionSnapshot } from '../services/subscriptionService';
 import haptics from '../services/haptics';
 
+const AI_USAGE_FEATURES = [
+  {
+    featureKey: 'cv_analysis',
+    labelKey: 'plans.aiUsage.cvAnalysis',
+  },
+  {
+    featureKey: 'match_explanation',
+    labelKey: 'plans.aiUsage.matchExplanation',
+  },
+  {
+    featureKey: 'application_support',
+    labelKey: 'plans.aiUsage.applicationSupport',
+  },
+  {
+    featureKey: 'interview_prep',
+    labelKey: 'plans.aiUsage.interviewPrep',
+  },
+];
+
 export default function PlansScreen({ navigation }) {
   const { t } = useTranslation();
   const { isRTL } = useLocalization();
@@ -36,7 +55,11 @@ export default function PlansScreen({ navigation }) {
     restorePurchases,
   } = useRevenueCat();
 
-  const { backendSubscription } = useSubscription();
+  const {
+    backendSubscription,
+    aiUsage,
+    reconcileSubscription,
+  } = useSubscription();
   const subscriptionSnapshot = getSubscriptionSnapshot(
     profile?.preferences?.account_type,
     candidateState,
@@ -86,6 +109,32 @@ export default function PlansScreen({ navigation }) {
     }
 
     if (result.success) {
+      let reconciliation;
+
+      try {
+        reconciliation = await reconcileSubscription();
+      } catch {
+        Alert.alert(
+          t('plans.pendingVerification.title'),
+          t('plans.pendingVerification.message'),
+          [{ text: t('common.close', { defaultValue: 'OK' }), style: 'default' }]
+        );
+        return;
+      }
+
+      const backendConfirmedPro =
+        reconciliation?.subscription?.plan === 'pro_student' &&
+        reconciliation?.subscription?.is_active === true;
+
+      if (!backendConfirmedPro) {
+        Alert.alert(
+          t('plans.pendingVerification.title'),
+          t('plans.pendingVerification.message'),
+          [{ text: t('common.close', { defaultValue: 'OK' }), style: 'default' }]
+        );
+        return;
+      }
+
       haptics.success();
       Alert.alert(
         t('plans.purchaseSuccess.title'),
@@ -108,7 +157,14 @@ export default function PlansScreen({ navigation }) {
         [{ text: t('common.close', { defaultValue: 'OK' }), style: 'default' }]
       );
     }
-  }, [isPurchasing, isRestoring, isPurchaseReady, purchaseProStudent, t]);
+  }, [
+    isPurchasing,
+    isRestoring,
+    isPurchaseReady,
+    purchaseProStudent,
+    reconcileSubscription,
+    t,
+  ]);
 
   const handleRestore = useCallback(async () => {
     if (isPurchasing || isRestoring) return;
@@ -130,19 +186,44 @@ export default function PlansScreen({ navigation }) {
       return;
     }
 
-    if (result.success && result.proStudentActive) {
-      haptics.success();
-      Alert.alert(
-        t('plans.restoreSuccess.title'),
-        t('plans.restoreSuccess.message'),
-        [{ text: t('common.close', { defaultValue: 'OK' }), style: 'default' }]
-      );
-    } else if (result.success && !result.proStudentActive) {
-      Alert.alert(
-        t('plans.nothingToRestore.title'),
-        t('plans.nothingToRestore.message'),
-        [{ text: t('common.close', { defaultValue: 'OK' }), style: 'default' }]
-      );
+    if (result.success) {
+      let reconciliation;
+
+      try {
+        reconciliation = await reconcileSubscription();
+      } catch {
+        Alert.alert(
+          t('plans.pendingVerification.title'),
+          t('plans.pendingVerification.message'),
+          [{ text: t('common.close', { defaultValue: 'OK' }), style: 'default' }]
+        );
+        return;
+      }
+
+      const backendConfirmedPro =
+        reconciliation?.subscription?.plan === 'pro_student' &&
+        reconciliation?.subscription?.is_active === true;
+
+      if (backendConfirmedPro) {
+        haptics.success();
+        Alert.alert(
+          t('plans.restoreSuccess.title'),
+          t('plans.restoreSuccess.message'),
+          [{ text: t('common.close', { defaultValue: 'OK' }), style: 'default' }]
+        );
+      } else if (!result.proStudentActive) {
+        Alert.alert(
+          t('plans.nothingToRestore.title'),
+          t('plans.nothingToRestore.message'),
+          [{ text: t('common.close', { defaultValue: 'OK' }), style: 'default' }]
+        );
+      } else {
+        Alert.alert(
+          t('plans.pendingVerification.title'),
+          t('plans.pendingVerification.message'),
+          [{ text: t('common.close', { defaultValue: 'OK' }), style: 'default' }]
+        );
+      }
     } else {
       Alert.alert(
         t('plans.restoreFailed.title'),
@@ -150,7 +231,13 @@ export default function PlansScreen({ navigation }) {
         [{ text: t('common.close', { defaultValue: 'OK' }), style: 'default' }]
       );
     }
-  }, [isPurchasing, isRestoring, restorePurchases, t]);
+  }, [
+    isPurchasing,
+    isRestoring,
+    reconcileSubscription,
+    restorePurchases,
+    t,
+  ]);
 
   return (
     <ScreenContainer edges={['top', 'bottom']}>
@@ -189,6 +276,91 @@ export default function PlansScreen({ navigation }) {
             <Text style={[styles.employerNoticeText, isRTL && styles.textRTL]}>
               {t('plans.employer.previewNotice')}
             </Text>
+          </GlassSurface>
+        ) : null}
+
+        {!isEmployer && aiUsage?.features?.length > 0 ? (
+          <GlassSurface
+            variant="subtle"
+            style={styles.aiUsageCard}
+          >
+            <View style={styles.aiUsageHeaderRow}>
+              <Ionicons
+                name="sparkles-outline"
+                size={18}
+                color={colors.primaryBlue}
+                style={
+                  isRTL
+                    ? styles.iconRTL
+                    : styles.iconLTR
+                }
+              />
+
+              <Text
+                style={[
+                  styles.aiUsageTitle,
+                  isRTL && styles.textRTL,
+                ]}
+              >
+                {t('plans.aiUsage.title')}
+              </Text>
+            </View>
+
+            <Text
+              style={[
+                styles.aiUsageSubtitle,
+                isRTL && styles.textRTL,
+              ]}
+            >
+              {t('plans.aiUsage.subtitle')}
+            </Text>
+
+            <View style={styles.aiUsageRows}>
+              {AI_USAGE_FEATURES.map(
+                ({ featureKey, labelKey }) => {
+                  const feature =
+                    aiUsage.features.find(
+                      (item) =>
+                        item.feature_key ===
+                        featureKey
+                    );
+
+                  if (!feature) {
+                    return null;
+                  }
+
+                  return (
+                    <View
+                      key={featureKey}
+                      style={styles.aiUsageRow}
+                    >
+                      <Text
+                        style={[
+                          styles.aiUsageLabel,
+                          isRTL && styles.textRTL,
+                        ]}
+                      >
+                        {t(labelKey)}
+                      </Text>
+
+                      <Text
+                        style={styles.aiUsageCount}
+                      >
+                        {t(
+                          'plans.aiUsage.remainingCount',
+                          {
+                            remaining:
+                              feature.remaining,
+                            limit:
+                              feature.limit,
+                          }
+                        )}
+                      </Text>
+                    </View>
+                  );
+                }
+              )}
+            </View>
           </GlassSurface>
         ) : null}
 
@@ -418,6 +590,56 @@ const styles = StyleSheet.create({
     color: colors.textSecondary || '#64748B',
     fontSize: 14,
     lineHeight: 20,
+  },
+  aiUsageCard: {
+    padding: spacing.md,
+    borderRadius: spacing.radii.lg,
+    marginBottom: spacing.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor:
+      colors.borderSubtle || '#E2E8F0',
+  },
+  aiUsageHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  aiUsageTitle: {
+    ...typography.bodyMedium,
+    flex: 1,
+    fontSize: 15,
+    color:
+      colors.textPrimary || colors.textDark,
+  },
+  aiUsageSubtitle: {
+    ...typography.caption,
+    marginTop: spacing.xs,
+    color:
+      colors.textSecondary || colors.textMuted,
+    lineHeight: 17,
+  },
+  aiUsageRows: {
+    marginTop: spacing.md,
+    gap: spacing.sm,
+  },
+  aiUsageRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+  },
+  aiUsageLabel: {
+    ...typography.body,
+    flex: 1,
+    fontSize: 13,
+    color:
+      colors.textPrimary || colors.textDark,
+  },
+  aiUsageCount: {
+    ...typography.caption,
+    fontWeight: '700',
+    color:
+      colors.accentStrong || colors.tealDark,
+    writingDirection: 'ltr',
   },
   employerNoticeCard: {
     padding: spacing.md,

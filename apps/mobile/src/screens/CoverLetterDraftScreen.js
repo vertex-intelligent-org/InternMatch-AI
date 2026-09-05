@@ -25,6 +25,7 @@ import { useApplicationGeneration } from '../hooks/useApplicationGeneration';
 import { discardApplicationDraft, getApplications } from '../services/api';
 import { getLocalizedErrorMessage } from '../localization/errorMessages';
 import haptics from '../services/haptics';
+import { useSubscription } from '../context/SubscriptionProvider';
 
 const TONE_PRESETS = ['Professional', 'Concise', 'Enthusiastic'];
 const LOCALES = [
@@ -35,6 +36,20 @@ const LOCALES = [
 
 export default function CoverLetterDraftScreen({ route, navigation }) {
   const { t } = useTranslation();
+  const {
+    aiUsage,
+    refreshAIUsage,
+  } = useSubscription();
+
+  const applicationSupportUsage =
+    aiUsage?.features?.find(
+      (feature) =>
+        feature.feature_key ===
+        'application_support'
+    );
+
+  const isApplicationSupportExhausted =
+    applicationSupportUsage?.remaining === 0;
   const matchId = route?.params?.matchId;
   const internshipId = route?.params?.internshipId;
 
@@ -79,7 +94,60 @@ export default function CoverLetterDraftScreen({ route, navigation }) {
     checkExistingApplication();
   }, [checkExistingApplication]);
 
-  const handleGenerate = () => {
+  useEffect(() => {
+    if (
+      generationError !==
+      'AI_QUOTA_EXCEEDED'
+    ) {
+      return;
+    }
+
+    refreshAIUsage().catch(
+      (usageError) => {
+        console.warn(
+          'AI usage refresh after application quota response failed:',
+          usageError
+        );
+      }
+    );
+
+    navigation.navigate('Plans');
+  }, [
+    generationError,
+    navigation,
+    refreshAIUsage,
+  ]);
+
+  const handleGenerate = async () => {
+    if (isApplicationSupportExhausted) {
+      try {
+        const latestUsage =
+          await refreshAIUsage();
+
+        const latestSupportUsage =
+          latestUsage?.features?.find(
+            (feature) =>
+              feature.feature_key ===
+              'application_support'
+          );
+
+        if (
+          !latestSupportUsage ||
+          latestSupportUsage.remaining === 0
+        ) {
+          navigation.navigate('Plans');
+          return;
+        }
+      } catch (usageError) {
+        console.warn(
+          'AI usage refresh before application support failed:',
+          usageError
+        );
+        navigation.navigate('Plans');
+        return;
+      }
+    }
+
     if (!matchId) {
       setResolveError('MISSING_MATCH_REF');
       return;
@@ -96,6 +164,15 @@ export default function CoverLetterDraftScreen({ route, navigation }) {
         content_locale: contentLocale,
       },
       async (jobResult) => {
+        try {
+          await refreshAIUsage();
+        } catch (usageError) {
+          console.warn(
+            'AI usage refresh after application generation failed:',
+            usageError
+          );
+        }
+
         haptics.success();
         try {
           const listRes = await getApplications();

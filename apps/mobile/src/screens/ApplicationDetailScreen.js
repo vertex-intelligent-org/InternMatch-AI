@@ -30,6 +30,7 @@ import {
 import haptics from '../services/haptics';
 import { useLocalization } from '../localization/LocalizationContext';
 import { formatLocalizedDate, formatLocalizedDateTime } from '../localization/formatters';
+import { useSubscription } from '../context/SubscriptionProvider';
 
 const CANONICAL_STATUSES = [
   'saved',
@@ -88,6 +89,9 @@ function StatusPill({ status }) {
 
 export default function ApplicationDetailScreen({ route, navigation }) {
   const { t } = useTranslation();
+  const {
+    refreshAIUsage,
+  } = useSubscription();
   const { locale } = useLocalization();
   const applicationId =
     route?.params?.applicationId ||
@@ -217,9 +221,40 @@ export default function ApplicationDetailScreen({ route, navigation }) {
       );
 
       setInterviewPrep(result);
+
+      refreshAIUsage().catch(
+        (usageError) => {
+          console.warn(
+            'AI usage refresh after interview prep failed:',
+            usageError
+          );
+        }
+      );
+
       haptics.success();
     } catch (err) {
-      console.warn('Failed to generate interview prep:', err);
+      if (
+        err instanceof ApiError &&
+        err.status === 402 &&
+        err.code === 'AI_QUOTA_EXCEEDED'
+      ) {
+        refreshAIUsage().catch(
+          (usageError) => {
+            console.warn(
+              'AI usage refresh after interview prep quota response failed:',
+              usageError
+            );
+          }
+        );
+
+        navigation.navigate('Plans');
+        return;
+      }
+
+      console.warn(
+        'Failed to generate interview prep:',
+        err
+      );
       setInterviewPrepError(true);
       haptics.error();
     } finally {

@@ -836,6 +836,15 @@ export default {
       planCard: '{{plan}} plan details',
       upgradeButton: 'Upgrade to {{plan}} plan',
     },
+    aiUsage: {
+      title: 'AI usage',
+      subtitle: 'Your current AI allowances are managed by your active plan.',
+      cvAnalysis: 'AI analyses remaining',
+      matchExplanation: 'Match explanations remaining',
+      applicationSupport: 'Application support remaining',
+      interviewPrep: 'Interview prep remaining',
+      remainingCount: '{{remaining}} / {{limit}}',
+    },
     badges: {
       employer: 'Employer',
       employerPro: 'Employer Pro',

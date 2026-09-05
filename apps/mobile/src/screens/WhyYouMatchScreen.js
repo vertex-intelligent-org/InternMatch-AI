@@ -21,9 +21,13 @@ import AnimatedScoreRing from '../components/motion/AnimatedScoreRing';
 import Reveal from '../components/motion/Reveal';
 import { getMatchExplanation, ApiError } from '../services/api';
 import { useLocalization } from '../localization/LocalizationContext';
+import { useSubscription } from '../context/SubscriptionProvider';
 
 export default function WhyYouMatchScreen({ route, navigation }) {
   const { t } = useTranslation();
+  const {
+    refreshAIUsage,
+  } = useSubscription();
   const { locale } = useLocalization();
   const matchId = route?.params?.matchId;
   const internshipId = route?.params?.internshipId;
@@ -52,9 +56,36 @@ export default function WhyYouMatchScreen({ route, navigation }) {
       const data = await getMatchExplanation(matchId, locale);
       if (generation !== requestGenerationRef.current) return;
       setExplanation(data);
+
+      refreshAIUsage().catch(
+        (usageError) => {
+          console.warn(
+            'AI usage refresh after match explanation failed:',
+            usageError
+          );
+        }
+      );
     } catch (err) {
       if (generation !== requestGenerationRef.current) return;
-      if (err instanceof ApiError && err.status === 404) {
+      if (
+        err instanceof ApiError &&
+        err.status === 402 &&
+        err.code === 'AI_QUOTA_EXCEEDED'
+      ) {
+        refreshAIUsage().catch(
+          (usageError) => {
+            console.warn(
+              'AI usage refresh after match quota response failed:',
+              usageError
+            );
+          }
+        );
+
+        navigation.navigate('Plans');
+      } else if (
+        err instanceof ApiError &&
+        err.status === 404
+      ) {
         setIsNotFound(true);
       } else if (err instanceof ApiError && err.status === 429) {
         setError('SERVICE_BUSY');
@@ -67,7 +98,12 @@ export default function WhyYouMatchScreen({ route, navigation }) {
         setLoading(false);
       }
     }
-  }, [matchId, locale]);
+  }, [
+    matchId,
+    locale,
+    navigation,
+    refreshAIUsage,
+  ]);
 
   useEffect(() => {
     fetchExplanationData();

@@ -836,6 +836,15 @@ export default {
       planCard: '{{plan}} plan detayları',
       upgradeButton: '{{plan}} planına yükselt',
     },
+    aiUsage: {
+      title: 'Yapay zeka kullanımı',
+      subtitle: 'Mevcut yapay zeka kullanım haklarınız aktif planınız tarafından yönetilir.',
+      cvAnalysis: 'Kalan yapay zeka analizleri',
+      matchExplanation: 'Kalan eşleşme açıklamaları',
+      applicationSupport: 'Kalan başvuru desteği',
+      interviewPrep: 'Kalan mülakat hazırlığı',
+      remainingCount: '{{remaining}} / {{limit}}',
+    },
     badges: {
       employer: 'İşveren',
       employerPro: 'İşveren Pro',

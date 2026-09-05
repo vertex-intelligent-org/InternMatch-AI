@@ -28,6 +28,7 @@ import {
 } from '../services/api';
 import { useProfile } from '../context/ProfileContext';
 import haptics from '../services/haptics';
+import { useSubscription } from '../context/SubscriptionProvider';
 
 const MAX_POLL_DURATION_MS = 210000; // 210s: allow background CV extraction to complete before hard timeout
 const POLL_INTERVAL_MS = 1500;
@@ -46,6 +47,20 @@ const getCVJobErrorCode = (jobError) =>
 
 export default function CVUploadScreen({ route, navigation }) {
   const { t } = useTranslation();
+  const {
+    aiUsage,
+    refreshAIUsage,
+  } = useSubscription();
+
+  const cvAnalysisUsage =
+    aiUsage?.features?.find(
+      (feature) =>
+        feature.feature_key ===
+        'cv_analysis'
+    );
+
+  const isCVAnalysisExhausted =
+    cvAnalysisUsage?.remaining === 0;
   const [selectedFile, setSelectedFile] = useState(null);
   const [status, setStatus] = useState('idle'); // 'idle' | 'uploading' | 'queued' | 'processing' | 'pending_confirmation' | 'completed' | 'failed' | 'timeout'
   const [progressPercent, setProgressPercent] = useState(0);
@@ -135,6 +150,35 @@ export default function CVUploadScreen({ route, navigation }) {
   }, [status]);
 
   const pickFileAndUpload = async () => {
+    if (isCVAnalysisExhausted) {
+      try {
+        const latestUsage =
+          await refreshAIUsage();
+
+        const latestCVUsage =
+          latestUsage?.features?.find(
+            (feature) =>
+              feature.feature_key ===
+              'cv_analysis'
+          );
+
+        if (
+          !latestCVUsage ||
+          latestCVUsage.remaining === 0
+        ) {
+          navigation.navigate('Plans');
+          return;
+        }
+      } catch (usageError) {
+        console.warn(
+          'AI usage refresh before CV analysis failed:',
+          usageError
+        );
+        navigation.navigate('Plans');
+        return;
+      }
+    }
+
     clearPolling();
     setErrorMessage(null);
 
@@ -192,6 +236,30 @@ export default function CVUploadScreen({ route, navigation }) {
       scheduleNextPoll(uploadRes.job_id);
     } catch (err) {
       if (!isMountedRef.current) return;
+      if (
+        err?.status === 402 &&
+        err?.code ===
+          'AI_QUOTA_EXCEEDED'
+      ) {
+        setSelectedFile(null);
+        setJobId(null);
+        setProgressPercent(0);
+        setErrorMessage(null);
+        setStatus('idle');
+
+        refreshAIUsage().catch(
+          (usageError) => {
+            console.warn(
+              'AI usage refresh after CV quota response failed:',
+              usageError
+            );
+          }
+        );
+
+        navigation.navigate('Plans');
+        return;
+      }
+
       console.warn('CV upload failed:', err);
       setErrorMessage('CV_UPLOAD_FAILED');
       setStatus('failed');
@@ -257,6 +325,15 @@ export default function CVUploadScreen({ route, navigation }) {
         isPollingRef.current = false;
         scheduleNextPoll(activeJobId);
       } else if (job.status === 'completed') {
+        try {
+          await refreshAIUsage();
+        } catch (usageError) {
+          console.warn(
+            'AI usage refresh after CV completion failed:',
+            usageError
+          );
+        }
+
         // Check requires_confirmation BEFORE normal completed success handling
         if (job.result && job.result.requires_confirmation === true) {
           clearPolling();

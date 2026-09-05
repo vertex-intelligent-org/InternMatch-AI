@@ -821,6 +821,15 @@ export default {
       planCard: 'تفاصيل خطة {{plan}}',
       upgradeButton: 'الترقية إلى خطة {{plan}}',
     },
+    aiUsage: {
+      title: 'استخدام الذكاء الاصطناعي',
+      subtitle: 'تتم إدارة حدود استخدام الذكاء الاصطناعي الحالية حسب خطتك النشطة.',
+      cvAnalysis: 'تحليلات الذكاء الاصطناعي المتبقية',
+      matchExplanation: 'تفسيرات المطابقة المتبقية',
+      applicationSupport: 'مرات دعم التقديم المتبقية',
+      interviewPrep: 'مرات التحضير للمقابلة المتبقية',
+      remainingCount: '{{remaining}} / {{limit}}',
+    },
     badges: {
       employer: 'صاحب عمل',
       employerPro: 'صاحب عمل احترافي',

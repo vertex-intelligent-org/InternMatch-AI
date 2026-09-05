@@ -122,6 +122,7 @@ export function useApplicationGeneration() {
             if (!isMountedRef.current || !isGeneratingRef.current) {
               return;
             }
+
             console.warn('Application generation poll error:', err);
             isPollingRef.current = false;
 
@@ -156,7 +157,12 @@ export function useApplicationGeneration() {
         setIsGenerating(false);
 
         if (err instanceof ApiError) {
-          if (err.status === 404) {
+          if (
+            err.status === 402 &&
+            err.code === 'AI_QUOTA_EXCEEDED'
+          ) {
+            setGenerationError('AI_QUOTA_EXCEEDED');
+          } else if (err.status === 404) {
             setGenerationError('MATCH_NOT_FOUND');
           } else if (err.status === 429) {
             setGenerationError('RATE_LIMITED');
