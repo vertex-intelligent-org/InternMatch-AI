@@ -18,6 +18,7 @@ from app.schemas.match import (
     MatchItemResponse,
     MatchListResponse,
 )
+from app.services.ai_quota import AIQuotaExceededError
 from app.services.match_enqueue import enqueue_match_calculation
 from app.services.match_explanation import get_or_create_match_explanation
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -138,6 +139,9 @@ def get_match_explanation(
             user_id=current_user.user_id,
             content_locale=content_locale,
         )
+    except AIQuotaExceededError:
+        # Global handler emits the machine-readable AI_QUOTA_EXCEEDED contract.
+        raise
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,

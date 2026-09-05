@@ -24,6 +24,12 @@ from app.core.config import settings
 from app.repositories.match import MatchRepository
 from app.repositories.matching_data import MatchingDataRepository
 from app.schemas.interview_prep import InterviewPrepResponse
+from app.services.ai_quota import FEATURE_INTERVIEW_PREP
+from app.services.ai_quota_integration import (
+    release_sync_ai_quota,
+    reserve_sync_ai_quota,
+    settle_sync_ai_quota,
+)
 
 CACHE_VERSION = "v1"
 CACHE_TTL_SECONDS = 60 * 60 * 24 * 30
@@ -313,38 +319,89 @@ STRICT GROUNDING RULES:
         + context_json
     )
 
-    client = genai.Client(
-        api_key=settings.GEMINI_API_KEY,
-    )
+    application_id = getattr(application, "id")
 
-    response = client.models.generate_content(
-        model=settings.LLM_MODEL_NAME,
-        contents=user_content,
-        config=types.GenerateContentConfig(
-            system_instruction=system_prompt,
-            response_mime_type="application/json",
-            response_json_schema=LLMInterviewPrep.model_json_schema(),
+    quota_reservation = reserve_sync_ai_quota(
+        db,
+        user_id=user_id,
+        feature_key=FEATURE_INTERVIEW_PREP,
+        idempotency_key=(
+            f"{FEATURE_INTERVIEW_PREP}:"
+            f"application:{application_id}:{locale}:{context_hash}"
+        ),
+        request_fingerprint=(
+            f"application:{application_id}:{locale}:{context_hash}"
         ),
     )
-
-    raw_text = getattr(response, "text", None)
-
-    if (
-        not isinstance(raw_text, str)
-        or not raw_text.strip()
-    ):
-        raise ValueError(
-            "Gemini returned empty interview preparation."
-        )
+    quota_operation_id = quota_reservation["operation"].id
 
     try:
-        generated = LLMInterviewPrep.model_validate_json(
-            raw_text
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+
+    try:
+        client = genai.Client(
+            api_key=settings.GEMINI_API_KEY,
         )
-    except Exception as exc:
-        raise ValueError(
-            "Gemini returned invalid structured interview preparation."
-        ) from exc
+
+        response = client.models.generate_content(
+            model=settings.LLM_MODEL_NAME,
+            contents=user_content,
+            config=types.GenerateContentConfig(
+                system_instruction=system_prompt,
+                response_mime_type="application/json",
+                response_json_schema=LLMInterviewPrep.model_json_schema(),
+            ),
+        )
+
+        raw_text = getattr(response, "text", None)
+
+        if (
+            not isinstance(raw_text, str)
+            or not raw_text.strip()
+        ):
+            raise ValueError(
+                "Gemini returned empty interview preparation."
+            )
+
+        try:
+            generated = LLMInterviewPrep.model_validate_json(
+                raw_text
+            )
+        except Exception as exc:
+            raise ValueError(
+                "Gemini returned invalid structured interview preparation."
+            ) from exc
+
+    except Exception:
+        db.rollback()
+
+        release_sync_ai_quota(
+            db,
+            operation_id=quota_operation_id,
+            reason="provider_or_validation_failure",
+        )
+        db.commit()
+        raise
+
+    try:
+        settle_sync_ai_quota(
+            db,
+            operation_id=quota_operation_id,
+        )
+        db.commit()
+    except Exception:
+        db.rollback()
+
+        release_sync_ai_quota(
+            db,
+            operation_id=quota_operation_id,
+            reason="settlement_failure",
+        )
+        db.commit()
+        raise
 
     if redis_client is not None:
         try:

@@ -168,3 +168,52 @@ def release_job_ai_quota_if_present(
         operation_id=operation.id,
         reason=reason,
     )
+
+
+
+def reserve_sync_ai_quota(
+    db: Session,
+    *,
+    user_id: UUID,
+    feature_key: str,
+    idempotency_key: str,
+    request_fingerprint: str,
+) -> dict[str, Any]:
+    """Reserve one unit for a synchronous fresh AI generation."""
+
+    return reserve_ai_quota(
+        db,
+        user_id=user_id,
+        feature_key=feature_key,
+        idempotency_key=idempotency_key,
+        request_fingerprint=request_fingerprint,
+        processing_job_id=None,
+    )
+
+
+def settle_sync_ai_quota(
+    db: Session,
+    *,
+    operation_id: UUID,
+) -> dict[str, Any]:
+    """Settle a successful synchronous AI generation exactly once."""
+
+    return settle_ai_quota_operation(
+        db,
+        operation_id=operation_id,
+    )
+
+
+def release_sync_ai_quota(
+    db: Session,
+    *,
+    operation_id: UUID,
+    reason: str,
+) -> dict[str, Any]:
+    """Release an unsuccessful synchronous AI generation."""
+
+    return release_ai_quota_operation(
+        db,
+        operation_id=operation_id,
+        reason=reason,
+    )

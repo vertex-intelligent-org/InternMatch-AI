@@ -26,6 +26,12 @@ from app.schemas.match import (
     MatchExplanationResponse,
     SkillGapAnalysisResponse,
 )
+from app.services.ai_quota import FEATURE_MATCH_EXPLANATION
+from app.services.ai_quota_integration import (
+    release_sync_ai_quota,
+    reserve_sync_ai_quota,
+    settle_sync_ai_quota,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -487,9 +493,8 @@ def get_or_create_match_explanation(
             )
         ]
 
-        explanation = generate_grounded_match_explanation(
-            profile=profile,
-            internship=internship,
+        english_context_hash = compute_match_explanation_context_hash(
+            match_id=match.id,
             overall_score=match.overall_score,
             matching_skills=matching_skills,
             missing_skills=missing_skills,
@@ -497,20 +502,77 @@ def get_or_create_match_explanation(
             education_entries=edu_list,
             experience_entries=exp_list,
             project_entries=proj_list,
-            content_locale="en",
+            candidate_name=profile.full_name,
+            candidate_headline=profile.headline,
+            internship_title=internship.title,
+            internship_company=internship.company,
+            internship_location=(
+                f"{internship.location} ({internship.work_type})"
+            ),
+            internship_description=internship.description,
+            internship_required_skills=internship.required_skills,
+            internship_preferred_skills=internship.preferred_skills,
         )
 
-        # Persist English narrative to DB
-        match.why_you_match = explanation.why_you_match
-        updated_gap = dict(raw_gap)
-        updated_gap["matching_skills"] = matching_skills  # PRESERVED
-        updated_gap["missing_skills"] = missing_skills    # PRESERVED
-        updated_gap["summary"] = explanation.skill_gap_summary
-        updated_gap["recommendations"] = explanation.recommendations
-        match.skill_gap_analysis = updated_gap
+        quota_reservation = reserve_sync_ai_quota(
+            db,
+            user_id=user_id,
+            feature_key=FEATURE_MATCH_EXPLANATION,
+            idempotency_key=(
+                f"{FEATURE_MATCH_EXPLANATION}:"
+                f"match:{match.id}:en:{english_context_hash}"
+            ),
+            request_fingerprint=(
+                f"match:{match.id}:en:{english_context_hash}"
+            ),
+        )
+        quota_operation_id = quota_reservation["operation"].id
 
-        db.commit()
-        db.refresh(match)
+        try:
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
+
+        try:
+            explanation = generate_grounded_match_explanation(
+                profile=profile,
+                internship=internship,
+                overall_score=match.overall_score,
+                matching_skills=matching_skills,
+                missing_skills=missing_skills,
+                candidate_skills=candidate_skills,
+                education_entries=edu_list,
+                experience_entries=exp_list,
+                project_entries=proj_list,
+                content_locale="en",
+            )
+
+            # Persist English narrative and quota settlement atomically.
+            match.why_you_match = explanation.why_you_match
+            updated_gap = dict(raw_gap)
+            updated_gap["matching_skills"] = matching_skills
+            updated_gap["missing_skills"] = missing_skills
+            updated_gap["summary"] = explanation.skill_gap_summary
+            updated_gap["recommendations"] = explanation.recommendations
+            match.skill_gap_analysis = updated_gap
+
+            settle_sync_ai_quota(
+                db,
+                operation_id=quota_operation_id,
+            )
+            db.commit()
+
+        except Exception:
+            db.rollback()
+
+            release_sync_ai_quota(
+                db,
+                operation_id=quota_operation_id,
+                reason="generation_or_persistence_failure",
+            )
+            db.commit()
+            raise
 
         return MatchExplanationResponse(
             match_id=match.id,
@@ -667,7 +729,7 @@ def get_or_create_match_explanation(
             return _build_canonical_english_response()
         raise ValueError("Match explanation service is temporarily unavailable.")
 
-    # D. Lock Winner: Re-check cache once, then generate with Gemini
+    # D. Lock Winner: Re-check cache once before reserving quota.
     try:
         cached_data = client.get(cache_key)
         if cached_data:
@@ -686,7 +748,38 @@ def get_or_create_match_explanation(
                 )
             except Exception:
                 pass
+    except Exception as redis_err:
+        logger.warning(
+            "Redis failure during final localized cache re-check (%s)",
+            type(redis_err).__name__,
+        )
+        if has_valid_english_db_cache:
+            return _build_canonical_english_response()
+        raise ValueError(
+            "Match explanation service is temporarily unavailable."
+        ) from redis_err
 
+    quota_reservation = reserve_sync_ai_quota(
+        db,
+        user_id=user_id,
+        feature_key=FEATURE_MATCH_EXPLANATION,
+        idempotency_key=(
+            f"{FEATURE_MATCH_EXPLANATION}:"
+            f"match:{match.id}:{content_locale}:{context_hash}"
+        ),
+        request_fingerprint=(
+            f"match:{match.id}:{content_locale}:{context_hash}"
+        ),
+    )
+    quota_operation_id = quota_reservation["operation"].id
+
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+
+    try:
         explanation = generate_grounded_match_explanation(
             profile=profile,
             internship=internship,
@@ -700,17 +793,49 @@ def get_or_create_match_explanation(
             content_locale=content_locale,
         )
     except Exception as gen_err:
+        db.rollback()
+
+        release_sync_ai_quota(
+            db,
+            operation_id=quota_operation_id,
+            reason="provider_failure",
+        )
+        db.commit()
+
         logger.warning(
             "Localized match explanation generation failed (%s); storing failure sentinel.",
             type(gen_err).__name__,
         )
         try:
-            client.set(failure_key, "1", ex=FAILURE_SENTINEL_TTL_SECONDS)
+            client.set(
+                failure_key,
+                "1",
+                ex=FAILURE_SENTINEL_TTL_SECONDS,
+            )
         except Exception:
             pass
+
         if has_valid_english_db_cache:
             return _build_canonical_english_response()
+
         return _build_deterministic_fallback_response()
+
+    try:
+        settle_sync_ai_quota(
+            db,
+            operation_id=quota_operation_id,
+        )
+        db.commit()
+    except Exception:
+        db.rollback()
+
+        release_sync_ai_quota(
+            db,
+            operation_id=quota_operation_id,
+            reason="settlement_failure",
+        )
+        db.commit()
+        raise
 
     # E. Store localized narrative in Redis (NO DB MUTATION!)
     payload = LocalizedMatchExplanationPayload(
