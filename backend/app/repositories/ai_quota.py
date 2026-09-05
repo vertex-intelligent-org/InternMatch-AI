@@ -136,6 +136,33 @@ class AIQuotaRepository:
         return db.scalar(stmt)
 
     @staticmethod
+    def get_operation_by_processing_job(
+        db: Session,
+        *,
+        processing_job_id: UUID,
+        feature_key: str,
+        for_update: bool = False,
+    ) -> AIQuotaOperation | None:
+        """Return the newest quota operation linked to one durable AI job."""
+
+        stmt = (
+            select(AIQuotaOperation)
+            .where(
+                AIQuotaOperation.processing_job_id == processing_job_id,
+                AIQuotaOperation.feature_key == feature_key,
+            )
+            .order_by(
+                AIQuotaOperation.created_at.desc(),
+                AIQuotaOperation.id.desc(),
+            )
+        )
+
+        if for_update:
+            stmt = stmt.with_for_update()
+
+        return db.scalar(stmt)
+
+    @staticmethod
     def get_operation_by_id(
         db: Session,
         *,

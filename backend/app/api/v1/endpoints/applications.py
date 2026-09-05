@@ -23,6 +23,11 @@ from app.schemas.application import (
     ApplicationTrackerResponse,
 )
 from app.schemas.interview_prep import InterviewPrepResponse
+from app.services.ai_quota import FEATURE_APPLICATION_SUPPORT
+from app.services.ai_quota_integration import (
+    release_job_ai_quota_if_present,
+    reserve_job_ai_quota,
+)
 from app.services.application_enqueue import enqueue_application_generation
 from app.services.interview_prep import get_or_create_interview_prep
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -182,6 +187,12 @@ def generate_application(
             user_id=current_user.user_id,
             job_type="application_generation",
         )
+        reserve_job_ai_quota(
+            db,
+            user_id=current_user.user_id,
+            feature_key=FEATURE_APPLICATION_SUPPORT,
+            job_id=processing_job.id,
+        )
         db.commit()
     except Exception:
         db.rollback()
@@ -202,6 +213,12 @@ def generate_application(
             processing_job.progress_percent = 100
             processing_job.result = None
             processing_job.error = safe_error
+            release_job_ai_quota_if_present(
+                db,
+                feature_key=FEATURE_APPLICATION_SUPPORT,
+                job_id=processing_job.id,
+                reason="enqueue_failure",
+            )
             db.commit()
         except Exception:
             db.rollback()

@@ -12,6 +12,12 @@ from app.repositories.application import ApplicationRepository
 from app.repositories.match import MatchRepository
 from app.repositories.matching_data import MatchingDataRepository
 from app.repositories.processing_job import ProcessingJobRepository
+from app.services.ai_quota import FEATURE_APPLICATION_SUPPORT
+from app.services.ai_quota_integration import (
+    ensure_job_ai_quota_reserved_if_present,
+    release_job_ai_quota_if_present,
+    settle_job_ai_quota_if_present,
+)
 from app.services.application_generation import generate_grounded_cover_letter
 
 
@@ -77,6 +83,40 @@ def run_application_generation(
 
         # Precondition checks passed for target job
         job_validated = True
+
+        # A successfully completed durable job is idempotent. Never invoke
+        # the AI provider again if RQ delivers the same job more than once.
+        completed_result = (
+            job.result
+            if isinstance(job.result, dict)
+            else {}
+        )
+        if (
+            job.status == "completed"
+            and completed_result.get("application_id")
+        ):
+            return {
+                "job_id": str(norm_job_id),
+                "status": "completed",
+                "application_id": str(
+                    completed_result["application_id"]
+                ),
+            }
+
+        # A retry after worker/provider failure reuses the same durable
+        # operation idempotency key and re-reserves only if it was released.
+        quota_state = ensure_job_ai_quota_reserved_if_present(
+            db,
+            user_id=norm_user_id,
+            feature_key=FEATURE_APPLICATION_SUPPORT,
+            job_id=norm_job_id,
+        )
+
+        if (
+            quota_state is not None
+            and quota_state.get("outcome") == "re_reserved"
+        ):
+            db.commit()
 
         # Transition to processing state
         job.status = "processing"
@@ -149,6 +189,11 @@ def run_application_generation(
         job.error = None
         job.result = {"application_id": str(application.id)}
 
+        settle_job_ai_quota_if_present(
+            db,
+            feature_key=FEATURE_APPLICATION_SUPPORT,
+            job_id=norm_job_id,
+        )
         db.commit()
 
         return {
@@ -174,6 +219,12 @@ def run_application_generation(
                     fail_job.progress_percent = 100
                     fail_job.result = None
                     fail_job.error = "Application generation failed."
+                    release_job_ai_quota_if_present(
+                        fail_db,
+                        feature_key=FEATURE_APPLICATION_SUPPORT,
+                        job_id=norm_job_id,
+                        reason="worker_failure",
+                    )
                     fail_db.commit()
             except Exception:
                 fail_db.rollback()

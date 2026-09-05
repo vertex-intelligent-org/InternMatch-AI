@@ -5,13 +5,16 @@ Authors: Mohammad & Selen (AISS Club — Üsküdar University)
 
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app.api.router import api_router
 from app.api.v1.endpoints.health import HealthResponse, get_liveness
 from app.core.config import settings, validate_production_config
 from app.core.logging import logger
+from app.services.ai_quota import AIQuotaExceededError
+from app.services.ai_quota_integration import format_ai_quota_exceeded_payload
 
 
 @asynccontextmanager
@@ -34,6 +37,19 @@ app = FastAPI(
     redoc_url="/redoc",
     lifespan=lifespan,
 )
+
+
+@app.exception_handler(AIQuotaExceededError)
+async def handle_ai_quota_exceeded(
+    _request: Request,
+    exc: AIQuotaExceededError,
+) -> JSONResponse:
+    """Expose product quota exhaustion separately from abuse rate limiting."""
+
+    return JSONResponse(
+        status_code=402,
+        content=format_ai_quota_exceeded_payload(exc),
+    )
 
 # CORS Configuration
 if settings.cors_origins_list:

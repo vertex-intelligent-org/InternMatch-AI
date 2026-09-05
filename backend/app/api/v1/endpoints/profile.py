@@ -18,6 +18,11 @@ from app.repositories.candidate_profile_write import (
 from app.repositories.matching_data import MatchingDataRepository
 from app.repositories.processing_job import ProcessingJobRepository
 from app.repositories.student_profile import StudentProfileRepository
+from app.services.ai_quota import FEATURE_CV_ANALYSIS
+from app.services.ai_quota_integration import (
+    release_job_ai_quota_if_present,
+    reserve_job_ai_quota,
+)
 from app.services.avatar_storage import (
     MAX_AVATAR_SIZE_BYTES,
     AvatarStorageValidationError,
@@ -338,6 +343,12 @@ async def upload_candidate_cv(
             user_id=current_user.user_id,
             job_type="cv_extraction",
         )
+        reserve_job_ai_quota(
+            db,
+            user_id=current_user.user_id,
+            feature_key=FEATURE_CV_ANALYSIS,
+            job_id=job.id,
+        )
         db.commit()
         db.refresh(job)
     except Exception:
@@ -367,6 +378,12 @@ async def upload_candidate_cv(
             job.progress_percent = 100
             job.result = None
             job.error = "Failed to enqueue CV extraction job."
+            release_job_ai_quota_if_present(
+                db,
+                feature_key=FEATURE_CV_ANALYSIS,
+                job_id=job.id,
+                reason="enqueue_failure",
+            )
             db.commit()
         except Exception:
             db.rollback()
@@ -457,6 +474,12 @@ def cancel_cv_analysis(
     job.result = updated_result
     job.error = "CV analysis cancelled by user."
 
+    release_job_ai_quota_if_present(
+        db,
+        feature_key=FEATURE_CV_ANALYSIS,
+        job_id=job.id,
+        reason="user_cancelled",
+    )
     db.commit()
 
     return CVCancelResponse(job_id=job.id)

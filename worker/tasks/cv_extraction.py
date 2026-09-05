@@ -14,6 +14,12 @@ from app.repositories.candidate_profile_write import (
 )
 from app.repositories.processing_job import ProcessingJobRepository
 from app.repositories.student_profile import StudentProfileRepository
+from app.services.ai_quota import FEATURE_CV_ANALYSIS
+from app.services.ai_quota_integration import (
+    ensure_job_ai_quota_reserved_if_present,
+    release_job_ai_quota_if_present,
+    settle_job_ai_quota_if_present,
+)
 from app.services.candidate_embedding import (
     generate_and_persist_candidate_embedding,
 )
@@ -173,8 +179,49 @@ def run_cv_extraction(
         # Precondition checks passed for target job
         job_validated = True
 
+        # A completed durable job must never invoke CV AI extraction again.
+        completed_result = (
+            job.result
+            if isinstance(job.result, dict)
+            else {}
+        )
+        if job.status == "completed":
+            if completed_result.get("requires_confirmation") is True:
+                return {
+                    "job_id": str(norm_job_id),
+                    "status": "completed",
+                    "requires_confirmation": True,
+                }
+
+            if completed_result.get("profile_id"):
+                return {
+                    "job_id": str(norm_job_id),
+                    "status": "completed",
+                    "profile_id": str(
+                        completed_result["profile_id"]
+                    ),
+                }
+
+        # Check cancellation before a released retry can reserve capacity.
+        _raise_if_cancel_requested(
+            norm_job_id,
+            norm_user_id,
+        )
+
+        quota_state = ensure_job_ai_quota_reserved_if_present(
+            db,
+            user_id=norm_user_id,
+            feature_key=FEATURE_CV_ANALYSIS,
+            job_id=norm_job_id,
+        )
+
+        if (
+            quota_state is not None
+            and quota_state.get("outcome") == "re_reserved"
+        ):
+            db.commit()
+
         # Publish the first visible processing checkpoint separately.
-        _raise_if_cancel_requested(norm_job_id, norm_user_id)
         _publish_progress(norm_job_id, 10)
 
         # Step 1: Download private CV object from storage
@@ -293,6 +340,11 @@ def run_cv_extraction(
                 "cv_storage_path": clean_path,
                 "extracted_profile": extracted_profile.model_dump(mode="json"),
             }
+            settle_job_ai_quota_if_present(
+                db,
+                feature_key=FEATURE_CV_ANALYSIS,
+                job_id=norm_job_id,
+            )
             db.commit()
 
             return {
@@ -339,6 +391,11 @@ def run_cv_extraction(
             "profile_id": str(profile.id),
         }
 
+        settle_job_ai_quota_if_present(
+            db,
+            feature_key=FEATURE_CV_ANALYSIS,
+            job_id=norm_job_id,
+        )
         db.commit()
 
         # Start initial match calculation after the completed CV/profile transaction.
@@ -383,6 +440,21 @@ def run_cv_extraction(
         }
     except CVExtractionCancelled:
         db.rollback()
+
+        # HTTP cancellation normally releases the reservation in the same
+        # transaction as the durable cancellation marker. This is an
+        # idempotent worker-side safety release for races/replays.
+        try:
+            release_job_ai_quota_if_present(
+                db,
+                feature_key=FEATURE_CV_ANALYSIS,
+                job_id=norm_job_id,
+                reason="user_cancelled",
+            )
+            db.commit()
+        except Exception:
+            db.rollback()
+
         return {
             "job_id": str(norm_job_id),
             "status": "cancelled",
@@ -414,6 +486,13 @@ def run_cv_extraction(
                         )
                     else:
                         fail_job.error = "CV processing failed."
+
+                    release_job_ai_quota_if_present(
+                        fail_db,
+                        feature_key=FEATURE_CV_ANALYSIS,
+                        job_id=norm_job_id,
+                        reason="worker_failure",
+                    )
                     fail_db.commit()
             except Exception:
                 fail_db.rollback()
