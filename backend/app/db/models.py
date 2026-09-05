@@ -595,6 +595,119 @@ class AIQuotaPeriod(Base):
     )
 
 
+class AIQuotaOperation(Base):
+    """Durable lifecycle ledger for one quota-controlled AI operation."""
+
+    __tablename__ = "ai_quota_operations"
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id",
+            "feature_key",
+            "period_start",
+            "idempotency_key",
+            name="uq_ai_quota_operations_idempotency",
+        ),
+        CheckConstraint(
+            "feature_key IN ("
+            "'cv_analysis', "
+            "'match_explanation', "
+            "'application_support', "
+            "'interview_prep'"
+            ")",
+            name="ck_ai_quota_operations_feature_key",
+        ),
+        CheckConstraint(
+            "plan_key IN ('free', 'pro_student')",
+            name="ck_ai_quota_operations_plan_key",
+        ),
+        CheckConstraint(
+            "status IN ('reserved', 'settled', 'released')",
+            name="ck_ai_quota_operations_status",
+        ),
+        CheckConstraint(
+            "period_end > period_start",
+            name="ck_ai_quota_operations_period",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid4,
+    )
+    user_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        nullable=False,
+        index=True,
+    )
+    feature_key: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+    )
+    plan_key: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+    )
+    period_start: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+    )
+    period_end: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+    )
+    idempotency_key: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+    )
+    request_fingerprint: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+    )
+    status: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+        default="reserved",
+    )
+    processing_job_id: Mapped[Optional[UUID]] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey(
+            "processing_jobs.id",
+            ondelete="SET NULL",
+        ),
+        nullable=True,
+        index=True,
+    )
+    reserved_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+    settled_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    released_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    release_reason: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+
 class RevenueCatWebhookEvent(Base):
     """Minimal RevenueCat event ledger used for idempotent webhook processing."""
 

@@ -1,5 +1,6 @@
 """Shared SQLite test database infrastructure."""
 from app.db.models import (  # noqa: F401
+    AIQuotaOperation,
     AIQuotaPeriod,
     Application,
     ApplicationStatusEvent,
