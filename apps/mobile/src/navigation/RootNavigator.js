@@ -30,7 +30,10 @@ import {
   isPasswordRecoveryUrl,
   consumePasswordRecoveryUrl,
 } from '../services/passwordRecovery';
-import { EMAIL_CONFIRMATION_REDIRECT_URL } from '../services/auth';
+import {
+  EMAIL_CONFIRMATION_REDIRECT_URL,
+  establishSessionFromAuthCallbackUrl,
+} from '../services/auth';
 import { useProfile } from '../context/ProfileContext';
 
 const Stack = createNativeStackNavigator();
@@ -55,7 +58,7 @@ export default function RootNavigator() {
   const currentProcessingIdRef = useRef(0);
   const { clearProfile } = useProfile();
   const [initialRecoveryParams, setInitialRecoveryParams] = useState(null);
-  const [initialEmailConfirmed, setInitialEmailConfirmed] = useState(false);
+  const [initialEmailConfirmationResult, setInitialEmailConfirmationResult] = useState(null);
   const [initialUrlResolved, setInitialUrlResolved] = useState(false);
 
   const handleIncomingUrl = useCallback(async (url, navigate = true) => {
@@ -72,33 +75,64 @@ export default function RootNavigator() {
     lastProcessedUrlRef.current = url;
 
     if (isConfirmationUrl) {
-      if (!navigate) {
-        return { emailConfirmed: true };
+      const processingId = ++currentProcessingIdRef.current;
+      let sessionEstablished = false;
+
+      try {
+        sessionEstablished =
+          await establishSessionFromAuthCallbackUrl(url);
+      } catch {
+        sessionEstablished = false;
       }
 
-      const navigateToSignIn = () => {
+      if (processingId !== currentProcessingIdRef.current) {
+        return;
+      }
+
+      if (sessionEstablished) {
+        clearProfile();
+      }
+
+      const confirmationResult = {
+        emailConfirmed: true,
+        sessionEstablished,
+      };
+
+      if (!navigate) {
+        return confirmationResult;
+      }
+
+      const destination =
+        sessionEstablished
+          ? 'Splash'
+          : 'SignIn';
+
+      const navigateToDestination = () => {
         if (navigationRef.isReady()) {
           navigationRef.reset({
             index: 0,
-            routes: [{ name: 'SignIn' }],
+            routes: [{ name: destination }],
           });
         }
       };
 
       if (navigationRef.isReady()) {
-        navigateToSignIn();
+        navigateToDestination();
       } else {
         const intervalId = setInterval(() => {
           if (navigationRef.isReady()) {
             clearInterval(intervalId);
-            navigateToSignIn();
+            navigateToDestination();
           }
         }, 50);
 
-        setTimeout(() => clearInterval(intervalId), 4000);
+        setTimeout(
+          () => clearInterval(intervalId),
+          4000
+        );
       }
 
-      return { emailConfirmed: true };
+      return confirmationResult;
     }
 
     const processingId = ++currentProcessingIdRef.current;
@@ -193,7 +227,7 @@ export default function RootNavigator() {
           const result = await handleIncomingUrl(initialUrl, false);
 
           if (isMounted && result?.emailConfirmed === true) {
-            setInitialEmailConfirmed(true);
+            setInitialEmailConfirmationResult(result);
           }
         }
       })
@@ -226,14 +260,14 @@ export default function RootNavigator() {
       ref={navigationRef}
       onReady={() => {
         setInitialRecoveryParams(null);
-        setInitialEmailConfirmed(false);
+        setInitialEmailConfirmationResult(null);
       }}
     >
       <Stack.Navigator
         initialRouteName={
           initialRecoveryParams
             ? 'ResetPassword'
-            : initialEmailConfirmed
+            : initialEmailConfirmationResult?.sessionEstablished === false
               ? 'SignIn'
               : 'Splash'
         }

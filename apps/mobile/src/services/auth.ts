@@ -7,6 +7,114 @@ import { supabase } from '../lib/supabase';
 
 export const EMAIL_CONFIRMATION_REDIRECT_URL = 'internmatch://auth-confirmed';
 
+function decodeAuthCallbackValue(value: string): string {
+  try {
+    return decodeURIComponent(value.replace(/\+/g, ' '));
+  } catch {
+    return value;
+  }
+}
+
+function extractAuthCallbackParams(url: string): Record<string, string> {
+  const params: Record<string, string> = {};
+  const queryIndex = url.indexOf('?');
+  const hashIndex = url.indexOf('#');
+  const segments: string[] = [];
+
+  if (queryIndex >= 0) {
+    const queryEnd =
+      hashIndex > queryIndex ? hashIndex : url.length;
+
+    segments.push(
+      url.slice(queryIndex + 1, queryEnd)
+    );
+  }
+
+  if (hashIndex >= 0) {
+    segments.push(
+      url.slice(hashIndex + 1)
+    );
+  }
+
+  for (const segment of segments) {
+    for (const pair of segment.split('&')) {
+      if (!pair) continue;
+
+      const separatorIndex = pair.indexOf('=');
+
+      const rawKey =
+        separatorIndex >= 0
+          ? pair.slice(0, separatorIndex)
+          : pair;
+
+      const rawValue =
+        separatorIndex >= 0
+          ? pair.slice(separatorIndex + 1)
+          : '';
+
+      const key = decodeAuthCallbackValue(rawKey);
+
+      if (key && !params[key]) {
+        params[key] = decodeAuthCallbackValue(rawValue);
+      }
+    }
+  }
+
+  return params;
+}
+
+/**
+ * Establish a persisted Supabase session from a native auth callback.
+ * Supports implicit access/refresh tokens and PKCE authorization codes.
+ * Never logs or persists callback URLs or raw credentials.
+ */
+export async function establishSessionFromAuthCallbackUrl(
+  url: string
+): Promise<boolean> {
+  if (!url || typeof url !== 'string') {
+    return false;
+  }
+
+  const params = extractAuthCallbackParams(url.trim());
+
+  if (params.error || params.error_description) {
+    return false;
+  }
+
+  const accessToken = params.access_token;
+  const refreshToken = params.refresh_token;
+
+  if (accessToken || refreshToken) {
+    if (!accessToken || !refreshToken) {
+      return false;
+    }
+
+    const { data, error } = await supabase.auth.setSession({
+      access_token: accessToken,
+      refresh_token: refreshToken,
+    });
+
+    return (
+      !error &&
+      Boolean(data.session?.access_token)
+    );
+  }
+
+  if (params.code) {
+    const { data, error } =
+      await supabase.auth.exchangeCodeForSession(
+        params.code
+      );
+
+    return (
+      !error &&
+      Boolean(data.session?.access_token)
+    );
+  }
+
+  return false;
+}
+
 export type SignUpMetadata = {
   full_name?: string;
   department?: string;
