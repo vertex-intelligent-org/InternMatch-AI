@@ -548,7 +548,13 @@ export default function SignInScreen({ navigation, route }) {
                 style={styles.appleAuthButton}
                 onPress={handleApple}
               />
-            ) : null}
+            ) : (
+              <SocialAuthButton
+                provider="apple"
+                onPress={handleApple}
+                style={{ marginTop: spacing.md }}
+              />
+            )}
 
             {/* Legal Footer inside Panel */}
             <View style={styles.legalFooter}>
