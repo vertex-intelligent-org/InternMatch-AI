@@ -250,9 +250,21 @@ export default function SignUpScreen({ navigation }) {
                     accountType === 'intern' ? styles.typeCardActive : styles.typeCardInactive,
                   ]}
                   onPress={() => setAccountType('intern')}
-                  scaleTo={motionTokens.scales.chipPressed}
-                  activeOpacity={motionTokens.opacities.pressed}
-                  haptic="selection"
+                  scaleTo={
+                    accountType === 'intern'
+                      ? 1
+                      : motionTokens.scales.chipPressed
+                  }
+                  activeOpacity={
+                    accountType === 'intern'
+                      ? 1
+                      : motionTokens.opacities.pressed
+                  }
+                  haptic={
+                    accountType === 'intern'
+                      ? 'none'
+                      : 'selection'
+                  }
                   accessibilityRole="radio"
                   accessibilityState={{ selected: accountType === 'intern' }}
                   accessibilityLabel={`${t('auth.accountType')}: ${t('auth.intern')}`}
@@ -284,9 +296,21 @@ export default function SignUpScreen({ navigation }) {
                     accountType === 'employer' ? styles.typeCardActive : styles.typeCardInactive,
                   ]}
                   onPress={() => setAccountType('employer')}
-                  scaleTo={motionTokens.scales.chipPressed}
-                  activeOpacity={motionTokens.opacities.pressed}
-                  haptic="selection"
+                  scaleTo={
+                    accountType === 'employer'
+                      ? 1
+                      : motionTokens.scales.chipPressed
+                  }
+                  activeOpacity={
+                    accountType === 'employer'
+                      ? 1
+                      : motionTokens.opacities.pressed
+                  }
+                  haptic={
+                    accountType === 'employer'
+                      ? 'none'
+                      : 'selection'
+                  }
                   accessibilityRole="radio"
                   accessibilityState={{ selected: accountType === 'employer' }}
                   accessibilityLabel={`${t('auth.accountType')}: ${t('auth.employer')}`}
@@ -535,15 +559,11 @@ const styles = StyleSheet.create({
     borderRadius: spacing.radii.md,
     borderWidth: 1.5,
     paddingHorizontal: spacing.md,
+    overflow: 'hidden',
   },
   typeCardActive: {
     backgroundColor: 'rgba(14, 116, 144, 0.12)',
     borderColor: colors.accent || colors.teal,
-    shadowColor: colors.accent || colors.teal,
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.12,
-    shadowRadius: 3,
-    elevation: 1,
   },
   typeCardInactive: {
     backgroundColor: 'rgba(255, 255, 255, 0.70)',
