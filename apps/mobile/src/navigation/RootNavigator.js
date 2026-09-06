@@ -31,7 +31,8 @@ import {
   consumePasswordRecoveryUrl,
 } from '../services/passwordRecovery';
 import {
-  EMAIL_CONFIRMATION_REDIRECT_URL,
+  EMAIL_CONFIRMATION_NATIVE_REDIRECT_URL,
+  EMAIL_CONFIRMATION_WEB_REDIRECT_URL,
   establishSessionFromAuthCallbackUrl,
 } from '../services/auth';
 import { useProfile } from '../context/ProfileContext';
@@ -44,12 +45,17 @@ function isEmailConfirmationUrl(url) {
   if (!url || typeof url !== 'string') return false;
 
   const normalizedUrl = url.trim().toLowerCase();
-  const expectedUrl = EMAIL_CONFIRMATION_REDIRECT_URL.toLowerCase();
 
-  return (
-    normalizedUrl === expectedUrl ||
-    normalizedUrl.startsWith(`${expectedUrl}?`) ||
-    normalizedUrl.startsWith(`${expectedUrl}#`)
+  const expectedUrls = [
+    EMAIL_CONFIRMATION_NATIVE_REDIRECT_URL,
+    EMAIL_CONFIRMATION_WEB_REDIRECT_URL,
+  ].map((value) => value.toLowerCase());
+
+  return expectedUrls.some(
+    (expectedUrl) =>
+      normalizedUrl === expectedUrl ||
+      normalizedUrl.startsWith(`${expectedUrl}?`) ||
+      normalizedUrl.startsWith(`${expectedUrl}#`)
   );
 }
 

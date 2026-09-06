@@ -1,6 +1,15 @@
 import { supabase } from '../lib/supabase';
 
-export const PASSWORD_RESET_REDIRECT_URL = 'internmatch://reset-password';
+export const PASSWORD_RESET_NATIVE_REDIRECT_URL =
+  'internmatch://reset-password';
+
+export const PASSWORD_RESET_WEB_REDIRECT_URL =
+  'https://internmatch.college/auth/reset-password';
+
+export const PASSWORD_RESET_REDIRECT_URL =
+  __DEV__
+    ? PASSWORD_RESET_NATIVE_REDIRECT_URL
+    : PASSWORD_RESET_WEB_REDIRECT_URL;
 
 export type PasswordRecoveryStatus =
   | 'not_recovery'
@@ -22,26 +31,23 @@ export function isPasswordRecoveryUrl(url: string | null | undefined): boolean {
     return false;
   }
 
-  const trimmed = url.trim();
-  if (!trimmed) {
+  const normalizedUrl = url.trim().toLowerCase();
+
+  if (!normalizedUrl) {
     return false;
   }
 
-  // Scheme must be internmatch:
-  if (!/^internmatch:\/{2,3}(?!\/)/i.test(trimmed)) {
-    return false;
-  }
+  const expectedUrls = [
+    PASSWORD_RESET_NATIVE_REDIRECT_URL,
+    PASSWORD_RESET_WEB_REDIRECT_URL,
+  ].map((value) => value.toLowerCase());
 
-  try {
-    // Strip scheme prefix (handling 2 or 3 slashes)
-    const withoutScheme = trimmed.replace(/^internmatch:\/{2,3}(?!\/)/i, '');
-    const [pathPart] = withoutScheme.split(/[?#]/);
-    const normalizedPath = pathPart.replace(/^\/+|\/+$/g, '').toLowerCase();
-
-    return normalizedPath === 'reset-password';
-  } catch {
-    return false;
-  }
+  return expectedUrls.some(
+    (expectedUrl) =>
+      normalizedUrl === expectedUrl ||
+      normalizedUrl.startsWith(`${expectedUrl}?`) ||
+      normalizedUrl.startsWith(`${expectedUrl}#`)
+  );
 }
 
 /**

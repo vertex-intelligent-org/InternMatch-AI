@@ -5,7 +5,16 @@ import {
 } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 
-export const EMAIL_CONFIRMATION_REDIRECT_URL = 'internmatch://auth-confirmed';
+export const EMAIL_CONFIRMATION_NATIVE_REDIRECT_URL =
+  'internmatch://auth-confirmed';
+
+export const EMAIL_CONFIRMATION_WEB_REDIRECT_URL =
+  'https://internmatch.college/auth/confirmed';
+
+export const EMAIL_CONFIRMATION_REDIRECT_URL =
+  __DEV__
+    ? EMAIL_CONFIRMATION_NATIVE_REDIRECT_URL
+    : EMAIL_CONFIRMATION_WEB_REDIRECT_URL;
 
 function decodeAuthCallbackValue(value: string): string {
   try {

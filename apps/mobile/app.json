@@ -10,7 +10,29 @@
       "android"
     ],
     "android": {
-      "package": "com.aissclub.internmatchai"
+      "package": "com.aissclub.internmatchai",
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "internmatch.college",
+              "pathPrefix": "/auth/confirmed"
+            },
+            {
+              "scheme": "https",
+              "host": "internmatch.college",
+              "pathPrefix": "/auth/reset-password"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
+      ]
     },
     "plugins": [
       "expo-asset",
