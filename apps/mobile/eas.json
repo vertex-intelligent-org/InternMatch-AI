@@ -13,6 +13,19 @@
       "android": {
         "buildType": "apk"
       }
+    },
+    "production": {
+      "environment": "production",
+      "autoIncrement": true,
+      "android": {
+        "buildType": "app-bundle"
+      },
+      "env": {
+        "APP_VARIANT": "production"
+      }
     }
+  },
+  "cli": {
+    "appVersionSource": "remote"
   }
 }
