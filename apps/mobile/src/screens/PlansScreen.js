@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -79,6 +79,12 @@ export default function PlansScreen({ navigation }) {
     purchaseState?.purchasesAvailable === true
   );
 
+  const purchaseFlowInFlightRef = useRef(false);
+  const [isPurchaseFlowPending, setIsPurchaseFlowPending] = useState(false);
+
+  const isPurchaseFlowBusy =
+    isPurchasing || isPurchaseFlowPending;
+
   const handleEmployerUpgrade = useCallback((planTitle) => {
     haptics.selection();
     Alert.alert(
@@ -89,73 +95,89 @@ export default function PlansScreen({ navigation }) {
   }, [t]);
 
   const handleCandidateUpgrade = useCallback(async () => {
-    if (isPurchasing || isRestoring || !isPurchaseReady) return;
+    if (
+      purchaseFlowInFlightRef.current ||
+      isPurchasing ||
+      isRestoring ||
+      !isPurchaseReady
+    ) {
+      return;
+    }
+
+    purchaseFlowInFlightRef.current = true;
+    setIsPurchaseFlowPending(true);
     haptics.selection();
 
-    let result;
     try {
-      result = await purchaseProStudent();
-    } catch {
-      Alert.alert(
-        t('plans.purchaseFailed.title'),
-        t('plans.purchaseFailed.message'),
-        [{ text: t('common.close', { defaultValue: 'OK' }), style: 'default' }]
-      );
-      return;
-    }
-
-    if (result.reason === 'identity_changed') {
-      return;
-    }
-
-    if (result.success) {
-      let reconciliation;
+      let result;
 
       try {
-        reconciliation = await reconcileSubscription();
+        result = await purchaseProStudent();
       } catch {
         Alert.alert(
-          t('plans.pendingVerification.title'),
-          t('plans.pendingVerification.message'),
+          t('plans.purchaseFailed.title'),
+          t('plans.purchaseFailed.message'),
           [{ text: t('common.close', { defaultValue: 'OK' }), style: 'default' }]
         );
         return;
       }
 
-      const backendConfirmedPro =
-        reconciliation?.subscription?.plan === 'pro_student' &&
-        reconciliation?.subscription?.is_active === true;
+      if (result.reason === 'identity_changed') {
+        return;
+      }
 
-      if (!backendConfirmedPro) {
+      if (result.success) {
+        let reconciliation;
+
+        try {
+          reconciliation = await reconcileSubscription();
+        } catch {
+          Alert.alert(
+            t('plans.pendingVerification.title'),
+            t('plans.pendingVerification.message'),
+            [{ text: t('common.close', { defaultValue: 'OK' }), style: 'default' }]
+          );
+          return;
+        }
+
+        const backendConfirmedPro =
+          reconciliation?.subscription?.plan === 'pro_student' &&
+          reconciliation?.subscription?.is_active === true;
+
+        if (!backendConfirmedPro) {
+          Alert.alert(
+            t('plans.pendingVerification.title'),
+            t('plans.pendingVerification.message'),
+            [{ text: t('common.close', { defaultValue: 'OK' }), style: 'default' }]
+          );
+          return;
+        }
+
+        haptics.success();
+        Alert.alert(
+          t('plans.purchaseSuccess.title'),
+          t('plans.purchaseSuccess.message'),
+          [{ text: t('common.close', { defaultValue: 'OK' }), style: 'default' }]
+        );
+      } else if (result.cancelled) {
+        // Quiet dismissal for user cancellation
+      } else if (result.reason === 'entitlement_not_active') {
         Alert.alert(
           t('plans.pendingVerification.title'),
           t('plans.pendingVerification.message'),
           [{ text: t('common.close', { defaultValue: 'OK' }), style: 'default' }]
         );
-        return;
+      } else {
+        haptics.selection();
+        Alert.alert(
+          t('plans.purchaseFailed.title'),
+          t('plans.purchaseFailed.message'),
+          [{ text: t('common.close', { defaultValue: 'OK' }), style: 'default' }]
+        );
       }
-
-      haptics.success();
-      Alert.alert(
-        t('plans.purchaseSuccess.title'),
-        t('plans.purchaseSuccess.message'),
-        [{ text: t('common.close', { defaultValue: 'OK' }), style: 'default' }]
-      );
-    } else if (result.cancelled) {
-      // Quiet dismissal for user cancellation
-    } else if (result.reason === 'entitlement_not_active') {
-      Alert.alert(
-        t('plans.pendingVerification.title'),
-        t('plans.pendingVerification.message'),
-        [{ text: t('common.close', { defaultValue: 'OK' }), style: 'default' }]
-      );
-    } else {
-      haptics.selection();
-      Alert.alert(
-        t('plans.purchaseFailed.title'),
-        t('plans.purchaseFailed.message'),
-        [{ text: t('common.close', { defaultValue: 'OK' }), style: 'default' }]
-      );
+    } finally {
+      purchaseFlowInFlightRef.current = false;
+      setIsPurchaseFlowPending(false);
     }
   }, [
     isPurchasing,
@@ -167,7 +189,13 @@ export default function PlansScreen({ navigation }) {
   ]);
 
   const handleRestore = useCallback(async () => {
-    if (isPurchasing || isRestoring) return;
+    if (
+      purchaseFlowInFlightRef.current ||
+      isPurchasing ||
+      isRestoring
+    ) {
+      return;
+    }
     haptics.selection();
 
     let result;
@@ -512,13 +540,14 @@ export default function PlansScreen({ navigation }) {
                   ) : plan.id === 'pro_student' ? (
                     <GradientButton
                       title={
-                        isPurchasing
+                        isPurchaseFlowBusy
                           ? t('plans.purchasing')
                           : t('plans.upgradeCta')
                       }
                       onPress={handleCandidateUpgrade}
                       color={colors.primaryBlue}
-                      disabled={isPurchasing || isRestoring || !isPurchaseReady}
+                      disabled={isPurchaseFlowBusy || isRestoring || !isPurchaseReady}
+                      loading={isPurchaseFlowBusy}
                       accessibilityLabel={t('plans.accessibility.upgradeButton', {
                         plan: planTitle,
                       })}

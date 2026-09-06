@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 import Purchases, {
   CustomerInfo,
   PurchasesOfferings,
@@ -61,12 +62,39 @@ let currentIdentifiedUserId: string | null = null;
 let configurationReason: string | null = null;
 let lastResolvedPackage: PurchasesPackage | null = null;
 
+function normalizePublicApiKey(
+  value: string | undefined
+): string {
+  return typeof value === 'string'
+    ? value.trim()
+    : '';
+}
+
 function getPublicApiKey(): string {
-  const rawKey = process.env.EXPO_PUBLIC_REVENUECAT_API_KEY;
-  if (typeof rawKey === 'string') {
-    return rawKey.trim();
+  const developmentKey = normalizePublicApiKey(
+    process.env.EXPO_PUBLIC_REVENUECAT_API_KEY
+  );
+
+  if (__DEV__ && developmentKey) {
+    return developmentKey;
   }
-  return '';
+
+  const platformKey =
+    Platform.OS === 'ios'
+      ? normalizePublicApiKey(
+          process.env.EXPO_PUBLIC_REVENUECAT_IOS_API_KEY
+        )
+      : Platform.OS === 'android'
+        ? normalizePublicApiKey(
+            process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY
+          )
+        : '';
+
+  if (!platformKey || platformKey.startsWith('test_')) {
+    return '';
+  }
+
+  return platformKey;
 }
 
 /**
@@ -82,6 +110,35 @@ export function isRestorePurchasesSupported(): boolean {
     return false;
   }
   return true;
+}
+
+/**
+ * Matches the canonical Pro Student product across supported stores.
+ *
+ * Test Store and App Store use the canonical product identifier directly.
+ * Modern Google Play subscriptions append the base-plan identifier:
+ * <subscription-id>:<base-plan-id>.
+ */
+export function matchesCanonicalRevenueCatProductIdentifier(
+  productIdentifier: string | null | undefined
+): boolean {
+  const normalizedIdentifier =
+    typeof productIdentifier === 'string'
+      ? productIdentifier.trim()
+      : '';
+
+  if (normalizedIdentifier === REVENUECAT_PRODUCT_ID) {
+    return true;
+  }
+
+  return (
+    Platform.OS === 'android' &&
+    normalizedIdentifier.startsWith(
+      `${REVENUECAT_PRODUCT_ID}:`
+    ) &&
+    normalizedIdentifier.length >
+      REVENUECAT_PRODUCT_ID.length + 1
+  );
 }
 
 /**
@@ -110,7 +167,7 @@ export function resolveCanonicalCandidatePackage(
   for (const pkg of availablePackages) {
     if (
       pkg.identifier === REVENUECAT_MONTHLY_PACKAGE_ID &&
-      pkg.product?.identifier === REVENUECAT_PRODUCT_ID
+      matchesCanonicalRevenueCatProductIdentifier(pkg.product?.identifier)
     ) {
       matchingPackage = pkg;
       break;
@@ -120,7 +177,7 @@ export function resolveCanonicalCandidatePackage(
   if (
     !matchingPackage &&
     offering.monthly?.identifier === REVENUECAT_MONTHLY_PACKAGE_ID &&
-    offering.monthly?.product?.identifier === REVENUECAT_PRODUCT_ID
+    matchesCanonicalRevenueCatProductIdentifier(offering.monthly?.product?.identifier)
   ) {
     matchingPackage = offering.monthly;
   }
@@ -128,7 +185,7 @@ export function resolveCanonicalCandidatePackage(
   if (
     !matchingPackage ||
     matchingPackage.identifier !== REVENUECAT_MONTHLY_PACKAGE_ID ||
-    matchingPackage.product?.identifier !== REVENUECAT_PRODUCT_ID
+    !matchesCanonicalRevenueCatProductIdentifier(matchingPackage.product?.identifier)
   ) {
     return { package: null, reason: 'package_not_found' };
   }
