@@ -24,7 +24,8 @@
             "usesCleartextTraffic": true
           }
         }
-      ]
+      ],
+      "expo-apple-authentication"
     ],
     "extra": {
       "eas": {
@@ -33,7 +34,8 @@
     },
     "owner": "aiss-uskudar",
     "ios": {
-      "bundleIdentifier": "com.aissclub.internmatchai"
+      "bundleIdentifier": "com.aissclub.internmatchai",
+      "usesAppleSignIn": true
     }
   }
 }

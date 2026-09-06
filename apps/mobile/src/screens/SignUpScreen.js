@@ -11,6 +11,7 @@ import {
   Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as AppleAuthentication from 'expo-apple-authentication';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
@@ -25,6 +26,7 @@ import GradientButton from '../components/GradientButton';
 import PressableScale from '../components/PressableScale';
 import motionTokens from '../motion/motionTokens';
 import { signInWithGoogle } from '../services/googleAuth';
+import { signInWithApple } from '../services/appleAuth';
 import { signUpWithEmail, isAuthRateLimitError } from '../services/auth';
 import { syncAuthenticatedUser, upsertProfile } from '../services/api';
 import { useProfile } from '../context/ProfileContext';
@@ -190,8 +192,46 @@ export default function SignUpScreen({ navigation }) {
     }
   };
 
-  const handleApple = () => {
-    Alert.alert(t('auth.appleSignIn'), t('auth.appleNotAvailable'));
+  const handleApple = async () => {
+    if (loading) return;
+
+    setLoading(true);
+
+    try {
+      const result = await signInWithApple({
+        full_name: fullName.trim(),
+        department: department.trim(),
+        account_type: accountType,
+      });
+
+      if (result.cancelled) {
+        return;
+      }
+
+      if (result.unavailable) {
+        Alert.alert(
+          t('auth.appleSignIn'),
+          t('auth.appleNotAvailable')
+        );
+        return;
+      }
+
+      if (!result.session?.access_token) {
+        throw new Error(t('errors.unauthorized'));
+      }
+
+      navigation.replace('Splash');
+    } catch (error) {
+      console.warn('Apple sign-up failed:', error);
+      haptics.error();
+
+      Alert.alert(
+        t('auth.appleSignIn'),
+        t('errors.authSignUpFailed')
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -454,11 +494,19 @@ export default function SignUpScreen({ navigation }) {
               provider="google"
               onPress={handleGoogle}
             />
-            <SocialAuthButton
-              provider="apple"
-              onPress={handleApple}
-              style={{ marginTop: spacing.md }}
-            />
+            {Platform.OS === 'ios' ? (
+              <AppleAuthentication.AppleAuthenticationButton
+                buttonType={
+                  AppleAuthentication.AppleAuthenticationButtonType.SIGN_UP
+                }
+                buttonStyle={
+                  AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
+                }
+                cornerRadius={24}
+                style={styles.appleAuthButton}
+                onPress={handleApple}
+              />
+            ) : null}
 
             {/* Legal Footer inside Panel */}
             <View style={styles.legalFooter}>
@@ -653,4 +701,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
   },
+  appleAuthButton: {
+    width: '100%',
+    height: 48,
+    marginTop: spacing.md,
+  },
+
 });

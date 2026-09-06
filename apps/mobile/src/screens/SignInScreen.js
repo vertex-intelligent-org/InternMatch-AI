@@ -12,6 +12,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as AppleAuthentication from 'expo-apple-authentication';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
@@ -26,6 +27,7 @@ import GradientButton from '../components/GradientButton';
 import PressableScale from '../components/PressableScale';
 import motionTokens from '../motion/motionTokens';
 import { signInWithGoogle } from '../services/googleAuth';
+import { signInWithApple } from '../services/appleAuth';
 import {
   signInWithEmail,
   resendSignupConfirmation,
@@ -268,8 +270,45 @@ export default function SignInScreen({ navigation, route }) {
     }
   };
 
-  const handleApple = () => {
-    Alert.alert(t('auth.appleSignIn'), t('auth.appleNotAvailable'));
+  const handleApple = async () => {
+    if (loading) return;
+
+    setLoading(true);
+    setLoadingSource('apple');
+
+    try {
+      const result = await signInWithApple();
+
+      if (result.cancelled) {
+        return;
+      }
+
+      if (result.unavailable) {
+        Alert.alert(
+          t('auth.appleSignIn'),
+          t('auth.appleNotAvailable')
+        );
+        return;
+      }
+
+      if (!result.session?.access_token) {
+        throw new Error(t('errors.unauthorized'));
+      }
+
+      setPendingConfirmationEmail('');
+      navigation.replace('Splash');
+    } catch (error) {
+      console.warn('Apple sign-in failed:', error);
+      haptics.error();
+
+      Alert.alert(
+        t('auth.appleSignIn'),
+        t('errors.authSignInFailed')
+      );
+    } finally {
+      setLoading(false);
+      setLoadingSource(null);
+    }
   };
 
   const handleForgotPassword = () => {
@@ -497,11 +536,19 @@ export default function SignInScreen({ navigation, route }) {
               onPress={handleGoogle}
             />
 )}
-            <SocialAuthButton
-              provider="apple"
-              onPress={handleApple}
-              style={{ marginTop: spacing.md }}
-            />
+            {Platform.OS === 'ios' ? (
+              <AppleAuthentication.AppleAuthenticationButton
+                buttonType={
+                  AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN
+                }
+                buttonStyle={
+                  AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
+                }
+                cornerRadius={24}
+                style={styles.appleAuthButton}
+                onPress={handleApple}
+              />
+            ) : null}
 
             {/* Legal Footer inside Panel */}
             <View style={styles.legalFooter}>
@@ -734,4 +781,10 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
   },
+  appleAuthButton: {
+    width: '100%',
+    height: 48,
+    marginTop: spacing.md,
+  },
+
 });
