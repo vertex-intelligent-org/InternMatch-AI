@@ -319,40 +319,40 @@ export default function SplashBowArrowAnimation({
             points="0,0 -10,-3.5 -8,0 -10,3.5"
             fill="#FFFFFF"
           />
-          {/* Refined fletching pair 1 */}
+          {/* Refined forward-facing fletching pair 1 */}
           <Line
             x1="-50"
-            y1="0"
+            y1="-4"
             x2="-44"
-            y2="-4"
+            y2="0"
             stroke="rgba(255, 255, 255, 0.9)"
             strokeWidth="1.5"
             strokeLinecap="round"
           />
           <Line
             x1="-50"
-            y1="0"
+            y1="4"
             x2="-44"
-            y2="4"
+            y2="0"
             stroke="rgba(255, 255, 255, 0.9)"
             strokeWidth="1.5"
             strokeLinecap="round"
           />
-          {/* Refined fletching pair 2 */}
+          {/* Refined forward-facing fletching pair 2 */}
           <Line
             x1="-44"
-            y1="0"
+            y1="-4"
             x2="-38"
-            y2="-4"
+            y2="0"
             stroke="rgba(255, 255, 255, 0.9)"
             strokeWidth="1.5"
             strokeLinecap="round"
           />
           <Line
             x1="-44"
-            y1="0"
+            y1="4"
             x2="-38"
-            y2="4"
+            y2="0"
             stroke="rgba(255, 255, 255, 0.9)"
             strokeWidth="1.5"
             strokeLinecap="round"
