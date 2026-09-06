@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { useTranslation } from 'react-i18next';
+import { Alert, useTranslation } from 'react-i18next';
 import { getLocalizedErrorMessage } from '../localization/errorMessages';
 import { useLocalization } from '../localization/LocalizationContext';
 import {
@@ -76,6 +76,23 @@ export default function HomeScreen({ navigation }) {
   } = useMatchCalculation();
   const calculationErrorMessage = calculationError ? getLocalizedErrorMessage({ code: calculationError }, t) : null;
   const matchesErrorMessage = matchesError ? getLocalizedErrorMessage({ code: matchesError }, t) : null;
+
+  const handleStopChecking = useCallback(() => {
+    Alert.alert(
+      t('home.calculation.stopConfirmTitle'),
+      t('home.calculation.stopConfirmMessage'),
+      [
+        {
+          text: t('home.calculation.keepChecking'),
+          style: 'cancel',
+        },
+        {
+          text: t('home.calculation.stop'),
+          onPress: cancelCalculation,
+        },
+      ]
+    );
+  }, [cancelCalculation, t]);
 
   // Derived from real backend profile state
   const hasAnalyzedCV = Boolean(
@@ -540,7 +557,7 @@ export default function HomeScreen({ navigation }) {
                     </View>
                     <TouchableOpacity
                       style={styles.cancelCalcBtn}
-                      onPress={cancelCalculation}
+                      onPress={handleStopChecking}
                       accessibilityRole="button"
                       accessibilityLabel={t('home.calculation.stop')}
                     >

@@ -3,14 +3,18 @@ RQ Match Calculation Task
 Provides background execution boundary for candidate match calculation jobs.
 """
 
+from datetime import datetime, timezone
 from typing import Any, Dict, Union
 from uuid import UUID
 
+from app.db.models import ProcessingJob
 from app.db.session import SessionLocal
 from app.repositories.matching_data import MatchingDataRepository
 from app.repositories.processing_job import ProcessingJobRepository
 from app.services.candidate_embedding import generate_and_persist_candidate_embedding
 from app.services.match_calculation import calculate_and_persist_matches
+from sqlalchemy import update
+from sqlalchemy.engine import Connection
 
 
 def _normalize_uuid(val: Union[UUID, str], param_name: str) -> UUID:
@@ -25,6 +29,39 @@ def _normalize_uuid(val: Union[UUID, str], param_name: str) -> UUID:
     raise ValueError(
         f"Invalid UUID type for {param_name}: expected UUID or str, got {type(val).__name__}"
     )
+
+
+def _publish_progress(
+    connection: Connection | None,
+    job_id: UUID,
+    progress_percent: int,
+) -> None:
+    """Persist a real match-calculation stage without reopening terminal jobs."""
+    if connection is None or progress_percent <= 0 or progress_percent >= 100:
+        return
+
+    try:
+        statement = (
+            update(ProcessingJob)
+            .where(
+                ProcessingJob.id == job_id,
+                ProcessingJob.status == "processing",
+            )
+            .values(
+                progress_percent=progress_percent,
+                updated_at=datetime.now(timezone.utc),
+            )
+        )
+
+        result = connection.execute(statement)
+
+        if result.rowcount == 0:
+            connection.rollback()
+            return
+
+        connection.commit()
+    except Exception:
+        connection.rollback()
 
 
 def run_match_calculation(
@@ -46,6 +83,7 @@ def run_match_calculation(
 
     db = SessionLocal()
     job_validated = False
+    progress_connection: Connection | None = None
 
     try:
         job = ProcessingJobRepository.get_by_id(db, norm_job_id)
@@ -72,7 +110,9 @@ def run_match_calculation(
         job.progress_percent = 10
         job.result = None
         job.error = None
-        db.flush()
+        db.commit()
+
+        progress_connection = db.get_bind().connect()
 
         # Recover a missing cached candidate embedding.
         profile = MatchingDataRepository.get_profile_by_user_id(
@@ -90,6 +130,11 @@ def run_match_calculation(
             db=db,
             user_id=norm_user_id,
             candidate_limit=candidate_limit,
+            progress_callback=lambda progress: _publish_progress(
+                progress_connection,
+                norm_job_id,
+                progress,
+            ),
         )
 
         # Transition to completed state
@@ -130,5 +175,7 @@ def run_match_calculation(
 
         raise
     finally:
+        if progress_connection is not None:
+            progress_connection.close()
         db.close()
 

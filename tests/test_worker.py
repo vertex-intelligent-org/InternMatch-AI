@@ -24,6 +24,7 @@ from app.db.models import (  # noqa: E402
     StudentProfile,
     StudentSkill,
 )
+from app.db.session import Base  # noqa: E402
 from app.repositories.processing_job import ProcessingJobRepository  # noqa: E402
 from app.services.cv_profile_extraction import (  # noqa: E402
     ExtractedCandidateProfile,
@@ -49,7 +50,7 @@ from tasks.example_task import ping_task  # noqa: E402
 from tasks.job_state import update_job_state  # noqa: E402
 from tasks.match_calculation import run_match_calculation  # noqa: E402
 
-from tests.db import TestingSessionLocal  # noqa: E402
+from tests.db import TestingSessionLocal, test_engine  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
@@ -67,6 +68,25 @@ def override_worker_sessionlocal(monkeypatch):
             is_cv=True, confidence=0.95, reason_code="valid_cv"
         ),
     )
+
+
+
+def _clear_worker_test_database() -> None:
+    """Delete worker-test rows in foreign-key-safe dependency order."""
+    with test_engine.begin() as connection:
+        for table in reversed(Base.metadata.sorted_tables):
+            connection.execute(table.delete())
+
+
+@pytest.fixture(autouse=True)
+def clean_worker_database(setup_test_database):
+    """Isolate worker tests that intentionally commit through independent sessions."""
+    _clear_worker_test_database()
+
+    try:
+        yield
+    finally:
+        _clear_worker_test_database()
 
 
 def test_worker_ping_task():
@@ -167,7 +187,7 @@ def test_run_match_calculation_success(monkeypatch):
     fake_matches = ["match1", "match2"]
     monkeypatch.setattr(
         "tasks.match_calculation.calculate_and_persist_matches",
-        lambda db, user_id, candidate_limit: fake_matches,
+        lambda db, user_id, candidate_limit, progress_callback=None: fake_matches,
     )
 
     res = run_match_calculation(job_id=job_id, user_id=user_id, candidate_limit=25)
@@ -203,7 +223,7 @@ def test_run_match_calculation_boundary_call_args(monkeypatch):
 
     calls = []
 
-    def mock_calc(db, user_id, candidate_limit):
+    def mock_calc(db, user_id, candidate_limit, progress_callback=None):
         calls.append((user_id, candidate_limit))
         return ["m1"]
 
@@ -230,7 +250,7 @@ def test_run_match_calculation_default_candidate_limit_is_50(monkeypatch):
 
     limits = []
 
-    def mock_calc(db, user_id, candidate_limit):
+    def mock_calc(db, user_id, candidate_limit, progress_callback=None):
         limits.append(candidate_limit)
         return []
 
@@ -256,7 +276,7 @@ def test_run_match_calculation_accepts_uuid_strings(monkeypatch):
 
     monkeypatch.setattr(
         "tasks.match_calculation.calculate_and_persist_matches",
-        lambda db, user_id, candidate_limit: [],
+        lambda db, user_id, candidate_limit, progress_callback=None: [],
     )
 
     res = run_match_calculation(job_id=str(job_id), user_id=str(user_id))
@@ -404,7 +424,7 @@ def test_run_match_calculation_calculation_exception_rolls_back_and_marks_failed
     finally:
         db.close()
 
-    def mock_failing_calc(db, user_id, candidate_limit):
+    def mock_failing_calc(db, user_id, candidate_limit, progress_callback=None):
         # Perform an uncommitted Match write using supplied session
         uncommitted_match = Match(
             student_id=student_id,
@@ -455,7 +475,7 @@ def test_run_match_calculation_precondition_error_follows_failed_lifecycle(monke
     finally:
         db.close()
 
-    def mock_precondition_calc(db, user_id, candidate_limit):
+    def mock_precondition_calc(db, user_id, candidate_limit, progress_callback=None):
         raise MatchCalculationPreconditionError("Profile summary_embedding missing")
 
     monkeypatch.setattr(
@@ -493,7 +513,7 @@ def test_run_match_calculation_clears_stale_job_result_and_error(monkeypatch):
 
     monkeypatch.setattr(
         "tasks.match_calculation.calculate_and_persist_matches",
-        lambda db, user_id, candidate_limit: ["m1"],
+        lambda db, user_id, candidate_limit, progress_callback=None: ["m1"],
     )
 
     run_match_calculation(job_id=job_id, user_id=user_id)
@@ -529,7 +549,7 @@ def test_run_match_calculation_failure_persists_safe_error_and_hides_raw_excepti
 
     long_msg = "X" * 1500
 
-    def mock_long_error_calc(db, user_id, candidate_limit):
+    def mock_long_error_calc(db, user_id, candidate_limit, progress_callback=None):
         raise RuntimeError(long_msg)
 
     monkeypatch.setattr(

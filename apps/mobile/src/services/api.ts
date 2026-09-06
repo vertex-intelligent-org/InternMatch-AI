@@ -129,9 +129,12 @@ export async function apiRequest<T>(
   }
 
   const contentType = response.headers.get('content-type') ?? '';
-  const payload = contentType.includes('application/json')
-    ? await response.json()
-    : await response.text();
+  const hasNoContent = response.status === 204 || response.status === 205;
+  const payload = hasNoContent
+    ? null
+    : contentType.includes('application/json')
+      ? await response.json()
+      : await response.text();
 
   if (!response.ok) {
     const parsed = extractApiError(

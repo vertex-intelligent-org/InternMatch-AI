@@ -5,6 +5,7 @@ and scoring engine to compute and persist hybrid candidate match records.
 """
 
 import math
+from collections.abc import Callable
 from typing import Any, List, Optional, Sequence, Tuple
 from uuid import UUID
 
@@ -113,6 +114,7 @@ def calculate_and_persist_matches(
     db: Session,
     user_id: UUID,
     candidate_limit: int,
+    progress_callback: Optional[Callable[[int], None]] = None,
 ) -> List[Match]:
     """
     Calculate and persist hybrid matches for candidate identified by user_id.
@@ -143,6 +145,9 @@ def calculate_and_persist_matches(
     # 4. Load candidate skills using authoritative repository method
     candidate_skills = MatchingDataRepository.get_skill_names_for_student(db, profile.id)
 
+    if progress_callback is not None:
+        progress_callback(35)
+
     # 5. Retrieve vector candidates
     candidates = VectorRetrievalRepository.get_nearest_internships(
         db=db,
@@ -150,9 +155,15 @@ def calculate_and_persist_matches(
         limit=candidate_limit,
     )
 
+    if progress_callback is not None:
+        progress_callback(60)
+
     # Pre-fetch existing matches for student to enable fast in-place update
     existing_matches = MatchRepository.get_matches_by_student_id(db, profile.id)
     existing_match_map = {m.internship_id: m for m in existing_matches}
+
+    if progress_callback is not None:
+        progress_callback(75)
 
     current_matches: List[Match] = []
     current_internship_ids: List[UUID] = []

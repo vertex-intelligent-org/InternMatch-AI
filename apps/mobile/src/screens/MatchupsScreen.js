@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
+  Alert,
   View,
   Text,
   StyleSheet,
@@ -60,6 +61,23 @@ export default function MatchupsScreen({ navigation }) {
     startCalculation,
     cancelCalculation,
   } = useMatchCalculation();
+
+  const handleStopChecking = useCallback(() => {
+    Alert.alert(
+      t('matchups.stopConfirmTitle'),
+      t('matchups.stopConfirmMessage'),
+      [
+        {
+          text: t('matchups.keepChecking'),
+          style: 'cancel',
+        },
+        {
+          text: t('matchups.stopChecking'),
+          onPress: cancelCalculation,
+        },
+      ]
+    );
+  }, [cancelCalculation, t]);
 
   const hasAnalyZV = Boolean(
     profile?.cv_url ||
@@ -202,14 +220,14 @@ export default function MatchupsScreen({ navigation }) {
               />
               <Text style={styles.calculatingTitle}>{t('matchups.recalculating')}</Text>
               <Text style={styles.calculatingSubtitle}>
-                {t('matchups.comparingProfile', { percent: progressPercent })}
+                {t('matchups.calculatingSubtitle', { progress: progressPercent })}
               </Text>
               <View style={styles.progressTrack}>
                 <View style={[styles.progressFill, { width: `${progressPercent}%` }]} />
               </View>
               <TouchableOpacity
                 style={styles.cancelCalcBtn}
-                onPress={cancelCalculation}
+                onPress={handleStopChecking}
                 accessibilityRole="button"
                 accessibilityLabel={t('matchups.stopChecking')}
               >
