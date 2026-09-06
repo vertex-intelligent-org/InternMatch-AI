@@ -154,28 +154,17 @@ def run_application_generation(
 
         match, profile, internship = match_record
 
-        # Gather grounded contextual candidate data
-        cand_skills = MatchingDataRepository.get_skill_names_for_student(
-            db, profile.id
+        # Gather the same grounded candidate context in one DB round trip.
+        grounding_context = (
+            MatchingDataRepository.get_ai_grounding_context(
+                db,
+                profile.id,
+            )
         )
-        edu_list = [
-            f"{e.degree} at {e.institution} ({e.start_year or ''}-{e.end_year or ''})"
-            for e in MatchingDataRepository.get_education_for_student(
-                db, profile.id
-            )
-        ]
-        exp_list = [
-            f"{e.role} at {e.company}: {e.description or ''}"
-            for e in MatchingDataRepository.get_experience_for_student(
-                db, profile.id
-            )
-        ]
-        proj_list = [
-            f"{p.title} ({', '.join(p.tech_stack or [])}): {p.description or ''}"
-            for p in MatchingDataRepository.get_projects_for_student(
-                db, profile.id
-            )
-        ]
+        cand_skills = grounding_context["skills"]
+        edu_list = grounding_context["education_entries"]
+        exp_list = grounding_context["experience_entries"]
+        proj_list = grounding_context["project_entries"]
 
         # Call grounded LLM cover-letter generation
         cover_letter = generate_grounded_cover_letter(

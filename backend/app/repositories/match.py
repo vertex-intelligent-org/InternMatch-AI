@@ -57,6 +57,21 @@ class MatchRepository:
         stmt = select(Match).where(Match.student_id == student_id)
         return list(db.scalars(stmt).all())
 
+
+    @staticmethod
+    def get_match_by_student_and_internship(
+        db: Session,
+        *,
+        student_id: UUID,
+        internship_id: UUID,
+    ) -> Match | None:
+        """Fetch one student's match for one internship."""
+        stmt = select(Match).where(
+            Match.student_id == student_id,
+            Match.internship_id == internship_id,
+        )
+        return db.scalar(stmt)
+
     @staticmethod
     def upsert_match(
         db: Session,

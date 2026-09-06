@@ -14,7 +14,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { gradientColors, colors } from '../theme/colors';
 import { getCurrentSession, signOut } from '../services/auth';
-import { syncAuthenticatedUser, upsertProfile, ApiError } from '../services/api';
+import { upsertProfile, ApiError } from '../services/api';
 import { useProfile } from '../context/ProfileContext';
 import useReducedMotion from '../hooks/useReducedMotion';
 import SplashBowArrowAnimation from '../components/motion/SplashBowArrowAnimation';
@@ -143,11 +143,10 @@ export default function SplashScreen({ navigation }) {
           return;
         }
 
-        // Active session exists; sync with backend
-        const syncResult = await syncAuthenticatedUser();
+        // Load the authoritative backend profile once.
+        const existingProfile = await refreshProfile();
 
-        if (syncResult.has_profile) {
-          await refreshProfile();
+        if (existingProfile) {
           if (isMounted) {
             pendingDestinationRef.current = 'MainTabs';
             performNavigationIfReady();

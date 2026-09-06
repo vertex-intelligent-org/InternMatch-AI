@@ -163,18 +163,20 @@ def get_or_create_interview_prep(
         )
     )
 
-    match = next(
-        (
-            candidate_match
-            for candidate_match
-            in MatchRepository.get_matches_by_student_id(
-                db,
-                profile.id,
-            )
-            if candidate_match.internship_id
-            == getattr(internship, "id", None)
-        ),
+    internship_id = getattr(
+        internship,
+        "id",
         None,
+    )
+
+    match = (
+        MatchRepository.get_match_by_student_and_internship(
+            db,
+            student_id=profile.id,
+            internship_id=internship_id,
+        )
+        if internship_id is not None
+        else None
     )
 
     raw_gap = (

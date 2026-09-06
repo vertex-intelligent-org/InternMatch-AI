@@ -587,7 +587,8 @@ def test_processing_job_confirm_lookup_uses_postgres_for_update():
 
     normalized_sql = " ".join(sql.upper().split())
 
-    assert "FOR UPDATE" in normalized_sql
+    assert "FOR NO KEY UPDATE" in normalized_sql
+    assert "FOR UPDATE" not in normalized_sql
     assert "PROCESSING_JOBS.ID" in normalized_sql
     assert "PROCESSING_JOBS.USER_ID" in normalized_sql
     assert str(job_id).upper() in normalized_sql

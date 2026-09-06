@@ -10,6 +10,7 @@ from time import perf_counter
 from typing import Any, Callable, Iterator
 from uuid import UUID
 
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.core.logging import get_logger
@@ -21,6 +22,10 @@ logger = get_logger(__name__)
 PROVIDER_GEMINI = "gemini"
 STATUS_SUCCESS = "success"
 STATUS_ERROR = "error"
+
+# Telemetry is best-effort and must never hold an AI request behind
+# a PostgreSQL row/FK lock for an unbounded amount of time.
+TELEMETRY_LOCK_TIMEOUT_MS = 1500
 
 # Snapshot of Google's standard paid list prices verified 2026-09-05.
 # This is an internal estimate, not an invoice and not Free Tier detection.
@@ -293,6 +298,27 @@ def _sanitize_model(value: Any) -> str:
     return normalized[:255]
 
 
+def _apply_telemetry_lock_timeout(
+    db: Session,
+) -> None:
+    """Bound PostgreSQL lock waits for best-effort telemetry."""
+
+    bind = db.get_bind()
+
+    if (
+        bind is None
+        or bind.dialect.name != "postgresql"
+    ):
+        return
+
+    db.execute(
+        text(
+            "SET LOCAL lock_timeout = "
+            f"'{TELEMETRY_LOCK_TIMEOUT_MS}ms'"
+        )
+    )
+
+
 def _record_provider_event(
     *,
     operation: str,
@@ -333,6 +359,8 @@ def _record_provider_event(
     db = factory()
 
     try:
+        _apply_telemetry_lock_timeout(db)
+
         event = AIUsageEvent(
             user_id=context.user_id,
             processing_job_id=context.processing_job_id,
@@ -380,6 +408,144 @@ def _record_provider_event(
         db.close()
 
 
+
+_TRANSIENT_GEMINI_STATUS_CODES = frozenset(
+    {
+        408,
+        429,
+        500,
+        502,
+        503,
+        504,
+    }
+)
+
+
+def _gemini_model_attempts(
+    primary_model: Any,
+) -> tuple[Any, ...]:
+    """
+    Return the ordered Gemini generation model failover chain.
+
+    The explicitly requested model always remains primary.
+    Fallbacks are only appended for Gemini generation models.
+    """
+    if not isinstance(primary_model, str):
+        return (primary_model,)
+
+    primary = primary_model.strip()
+
+    if not primary:
+        return (primary_model,)
+
+    if not primary.startswith("gemini-"):
+        return (primary,)
+
+    from app.core.config import settings
+
+    raw_fallbacks = getattr(
+        settings,
+        "LLM_FALLBACK_MODEL_NAMES",
+        "",
+    )
+
+    fallback_models = [
+        candidate.strip()
+        for candidate in str(raw_fallbacks).split(",")
+        if candidate.strip()
+    ]
+
+    ordered = []
+
+    for candidate in [
+        primary,
+        *fallback_models,
+    ]:
+        if candidate not in ordered:
+            ordered.append(candidate)
+
+    return tuple(ordered)
+
+
+def _provider_status_code(
+    exc: Exception,
+) -> int | None:
+    """
+    Extract an HTTP-like provider status without depending on
+    one google-genai exception subclass implementation.
+    """
+    candidates = [
+        getattr(exc, "status_code", None),
+        getattr(exc, "code", None),
+    ]
+
+    response = getattr(
+        exc,
+        "response",
+        None,
+    )
+
+    if response is not None:
+        candidates.append(
+            getattr(
+                response,
+                "status_code",
+                None,
+            )
+        )
+
+    for candidate in candidates:
+        if candidate is None:
+            continue
+
+        try:
+            return int(candidate)
+        except (TypeError, ValueError):
+            continue
+
+    return None
+
+
+def _is_transient_gemini_error(
+    exc: Exception,
+) -> bool:
+    return (
+        _provider_status_code(exc)
+        in _TRANSIENT_GEMINI_STATUS_CODES
+    )
+
+
+def _replace_provider_model(
+    args: tuple[Any, ...],
+    kwargs: dict[str, Any],
+    model: Any,
+) -> tuple[
+    tuple[Any, ...],
+    dict[str, Any],
+]:
+    """
+    Preserve the provider call shape while replacing only
+    the model argument for a fallback attempt.
+    """
+    next_args = list(args)
+    next_kwargs = dict(kwargs)
+
+    if "model" in next_kwargs:
+        next_kwargs["model"] = model
+    elif (
+        next_args
+        and isinstance(next_args[0], str)
+    ):
+        next_args[0] = model
+    elif model is not None:
+        next_kwargs["model"] = model
+
+    return (
+        tuple(next_args),
+        next_kwargs,
+    )
+
+
 class _TrackedModelsProxy:
     def __init__(
         self,
@@ -411,44 +577,94 @@ class _TrackedModelsProxy:
             ):
                 model = args[0]
 
-            safe_model = _sanitize_model(model)
-            started = perf_counter()
-
-            try:
-                response = target(
-                    *args,
-                    **kwargs,
+            if name == "generate_content":
+                model_attempts = _gemini_model_attempts(
+                    model
                 )
-            except Exception as exc:
+            else:
+                model_attempts = (model,)
+
+            for attempt_index, attempt_model in enumerate(
+                model_attempts
+            ):
+                call_args, call_kwargs = (
+                    _replace_provider_model(
+                        args,
+                        kwargs,
+                        attempt_model,
+                    )
+                )
+
+                safe_model = _sanitize_model(
+                    attempt_model
+                )
+
+                started = perf_counter()
+
+                try:
+                    response = target(
+                        *call_args,
+                        **call_kwargs,
+                    )
+                except Exception as exc:
+                    latency_ms = round(
+                        (
+                            perf_counter()
+                            - started
+                        )
+                        * 1000
+                    )
+
+                    _record_provider_event(
+                        operation=self._operation,
+                        model=safe_model,
+                        status=STATUS_ERROR,
+                        latency_ms=latency_ms,
+                        response=None,
+                        embedding=embedding,
+                        error=exc,
+                    )
+
+                    has_fallback = (
+                        attempt_index
+                        < len(model_attempts) - 1
+                    )
+
+                    if (
+                        name == "generate_content"
+                        and has_fallback
+                        and _is_transient_gemini_error(
+                            exc
+                        )
+                    ):
+                        continue
+
+                    raise
+
                 latency_ms = round(
-                    (perf_counter() - started) * 1000
+                    (
+                        perf_counter()
+                        - started
+                    )
+                    * 1000
                 )
 
                 _record_provider_event(
                     operation=self._operation,
                     model=safe_model,
-                    status=STATUS_ERROR,
+                    status=STATUS_SUCCESS,
                     latency_ms=latency_ms,
-                    response=None,
+                    response=response,
                     embedding=embedding,
-                    error=exc,
+                    error=None,
                 )
-                raise
 
-            latency_ms = round(
-                (perf_counter() - started) * 1000
+                return response
+
+            raise RuntimeError(
+                "Gemini model attempt chain "
+                "completed without a result."
             )
-
-            _record_provider_event(
-                operation=self._operation,
-                model=safe_model,
-                status=STATUS_SUCCESS,
-                latency_ms=latency_ms,
-                response=response,
-                embedding=embedding,
-            )
-
-            return response
 
         return tracked_call
 

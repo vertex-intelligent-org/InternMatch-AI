@@ -47,7 +47,11 @@ class ProcessingJobRepository:
                 ProcessingJob.id == job_id,
                 ProcessingJob.user_id == user_id,
             )
-            .with_for_update()
+            # PostgreSQL renders this as FOR NO KEY UPDATE. It still
+            # serializes concurrent writers for this ProcessingJob, while
+            # remaining compatible with the KEY SHARE lock required by
+            # AI telemetry foreign-key validation on processing_job_id.
+            .with_for_update(key_share=True)
         )
         return db.scalar(stmt)
 

@@ -32,6 +32,8 @@ import { useSubscription } from '../context/SubscriptionProvider';
 
 const MAX_POLL_DURATION_MS = 210000; // 210s: allow background CV extraction to complete before hard timeout
 const POLL_INTERVAL_MS = 1500;
+const LONG_WAIT_NOTICE_MS = 45000;
+const EXTENDED_WAIT_NOTICE_MS = 90000;
 
 const CV_JOB_ERROR_CODES = {
   'The uploaded document does not appear to be a valid CV or resume. Please upload a valid resume.':
@@ -65,6 +67,7 @@ export default function CVUploadScreen({ route, navigation }) {
   const [status, setStatus] = useState('idle'); // 'idle' | 'uploading' | 'queued' | 'processing' | 'pending_confirmation' | 'completed' | 'failed' | 'timeout'
   const [progressPercent, setProgressPercent] = useState(0);
   const [errorMessage, setErrorMessage] = useState(null);
+  const [delayNoticeStage, setDelayNoticeStage] = useState(0);
   const [jobId, setJobId] = useState(null);
   const [isConfirming, setIsConfirming] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
@@ -149,6 +152,52 @@ export default function CVUploadScreen({ route, navigation }) {
     return clearVisualProgress;
   }, [status]);
 
+  useEffect(() => {
+    if (
+      status !== 'queued' &&
+      status !== 'processing'
+    ) {
+      setDelayNoticeStage(0);
+      return undefined;
+    }
+
+    const updateDelayNotice = () => {
+      if (
+        !isMountedRef.current ||
+        !startTimeRef.current
+      ) {
+        return;
+      }
+
+      const elapsedMs =
+        Date.now() - startTimeRef.current;
+
+      const nextStage =
+        elapsedMs >= EXTENDED_WAIT_NOTICE_MS
+          ? 2
+          : elapsedMs >= LONG_WAIT_NOTICE_MS
+            ? 1
+            : 0;
+
+      setDelayNoticeStage((current) =>
+        current === nextStage
+          ? current
+          : nextStage
+      );
+    };
+
+    updateDelayNotice();
+
+    const delayNoticeTimer = setInterval(
+      updateDelayNotice,
+      1000
+    );
+
+    return () => {
+      clearInterval(delayNoticeTimer);
+    };
+  }, [status]);
+
   const pickFileAndUpload = async () => {
     if (isCVAnalysisExhausted) {
       try {
@@ -197,6 +246,18 @@ export default function CVUploadScreen({ route, navigation }) {
       }
 
       const fileAsset = result.assets[0];
+      const fileUriScheme =
+        typeof fileAsset.uri === 'string' && fileAsset.uri.includes(':')
+          ? fileAsset.uri.split(':')[0]
+          : 'unknown';
+      const fileExtension =
+        typeof fileAsset.name === 'string' && fileAsset.name.includes('.')
+          ? fileAsset.name.split('.').pop()?.toLowerCase()
+          : 'none';
+
+      console.info(
+        `[CV_UPLOAD_DEBUG] asset uriScheme=${fileUriScheme} extension=${fileExtension} mime=${fileAsset.mimeType || 'missing'} size=${fileAsset.size ?? 'unknown'}`
+      );
 
       if (fileAsset.size && fileAsset.size > 10 * 1024 * 1024) {
         Alert.alert(t('cvUpload.fileTooLargeTitle'), t('cvUpload.fileTooLargeMsg'));
@@ -214,6 +275,8 @@ export default function CVUploadScreen({ route, navigation }) {
   };
 
   const startUploadAndPolling = async (fileAsset) => {
+    const uploadStartedAt = Date.now();
+    console.info('[CV_TIMING] upload-start');
     cancelledJobIdRef.current = null;
     setStatus('uploading');
     setProgressPercent(10);
@@ -228,13 +291,21 @@ export default function CVUploadScreen({ route, navigation }) {
 
       if (!isMountedRef.current) return;
 
+      console.info(
+        `[CV_TIMING] upload-accepted duration=${Date.now() - uploadStartedAt}ms`
+      );
+
       setJobId(uploadRes.job_id);
       setStatus('queued');
       setProgressPercent(15);
       startTimeRef.current = Date.now();
+      console.info('[CV_TIMING] analysis-start');
 
       scheduleNextPoll(uploadRes.job_id);
     } catch (err) {
+      console.info(
+        `[CV_TIMING] upload-failed duration=${Date.now() - uploadStartedAt}ms`
+      );
       if (!isMountedRef.current) return;
       if (
         err?.status === 402 &&
@@ -280,6 +351,9 @@ export default function CVUploadScreen({ route, navigation }) {
     if (!isMountedRef.current || isPollingRef.current) return;
 
     if (Date.now() - startTimeRef.current > MAX_POLL_DURATION_MS) {
+      console.info(
+        `[CV_TIMING] timeout elapsed=${Date.now() - startTimeRef.current}ms`
+      );
       setStatus('timeout');
       setErrorMessage('CV_TIMEOUT');
       clearPolling();
@@ -297,6 +371,10 @@ export default function CVUploadScreen({ route, navigation }) {
       ) {
         return;
       }
+
+      console.info(
+        `[CV_TIMING] poll status=${job.status} backendProgress=${Number(job.progress_percent) || 0} elapsed=${Date.now() - startTimeRef.current}ms`
+      );
 
       if (job.status === 'queued') {
         setStatus('queued');
@@ -325,8 +403,16 @@ export default function CVUploadScreen({ route, navigation }) {
         isPollingRef.current = false;
         scheduleNextPoll(activeJobId);
       } else if (job.status === 'completed') {
+        console.info(
+          `[CV_TIMING] job-completed elapsed=${Date.now() - startTimeRef.current}ms`
+        );
+
+        const usageRefreshStartedAt = Date.now();
         try {
           await refreshAIUsage();
+          console.info(
+            `[CV_TIMING] usage-refresh duration=${Date.now() - usageRefreshStartedAt}ms`
+          );
         } catch (usageError) {
           console.warn(
             'AI usage refresh after CV completion failed:',
@@ -336,6 +422,9 @@ export default function CVUploadScreen({ route, navigation }) {
 
         // Check requires_confirmation BEFORE normal completed success handling
         if (job.result && job.result.requires_confirmation === true) {
+          console.info(
+            `[CV_TIMING] requires-confirmation elapsed=${Date.now() - startTimeRef.current}ms`
+          );
           clearPolling();
           setStatus('pending_confirmation');
           setProgressPercent(100);
@@ -346,8 +435,12 @@ export default function CVUploadScreen({ route, navigation }) {
         setProgressPercent(100);
         clearPolling();
 
+        const profileRefreshStartedAt = Date.now();
         try {
           await refreshProfile();
+          console.info(
+            `[CV_TIMING] profile-refresh duration=${Date.now() - profileRefreshStartedAt}ms`
+          );
         } catch (profileErr) {
           // The backend CV job already completed successfully. A temporary
           // local refresh failure must not misrepresent that success.
@@ -355,11 +448,17 @@ export default function CVUploadScreen({ route, navigation }) {
         }
 
         if (isMountedRef.current) {
+          console.info(
+            `[CV_TIMING] ui-completed elapsed=${Date.now() - startTimeRef.current}ms`
+          );
           setErrorMessage(null);
           setStatus('completed');
           haptics.success();
         }
       } else if (job.status === 'failed') {
+        console.info(
+          `[CV_TIMING] job-failed elapsed=${Date.now() - startTimeRef.current}ms`
+        );
         clearPolling();
         setStatus('failed');
         setProgressPercent(100);
@@ -575,8 +674,15 @@ export default function CVUploadScreen({ route, navigation }) {
             </View>
             <Text style={styles.percentText}>{progressPercent}%</Text>
 
-            <Text style={styles.workingNotice}>
-              {t('cvUpload.notice')}
+            <Text
+              style={styles.workingNotice}
+              accessibilityLiveRegion="polite"
+            >
+              {delayNoticeStage >= 2
+                ? t('cvUpload.extendedWaitNotice')
+                : delayNoticeStage === 1
+                  ? t('cvUpload.longWaitNotice')
+                  : t('cvUpload.notice')}
             </Text>
 
             <TouchableOpacity

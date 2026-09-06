@@ -22,6 +22,7 @@ import Reveal from '../components/motion/Reveal';
 import { getMatchExplanation, ApiError } from '../services/api';
 import { useLocalization } from '../localization/LocalizationContext';
 import { useSubscription } from '../context/SubscriptionProvider';
+import useSmoothAIProgress from '../hooks/useSmoothAIProgress';
 
 export default function WhyYouMatchScreen({ route, navigation }) {
   const { t } = useTranslation();
@@ -34,6 +35,13 @@ export default function WhyYouMatchScreen({ route, navigation }) {
 
   const [explanation, setExplanation] = useState(null);
   const [loading, setLoading] = useState(true);
+
+  const aiProgress = useSmoothAIProgress(
+    loading,
+    8,
+    94,
+    18000
+  );
   const [error, setError] = useState(null);
   const [isNotFound, setIsNotFound] = useState(false);
   const requestGenerationRef = useRef(0);
@@ -125,10 +133,31 @@ export default function WhyYouMatchScreen({ route, navigation }) {
         {/* Loading State */}
         {loading && (
           <View style={styles.centerContainer}>
-            <ActivityIndicator size="large" color={colors.accent || colors.teal} />
-            <Text style={styles.loadingText}>{t('whyYouMatch.generating')}</Text>
+            <ActivityIndicator
+              size="large"
+              color={colors.accent || colors.teal}
+            />
+            <Text style={styles.loadingText}>
+              {t('whyYouMatch.generating')}
+            </Text>
             <Text style={styles.loadingSubtext}>
               {t('whyYouMatch.analyzingRequirements')}
+            </Text>
+            <View style={styles.aiProgressTrack}>
+              <View
+                style={[
+                  styles.aiProgressFill,
+                  {
+                    width: `${aiProgress}%`,
+                  },
+                ]}
+              />
+            </View>
+            <Text
+              style={styles.aiProgressText}
+              accessibilityLiveRegion="polite"
+            >
+              {aiProgress}%
             </Text>
           </View>
         )}
@@ -499,5 +528,24 @@ const styles = StyleSheet.create({
   },
   buttonIcon: {
     marginEnd: spacing.xs,
+  },
+  aiProgressTrack: {
+    width: '78%',
+    height: 6,
+    borderRadius: 999,
+    backgroundColor: colors.border || '#D7E3E8',
+    overflow: 'hidden',
+    marginTop: spacing.md,
+  },
+  aiProgressFill: {
+    height: '100%',
+    borderRadius: 999,
+    backgroundColor: colors.accent || colors.teal,
+  },
+  aiProgressText: {
+    marginTop: spacing.xs,
+    color: colors.textSecondary || colors.textMuted,
+    fontSize: 12,
+    fontWeight: '600',
   },
 });

@@ -15,7 +15,7 @@ from app.db.models import (
     StudentProfile,
     StudentSkill,
 )
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 
@@ -93,3 +93,379 @@ class MatchingDataRepository:
         """
         stmt = select(InternshipListing).where(InternshipListing.id == internship_id)
         return db.scalar(stmt)
+
+
+    @staticmethod
+    def get_structured_profile_by_user_id(
+        db: Session,
+        user_id: UUID,
+    ) -> Optional[dict[str, object]]:
+        """Fetch the complete structured profile with one PostgreSQL round trip."""
+        bind = db.get_bind()
+
+        if (
+            bind is None
+            or bind.dialect.name != "postgresql"
+        ):
+            profile = MatchingDataRepository.get_profile_by_user_id(
+                db,
+                user_id,
+            )
+
+            if profile is None:
+                return None
+
+            education = MatchingDataRepository.get_education_for_student(
+                db,
+                profile.id,
+            )
+            experience = MatchingDataRepository.get_experience_for_student(
+                db,
+                profile.id,
+            )
+            projects = MatchingDataRepository.get_projects_for_student(
+                db,
+                profile.id,
+            )
+
+            return {
+                "id": profile.id,
+                "user_id": profile.user_id,
+                "full_name": profile.full_name,
+                "headline": profile.headline,
+                "preferences": profile.preferences,
+                "avatar_storage_path": profile.avatar_storage_path,
+                "skills": MatchingDataRepository.get_skill_names_for_student(
+                    db,
+                    profile.id,
+                ),
+                "education": [
+                    {
+                        "institution": entry.institution,
+                        "degree": entry.degree,
+                        "start_year": entry.start_year,
+                        "end_year": entry.end_year,
+                    }
+                    for entry in education
+                ],
+                "experience": [
+                    {
+                        "company": entry.company,
+                        "role": entry.role,
+                        "description": entry.description,
+                        "start_date": entry.start_date,
+                        "end_date": entry.end_date,
+                    }
+                    for entry in experience
+                ],
+                "projects": [
+                    {
+                        "title": entry.title,
+                        "tech_stack": entry.tech_stack,
+                        "description": entry.description,
+                    }
+                    for entry in projects
+                ],
+            }
+
+        row = db.execute(
+            text(
+                """
+                SELECT
+                    sp.id,
+                    sp.user_id,
+                    sp.full_name,
+                    sp.headline,
+                    sp.preferences,
+                    sp.avatar_storage_path,
+
+                    COALESCE(
+                        (
+                            SELECT jsonb_agg(
+                                s.name
+                                ORDER BY s.name ASC
+                            )
+                            FROM public.student_skills ss
+                            JOIN public.skills s
+                                ON s.id = ss.skill_id
+                            WHERE ss.student_id = sp.id
+                        ),
+                        CAST('[]' AS jsonb)
+                    ) AS skills,
+
+                    COALESCE(
+                        (
+                            SELECT jsonb_agg(
+                                jsonb_build_object(
+                                    'institution', e.institution,
+                                    'degree', e.degree,
+                                    'start_year', e.start_year,
+                                    'end_year', e.end_year
+                                )
+                                ORDER BY
+                                    e.start_year ASC,
+                                    e.id ASC
+                            )
+                            FROM public.education_entries e
+                            WHERE e.student_id = sp.id
+                        ),
+                        CAST('[]' AS jsonb)
+                    ) AS education,
+
+                    COALESCE(
+                        (
+                            SELECT jsonb_agg(
+                                jsonb_build_object(
+                                    'company', x.company,
+                                    'role', x.role,
+                                    'description', x.description,
+                                    'start_date', x.start_date,
+                                    'end_date', x.end_date
+                                )
+                                ORDER BY
+                                    x.start_date ASC,
+                                    x.id ASC
+                            )
+                            FROM public.experience_entries x
+                            WHERE x.student_id = sp.id
+                        ),
+                        CAST('[]' AS jsonb)
+                    ) AS experience,
+
+                    COALESCE(
+                        (
+                            SELECT jsonb_agg(
+                                jsonb_build_object(
+                                    'title', p.title,
+                                    'tech_stack', p.tech_stack,
+                                    'description', p.description
+                                )
+                                ORDER BY
+                                    p.title ASC,
+                                    p.id ASC
+                            )
+                            FROM public.project_entries p
+                            WHERE p.student_id = sp.id
+                        ),
+                        CAST('[]' AS jsonb)
+                    ) AS projects
+
+                FROM public.student_profiles sp
+                WHERE sp.user_id = :user_id
+                LIMIT 1
+                """
+            ),
+            {
+                "user_id": user_id,
+            },
+        ).mappings().one_or_none()
+
+        if row is None:
+            return None
+
+        return dict(row)
+
+    @staticmethod
+    def get_ai_grounding_context(
+        db: Session,
+        student_id: UUID,
+    ) -> dict[str, list[str]]:
+        """
+        Fetch AI grounding context with one PostgreSQL round trip.
+
+        SQLite and other non-PostgreSQL test/runtime environments
+        preserve the existing repository methods and their contracts.
+        """
+
+        bind = db.get_bind()
+
+        if (
+            bind is None
+            or bind.dialect.name
+            != "postgresql"
+        ):
+            education = (
+                MatchingDataRepository
+                .get_education_for_student(
+                    db,
+                    student_id,
+                )
+            )
+            experience = (
+                MatchingDataRepository
+                .get_experience_for_student(
+                    db,
+                    student_id,
+                )
+            )
+            projects = (
+                MatchingDataRepository
+                .get_projects_for_student(
+                    db,
+                    student_id,
+                )
+            )
+
+            return {
+                "skills": (
+                    MatchingDataRepository
+                    .get_skill_names_for_student(
+                        db,
+                        student_id,
+                    )
+                ),
+                "education_entries": [
+                    (
+                        f"{entry.degree} at "
+                        f"{entry.institution} "
+                        f"({entry.start_year or ''}-"
+                        f"{entry.end_year or ''})"
+                    )
+                    for entry in education
+                ],
+                "experience_entries": [
+                    (
+                        f"{entry.role} at "
+                        f"{entry.company}: "
+                        f"{entry.description or ''}"
+                    )
+                    for entry in experience
+                ],
+                "project_entries": [
+                    (
+                        f"{entry.title} "
+                        f"({', '.join(entry.tech_stack or [])}): "
+                        f"{entry.description or ''}"
+                    )
+                    for entry in projects
+                ],
+            }
+
+        row = db.execute(
+            text(
+                """
+                SELECT
+                    COALESCE(
+                        (
+                            SELECT
+                                jsonb_agg(s.name ORDER BY s.name ASC)
+                            FROM public.student_skills ss
+                            JOIN public.skills s
+                                ON s.id = ss.skill_id
+                            WHERE
+                                ss.student_id = :student_id
+                        ),
+                        CAST('[]' AS jsonb)
+                    ) AS skills,
+
+                    COALESCE(
+                        (
+                            SELECT
+                                jsonb_agg(
+                                    e.degree || ' at ' ||
+                                    e.institution || ' (' ||
+                                    CASE
+                                        WHEN e.start_year IS NULL
+                                             OR e.start_year = 0
+                                        THEN ''
+                                        ELSE CAST(e.start_year AS text)
+                                    END ||
+                                    '-' ||
+                                    CASE
+                                        WHEN e.end_year IS NULL
+                                             OR e.end_year = 0
+                                        THEN ''
+                                        ELSE CAST(e.end_year AS text)
+                                    END ||
+                                    ')'
+                                    ORDER BY
+                                        e.start_year ASC,
+                                        e.id ASC
+                                )
+                            FROM public.education_entries e
+                            WHERE
+                                e.student_id = :student_id
+                        ),
+                        CAST('[]' AS jsonb)
+                    ) AS education_entries,
+
+                    COALESCE(
+                        (
+                            SELECT
+                                jsonb_agg(
+                                    x.role || ' at ' ||
+                                    x.company || ': ' ||
+                                    COALESCE(
+                                        x.description,
+                                        ''
+                                    )
+                                    ORDER BY
+                                        x.start_date ASC,
+                                        x.id ASC
+                                )
+                            FROM public.experience_entries x
+                            WHERE
+                                x.student_id = :student_id
+                        ),
+                        CAST('[]' AS jsonb)
+                    ) AS experience_entries,
+
+                    COALESCE(
+                        (
+                            SELECT
+                                jsonb_agg(
+                                    p.title || ' (' ||
+                                    COALESCE(
+                                        array_to_string(
+                                            p.tech_stack,
+                                            ', '
+                                        ),
+                                        ''
+                                    ) ||
+                                    '): ' ||
+                                    COALESCE(
+                                        p.description,
+                                        ''
+                                    )
+                                    ORDER BY
+                                        p.title ASC,
+                                        p.id ASC
+                                )
+                            FROM public.project_entries p
+                            WHERE
+                                p.student_id = :student_id
+                        ),
+                        CAST('[]' AS jsonb)
+                    ) AS project_entries
+                """
+            ),
+            {
+                "student_id": student_id,
+            },
+        ).mappings().one()
+
+        result = {}
+
+        for key in (
+            "skills",
+            "education_entries",
+            "experience_entries",
+            "project_entries",
+        ):
+            value = row[key]
+
+            if not isinstance(
+                value,
+                list,
+            ):
+                raise TypeError(
+                    "PostgreSQL grounding context "
+                    f"field '{key}' must be a list."
+                )
+
+            result[key] = [
+                str(item)
+                for item in value
+            ]
+
+        return result

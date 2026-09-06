@@ -172,7 +172,14 @@ def test_failed_job_can_release_retry_and_settle_once():
         assert released is not None
         assert released["outcome"] == "released"
 
-        period = db.query(AIQuotaPeriod).one()
+        period = (
+            db.query(AIQuotaPeriod)
+            .filter(
+                AIQuotaPeriod.user_id
+                == user_id
+            )
+            .one()
+        )
 
         assert period.used_count == 0
         assert period.reserved_count == 0

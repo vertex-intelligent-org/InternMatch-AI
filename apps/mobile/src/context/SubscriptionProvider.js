@@ -25,7 +25,7 @@ const SubscriptionContext = createContext({
   reconcileSubscription: async () => null,
 });
 
-export function SubscriptionProvider({ children }) {
+export function SubscriptionProvider({ children, enabled = true }) {
   const [backendSubscription, setBackendSubscription] = useState(null);
   const [aiUsage, setAIUsage] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -185,6 +185,20 @@ export function SubscriptionProvider({ children }) {
 
   useEffect(() => {
     mountedRef.current = true;
+
+    if (!enabled) {
+      generationRef.current += 1;
+      currentUserIdRef.current = null;
+      setBackendSubscription(null);
+      setAIUsage(null);
+      setLoading(false);
+      setError(null);
+
+      return () => {
+        mountedRef.current = false;
+      };
+    }
+
     let active = true;
 
     const applySession = (session) => {
@@ -258,7 +272,7 @@ export function SubscriptionProvider({ children }) {
       currentUserIdRef.current = null;
       authListenerData?.subscription?.unsubscribe?.();
     };
-  }, [loadAllForUser]);
+  }, [enabled, loadAllForUser]);
 
   useEffect(() => {
     const appStateSubscription = AppState.addEventListener(

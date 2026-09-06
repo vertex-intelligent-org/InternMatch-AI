@@ -107,12 +107,24 @@ export async function apiRequest<T>(
   let response: Response;
 
   try {
+    if (path === '/profile/cv') {
+      console.info(
+        `[CV_UPLOAD_DEBUG] request-start url=${url} formData=${options.body instanceof FormData}`
+      );
+    }
+
     response = await fetch(url, {
       ...options,
       headers,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Network request failed.';
+
+    if (path === '/profile/cv') {
+      console.info(
+        `[CV_UPLOAD_DEBUG] request-failed error=${error instanceof Error ? error.name : 'unknown'} message=${message}`
+      );
+    }
     throw new ApiError(message, 0, 'NETWORK_ERROR');
   }
 

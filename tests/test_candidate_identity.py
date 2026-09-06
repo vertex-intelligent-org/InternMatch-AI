@@ -82,10 +82,10 @@ def test_minor_name_typo_returns_same_candidate():
     assert result.verdict == IdentityVerdict.SAME_CANDIDATE
 
 
-def test_name_difference_alone_without_background_history_does_not_block():
+def test_radically_different_name_without_background_history_requires_confirmation():
     """
-    Test 5: Name difference alone when candidate has no established background history
-    returns INSUFFICIENT_IDENTITY_EVIDENCE (false positives prevented).
+    Test 5: A radically different candidate name must require confirmation even
+    when structured education/experience history is unavailable.
     """
     user_id = uuid4()
     db = TestingSessionLocal()
@@ -109,9 +109,32 @@ def test_name_difference_alone_without_background_history_does_not_block():
             extracted=extracted,
             db=db,
         )
-        assert result.verdict == IdentityVerdict.INSUFFICIENT_IDENTITY_EVIDENCE
+        assert result.verdict == IdentityVerdict.POSSIBLE_MISMATCH
     finally:
         db.close()
+
+
+def test_legacy_profile_with_different_candidate_name_requires_confirmation():
+    """Legacy profiles must not be silently replaced by a clearly different person."""
+    existing = StudentProfile(
+        id=uuid4(),
+        user_id=uuid4(),
+        full_name="Legacy Candidate",
+        cv_storage_path="legacy/cv.pdf",
+    )
+    extracted = ExtractedCandidateProfile(
+        full_name="Completely Different Person",
+        skills=[ExtractedSkill(name="Python")],
+    )
+
+    result = evaluate_candidate_identity(
+        existing_profile=existing,
+        extracted=extracted,
+    )
+
+    assert result.verdict == IdentityVerdict.POSSIBLE_MISMATCH
+    assert result.details["existing_name"] == "Legacy Candidate"
+    assert result.details["extracted_name"] == "Completely Different Person"
 
 
 def test_different_name_with_education_overlap_returns_same_candidate():
@@ -243,7 +266,97 @@ def test_shared_surname_does_not_force_same_candidate():
             db=db,
         )
 
-        assert result.verdict == IdentityVerdict.INSUFFICIENT_IDENTITY_EVIDENCE
+        assert result.verdict == IdentityVerdict.POSSIBLE_MISMATCH
+    finally:
+        db.close()
+
+
+def test_radically_different_name_same_university_requires_confirmation():
+    """A shared university must not override a radically different candidate name."""
+    user_id = uuid4()
+    db = TestingSessionLocal()
+
+    try:
+        existing = StudentProfile(
+            id=uuid4(),
+            user_id=user_id,
+            full_name="John Doe",
+        )
+        db.add(existing)
+        db.flush()
+
+        db.add(
+            EducationEntry(
+                student_id=existing.id,
+                institution="Stanford University",
+                degree="Computer Science",
+            )
+        )
+        db.commit()
+
+        extracted = ExtractedCandidateProfile(
+            full_name="Alice Brown",
+            education=[
+                ExtractedEducation(
+                    institution="Stanford University",
+                    degree="Economics",
+                )
+            ],
+            skills=[ExtractedSkill(name="Finance")],
+        )
+
+        result = evaluate_candidate_identity(
+            existing_profile=existing,
+            extracted=extracted,
+            db=db,
+        )
+
+        assert result.verdict == IdentityVerdict.POSSIBLE_MISMATCH
+    finally:
+        db.close()
+
+
+def test_radically_different_name_same_employer_requires_confirmation():
+    """A shared employer must not override a radically different candidate name."""
+    user_id = uuid4()
+    db = TestingSessionLocal()
+
+    try:
+        existing = StudentProfile(
+            id=uuid4(),
+            user_id=user_id,
+            full_name="Michael Reed",
+        )
+        db.add(existing)
+        db.flush()
+
+        db.add(
+            ExperienceEntry(
+                student_id=existing.id,
+                company="Google",
+                role="Software Engineer",
+            )
+        )
+        db.commit()
+
+        extracted = ExtractedCandidateProfile(
+            full_name="Sophia Turner",
+            experience=[
+                ExtractedExperience(
+                    company="Google",
+                    role="Product Manager",
+                )
+            ],
+            skills=[ExtractedSkill(name="Product Strategy")],
+        )
+
+        result = evaluate_candidate_identity(
+            existing_profile=existing,
+            extracted=extracted,
+            db=db,
+        )
+
+        assert result.verdict == IdentityVerdict.POSSIBLE_MISMATCH
     finally:
         db.close()
 
@@ -356,3 +469,41 @@ def test_strong_multi_signal_mismatch_triggers_possible_mismatch():
         assert result.details["extracted_name"] == "Alice Smith"
     finally:
         db.close()
+
+def test_radically_different_name_skips_background_db_lookup(monkeypatch):
+    """Radical name contradiction must not depend on background DB availability."""
+    existing = StudentProfile(
+        id=uuid4(),
+        user_id=uuid4(),
+        full_name="John Doe",
+    )
+    extracted = ExtractedCandidateProfile(
+        full_name="Alice Brown",
+        skills=[ExtractedSkill(name="Finance")],
+    )
+
+    def fail_lookup(*args, **kwargs):
+        raise AssertionError(
+            "Background DB lookup must not run for a radical name mismatch."
+        )
+
+    monkeypatch.setattr(
+        "app.services.candidate_identity."
+        "MatchingDataRepository.get_education_for_student",
+        fail_lookup,
+    )
+    monkeypatch.setattr(
+        "app.services.candidate_identity."
+        "MatchingDataRepository.get_experience_for_student",
+        fail_lookup,
+    )
+
+    result = evaluate_candidate_identity(
+        existing_profile=existing,
+        extracted=extracted,
+        db=object(),
+    )
+
+    assert result.verdict == IdentityVerdict.POSSIBLE_MISMATCH
+    assert result.details["existing_name"] == "John Doe"
+    assert result.details["extracted_name"] == "Alice Brown"

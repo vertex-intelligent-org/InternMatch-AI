@@ -5,9 +5,11 @@ fast-path/multimodal parsing, structured LLM extraction, candidate identity eval
 profile persistence, and embedding generation.
 """
 
+from datetime import datetime, timezone
 from typing import Any, Dict, Union
 from uuid import UUID
 
+from app.db.models import ProcessingJob
 from app.db.session import SessionLocal
 from app.repositories.candidate_profile_write import (
     replace_candidate_profile_from_extraction,
@@ -44,6 +46,7 @@ from app.services.cv_validation import (
     validate_cv_document_multimodal,
 )
 from app.services.match_enqueue import enqueue_match_calculation
+from sqlalchemy import update
 
 
 def _normalize_uuid(val: Union[UUID, str], param_name: str) -> UUID:
@@ -69,19 +72,11 @@ def _job_cancel_requested(job: Any) -> bool:
     return result.get("cancel_requested") is True
 
 
-def _raise_if_cancel_requested(job_id: UUID, user_id: UUID) -> None:
-    """Read the latest durable cancellation marker in a short transaction."""
-    cancel_db = SessionLocal()
-    try:
-        cancel_job = ProcessingJobRepository.get_by_id_and_user_id(
-            db=cancel_db,
-            job_id=job_id,
-            user_id=user_id,
-        )
-        if cancel_job is not None and _job_cancel_requested(cancel_job):
-            raise CVExtractionCancelled()
-    finally:
-        cancel_db.close()
+def _raise_if_cancel_requested(db: Any, job: Any) -> None:
+    """Refresh the tracked job before continuing past a cancellation boundary."""
+    db.refresh(job)
+    if _job_cancel_requested(job):
+        raise CVExtractionCancelled()
 
 
 def _lock_active_cv_job(
@@ -103,8 +98,9 @@ def _lock_active_cv_job(
         raise ValueError(f"ProcessingJob with id '{job_id}' not found.")
 
     # The job may already exist in this Session's identity map from the initial
-    # lookup. Refresh after acquiring FOR UPDATE so cancellation committed by a
-    # competing transaction cannot remain hidden behind stale ORM attributes.
+    # lookup. Refresh after acquiring the database row lock so cancellation
+    # committed by a competing transaction cannot remain hidden behind stale
+    # ORM attributes.
     db.refresh(locked_job)
 
     if _job_cancel_requested(locked_job):
@@ -114,27 +110,32 @@ def _lock_active_cv_job(
 
 
 def _publish_progress(job_id: UUID, progress_percent: int) -> None:
-    """Persist a best-effort CV progress checkpoint in a short transaction."""
+    """Persist a best-effort progress checkpoint without reopening terminal jobs."""
     progress_db = SessionLocal()
     try:
-        current_job = ProcessingJobRepository.get_by_id(
-            db=progress_db,
-            job_id=job_id,
-        )
-
-        if current_job is None or _job_cancel_requested(current_job):
+        if progress_percent < 0 or progress_percent > 100:
             progress_db.rollback()
             return
 
-        updated = ProcessingJobRepository.update_state(
-            db=progress_db,
-            job_id=job_id,
-            status="processing",
-            progress_percent=progress_percent,
+        statement = (
+            update(ProcessingJob)
+            .where(
+                ProcessingJob.id == job_id,
+                ProcessingJob.status.in_(("queued", "processing")),
+            )
+            .values(
+                status="processing",
+                progress_percent=progress_percent,
+                updated_at=datetime.now(timezone.utc),
+            )
+            .execution_options(synchronize_session=False)
         )
-        if updated is None:
+
+        result = progress_db.execute(statement)
+        if result.rowcount == 0:
             progress_db.rollback()
             return
+
         progress_db.commit()
     except Exception:
         progress_db.rollback()
@@ -208,10 +209,7 @@ def run_cv_extraction(
                 }
 
         # Check cancellation before a released retry can reserve capacity.
-        _raise_if_cancel_requested(
-            norm_job_id,
-            norm_user_id,
-        )
+        _raise_if_cancel_requested(db, job)
 
         quota_state = ensure_job_ai_quota_reserved_if_present(
             db,
@@ -244,7 +242,7 @@ def run_cv_extraction(
             user_id=norm_user_id,
             storage_path=clean_path,
         )
-        _raise_if_cancel_requested(norm_job_id, norm_user_id)
+        _raise_if_cancel_requested(db, job)
         _publish_progress(norm_job_id, 20)
 
         ext = clean_path.rsplit(".", 1)[-1].lower() if "." in clean_path else ""
@@ -324,7 +322,7 @@ def run_cv_extraction(
                 content_locale=content_locale or "en",
             )
 
-        _raise_if_cancel_requested(norm_job_id, norm_user_id)
+        _raise_if_cancel_requested(db, job)
         _publish_progress(norm_job_id, 70)
 
         # Step 5: Candidate Identity Guard check BEFORE profile mutation

@@ -427,3 +427,63 @@ def test_post_auth_sync_ignores_client_body_or_query_overrides(
     assert data["user_id"] == str(authenticated_uuid)
     assert data["user_id"] != str(attacker_uuid)
     assert data["email"] == "student@example.com"
+
+def test_verify_jwt_reuses_supabase_client_for_same_configuration(monkeypatch):
+    """Repeated JWT verification reuses the client but never caches token claims."""
+    import app.core.security as security_module
+
+    user_id = uuid4()
+    create_calls = []
+    claims_calls = []
+
+    class FakeAuth:
+        def get_claims(self, *, jwt):
+            claims_calls.append(jwt)
+            return {
+                "claims": {
+                    "iss": (
+                        f"{security_module.settings.SUPABASE_URL.rstrip('/')}"
+                        "/auth/v1"
+                    ),
+                    "aud": "authenticated",
+                    "sub": str(user_id),
+                }
+            }
+
+    class FakeClient:
+        def __init__(self):
+            self.auth = FakeAuth()
+
+    fake_client = FakeClient()
+
+    def fake_create_client(url, key):
+        create_calls.append((url, key))
+        return fake_client
+
+    monkeypatch.setattr(
+        security_module,
+        "create_client",
+        fake_create_client,
+    )
+
+    security_module._get_supabase_auth_client.cache_clear()
+
+    try:
+        first = security_module.verify_jwt_token(
+            "first.jwt.token"
+        )
+        second = security_module.verify_jwt_token(
+            "second.jwt.token"
+        )
+
+        assert first["sub"] == str(user_id)
+        assert second["sub"] == str(user_id)
+
+        assert len(create_calls) == 1
+
+        assert claims_calls == [
+            "first.jwt.token",
+            "second.jwt.token",
+        ]
+    finally:
+        security_module._get_supabase_auth_client.cache_clear()

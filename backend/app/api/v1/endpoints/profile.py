@@ -157,7 +157,7 @@ class CVProcessingResponse(BaseModel):
     job_id: UUID
     status: Literal["queued"] = "queued"
     message: str = "CV processing enqueued successfully."
-    estimated_seconds: int = 15
+    estimated_seconds: int = 60
 
 
 class CVConfirmReplacementRequest(BaseModel):
@@ -205,36 +205,44 @@ def get_my_profile(
     Identity is strictly derived from the validated JWT subject UUID.
     Loads structured skills, education, experience, and projects deterministically.
     """
-    profile = StudentProfileRepository.get_by_user_id(db, user_id=current_user.user_id)
+    profile_data = MatchingDataRepository.get_structured_profile_by_user_id(
+        db,
+        user_id=current_user.user_id,
+    )
 
-    if not profile:
+    if profile_data is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=format_error_payload(
-                "NOT_FOUND", "Student profile not found for authenticated user."
+                "NOT_FOUND",
+                "Student profile not found for authenticated user.",
             ),
         )
 
-    skills = MatchingDataRepository.get_skill_names_for_student(db, student_id=profile.id)
-    education = MatchingDataRepository.get_education_for_student(db, student_id=profile.id)
-    experience = MatchingDataRepository.get_experience_for_student(db, student_id=profile.id)
-    projects = MatchingDataRepository.get_projects_for_student(db, student_id=profile.id)
-
     avatar_url = generate_avatar_signed_url(
         user_id=current_user.user_id,
-        storage_path=profile.avatar_storage_path,
+        storage_path=profile_data["avatar_storage_path"],
     )
 
     return StudentProfileResponse(
-        id=profile.id,
-        user_id=profile.user_id,
-        full_name=profile.full_name,
-        headline=profile.headline,
-        skills=skills,
-        education=[EducationResponse.model_validate(e) for e in education],
-        experience=[ExperienceResponse.model_validate(e) for e in experience],
-        projects=[ProjectResponse.model_validate(p) for p in projects],
-        preferences=profile.preferences or {},
+        id=profile_data["id"],
+        user_id=profile_data["user_id"],
+        full_name=profile_data["full_name"],
+        headline=profile_data["headline"],
+        skills=profile_data["skills"],
+        education=[
+            EducationResponse.model_validate(entry)
+            for entry in profile_data["education"]
+        ],
+        experience=[
+            ExperienceResponse.model_validate(entry)
+            for entry in profile_data["experience"]
+        ],
+        projects=[
+            ProjectResponse.model_validate(entry)
+            for entry in profile_data["projects"]
+        ],
+        preferences=profile_data["preferences"] or {},
         avatar_url=avatar_url,
     )
 
@@ -362,7 +370,7 @@ async def upload_candidate_cv(
                 job_id=existing_job.id,
                 status="queued",
                 message="CV processing request already exists.",
-                estimated_seconds=15,
+                estimated_seconds=60,
             )
 
         # Do not keep a read transaction open during external storage I/O.
@@ -422,7 +430,7 @@ async def upload_candidate_cv(
                         job_id=existing_job.id,
                         status="queued",
                         message="CV processing request already exists.",
-                        estimated_seconds=15,
+                        estimated_seconds=60,
                     )
 
                 job = existing_job
@@ -523,7 +531,7 @@ async def upload_candidate_cv(
         job_id=job.id,
         status="queued",
         message="CV processing enqueued successfully.",
-        estimated_seconds=15,
+        estimated_seconds=60,
     )
 
 

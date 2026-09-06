@@ -33,6 +33,9 @@ class Settings(BaseSettings):
     # Pinned AI Engine & Vector Search Models
     GEMINI_API_KEY: str = ""
     LLM_MODEL_NAME: str = "gemini-3.5-flash"
+    LLM_FALLBACK_MODEL_NAMES: str = (
+        "gemini-3.8-flash,gemini-3.7-flash,gemini-3.6-flash"
+    )
     EMBEDDING_MODEL_NAME: str = "gemini-embedding-2"
     EMBEDDING_DIMENSION: int = 1536
 

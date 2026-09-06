@@ -4,6 +4,7 @@ Enforces cryptographic verification and strict claim validation for Supabase JWT
 """
 
 from datetime import datetime, timezone
+from functools import lru_cache
 from typing import Any, Dict, Optional
 from uuid import UUID
 
@@ -45,6 +46,19 @@ def format_auth_error(message: str, code: str = "UNAUTHORIZED") -> Dict[str, Any
     }
 
 
+@lru_cache(maxsize=4)
+def _get_supabase_auth_client(
+    supabase_url: str,
+    supabase_pub_key: str,
+    client_factory: Any,
+) -> Any:
+    """Reuse the Supabase auth client for stable process-level configuration."""
+    return client_factory(
+        supabase_url,
+        supabase_pub_key,
+    )
+
+
 def verify_jwt_token(token: str) -> Dict[str, Any]:
     """
     Validate Supabase JWT bearer token using Supabase Auth's verified claims API.
@@ -70,7 +84,11 @@ def verify_jwt_token(token: str) -> Dict[str, Any]:
         )
 
     try:
-        supabase = create_client(supabase_url, supabase_pub_key)
+        supabase = _get_supabase_auth_client(
+            supabase_url,
+            supabase_pub_key,
+            create_client,
+        )
         claims_response = supabase.auth.get_claims(jwt=token)
     except Exception as exc:
         logger.warning("Supabase JWT claims verification failed: %s", type(exc).__name__)

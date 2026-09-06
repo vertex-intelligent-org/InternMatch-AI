@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { ActivityIndicator } from 'react-native';
 import {
   View,
   Text,
@@ -48,6 +49,7 @@ export default function SignInScreen({ navigation, route }) {
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [focusedField, setFocusedField] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [loadingSource, setLoadingSource] = useState(null);
   const [pendingConfirmationEmail, setPendingConfirmationEmail] = useState(initialConfirmationEmail || '');
   const [resendLoading, setResendLoading] = useState(false);
   const [resendCooldownSeconds, setResendCooldownSeconds] = useState(0);
@@ -127,6 +129,7 @@ export default function SignInScreen({ navigation, route }) {
     if (loading) return;
 
     setLoading(true);
+    setLoadingSource('email');
 
     try {
       const { data, error } = await signInWithEmail(normalizedEmail, password);
@@ -193,6 +196,7 @@ export default function SignInScreen({ navigation, route }) {
       Alert.alert(t('common.error'), t(errorKey));
     } finally {
       setLoading(false);
+      setLoadingSource(null);
     }
   };
 
@@ -200,6 +204,7 @@ export default function SignInScreen({ navigation, route }) {
     if (loading) return;
 
     setLoading(true);
+    setLoadingSource('google');
 
     try {
       const result = await signInWithGoogle();
@@ -259,6 +264,7 @@ export default function SignInScreen({ navigation, route }) {
       );
     } finally {
       setLoading(false);
+      setLoadingSource(null);
     }
   };
 
@@ -439,13 +445,29 @@ export default function SignInScreen({ navigation, route }) {
             </TouchableOpacity>
 
             {/* Primary CTA */}
-            <GradientButton
-              title={loading ? t('auth.signingIn') : t('auth.signIn')}
+            {loadingSource === 'email' ? (
+  <View
+    style={[styles.primaryCta, styles.authLoadingButton]}
+    accessibilityRole="progressbar"
+    accessibilityLiveRegion="polite"
+  >
+    <ActivityIndicator
+      size="small"
+      color={colors.textInverse || '#FFFFFF'}
+    />
+    <Text style={styles.authLoadingButtonText}>
+      {t('auth.signingIn')}
+    </Text>
+  </View>
+) : (
+<GradientButton
+              title={t('auth.signIn')}
               color={colors.accent || colors.teal}
               onPress={handleContinue}
               disabled={loading}
               style={styles.primaryCta}
             />
+)}
 
             {/* Divider */}
             <View style={styles.dividerRow}>
@@ -455,10 +477,26 @@ export default function SignInScreen({ navigation, route }) {
             </View>
 
             {/* Social Providers */}
-            <SocialAuthButton
+            {loadingSource === 'google' ? (
+  <View
+    style={styles.authLoadingButton}
+    accessibilityRole="progressbar"
+    accessibilityLiveRegion="polite"
+  >
+    <ActivityIndicator
+      size="small"
+      color={colors.textInverse || '#FFFFFF'}
+    />
+    <Text style={styles.authLoadingButtonText}>
+      {t('auth.signingIn')}
+    </Text>
+  </View>
+) : (
+<SocialAuthButton
               provider="google"
               onPress={handleGoogle}
             />
+)}
             <SocialAuthButton
               provider="apple"
               onPress={handleApple}
@@ -679,5 +717,21 @@ const styles = StyleSheet.create({
   },
   resendBtnTextDisabled: {
     color: colors.textTertiary || colors.textMuted,
+  },
+  authLoadingButton: {
+    minHeight: 50,
+    borderRadius: 14,
+    backgroundColor: '#94A3B8',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    opacity: 0.92,
+  },
+  authLoadingButtonText: {
+    color: colors.textInverse || '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '700',
   },
 });

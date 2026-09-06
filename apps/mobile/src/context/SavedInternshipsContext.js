@@ -19,7 +19,7 @@ import i18n from '../localization/i18n';
 
 const SavedInternshipsContext = createContext(null);
 
-export function SavedInternshipsProvider({ children }) {
+export function SavedInternshipsProvider({ children, enabled = true }) {
   const [savedIds, setSavedIds] = useState(() => new Set());
   const [savedItems, setSavedItems] = useState([]);
   const [total, setTotal] = useState(0);
@@ -97,6 +97,11 @@ export function SavedInternshipsProvider({ children }) {
 
   // Auth lifecycle synchronization
   useEffect(() => {
+    if (!enabled) {
+      clearSavedInternships();
+      return;
+    }
+
     let isMounted = true;
 
     // Check existing session on mount
@@ -133,7 +138,7 @@ export function SavedInternshipsProvider({ children }) {
       isMounted = false;
       subscription?.unsubscribe();
     };
-  }, [clearSavedInternships, refreshSavedInternships]);
+  }, [enabled, clearSavedInternships, refreshSavedInternships]);
 
   const isSaved = useCallback(
     (internshipId) => {

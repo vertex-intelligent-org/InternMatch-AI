@@ -540,7 +540,7 @@ def test_post_profile_cv_valid_pdf_success(client: TestClient, monkeypatch):
     assert "job_id" in data
     assert data["status"] == "queued"
     assert data["message"] == "CV processing enqueued successfully."
-    assert data["estimated_seconds"] == 15
+    assert data["estimated_seconds"] == 60
 
     assert len(storage_calls) == 1
     assert storage_calls[0][0] == user_id

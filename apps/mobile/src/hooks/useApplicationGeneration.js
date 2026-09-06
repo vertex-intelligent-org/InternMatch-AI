@@ -3,6 +3,10 @@ import { generateApplication, getProcessingJob, ApiError } from '../services/api
 
 const POLL_INTERVAL_MS = 1500;
 const TIMEOUT_MS = 210000; // 210 seconds (safely exceeds RQ 180s worker timeout)
+const VISUAL_PROGRESS_INTERVAL_MS = 500;
+const VISUAL_PROGRESS_CAP = 94;
+const VISUAL_PROGRESS_TIME_CONSTANT_MS = 18000;
+const VISUAL_PROGRESS_START = 5;
 
 export function useApplicationGeneration() {
   const [isGenerating, setIsGenerating] = useState(false);
@@ -11,6 +15,7 @@ export function useApplicationGeneration() {
 
   const isMountedRef = useRef(true);
   const pollTimerRef = useRef(null);
+  const visualProgressTimerRef = useRef(null);
   const isPollingRef = useRef(false);
   const startTimeRef = useRef(0);
   const isGeneratingRef = useRef(false);
@@ -23,23 +28,34 @@ export function useApplicationGeneration() {
     isPollingRef.current = false;
   }, []);
 
+  const clearVisualProgress = useCallback(() => {
+    if (visualProgressTimerRef.current) {
+      clearInterval(
+        visualProgressTimerRef.current
+      );
+      visualProgressTimerRef.current = null;
+    }
+  }, []);
+
   useEffect(() => {
     isMountedRef.current = true;
     return () => {
       isMountedRef.current = false;
       clearPolling();
+      clearVisualProgress();
     };
-  }, [clearPolling]);
+  }, [clearPolling, clearVisualProgress]);
 
   const cancelGeneration = useCallback(() => {
     clearPolling();
+    clearVisualProgress();
     isGeneratingRef.current = false;
     if (isMountedRef.current) {
       setIsGenerating(false);
       setProgressPercent(0);
       setGenerationError(null);
     }
-  }, [clearPolling]);
+  }, [clearPolling, clearVisualProgress]);
 
   const startGeneration = useCallback(
     async (params, onComplete) => {
@@ -49,11 +65,56 @@ export function useApplicationGeneration() {
       }
 
       clearPolling();
+      clearVisualProgress();
       isGeneratingRef.current = true;
       setIsGenerating(true);
-      setProgressPercent(0);
+      setProgressPercent(
+        VISUAL_PROGRESS_START
+      );
       setGenerationError(null);
       startTimeRef.current = Date.now();
+
+      visualProgressTimerRef.current =
+        setInterval(() => {
+          if (
+            !isMountedRef.current ||
+            !isGeneratingRef.current
+          ) {
+            return;
+          }
+
+          const elapsedMs =
+            Date.now() -
+            startTimeRef.current;
+
+          const eased =
+            1 -
+            Math.exp(
+              -elapsedMs /
+                VISUAL_PROGRESS_TIME_CONSTANT_MS
+            );
+
+          const nextProgress =
+            Math.min(
+              VISUAL_PROGRESS_CAP,
+              Math.round(
+                VISUAL_PROGRESS_START +
+                  (
+                    VISUAL_PROGRESS_CAP -
+                    VISUAL_PROGRESS_START
+                  ) *
+                    eased
+              )
+            );
+
+          setProgressPercent(
+            (current) =>
+              Math.max(
+                current,
+                nextProgress
+              )
+          );
+        }, VISUAL_PROGRESS_INTERVAL_MS);
 
       try {
         const acceptRes = await generateApplication({
@@ -67,7 +128,10 @@ export function useApplicationGeneration() {
           return;
         }
 
-        setProgressPercent(0);
+        setProgressPercent(
+          (current) =>
+            Math.max(current, 8)
+        );
 
         const poll = async () => {
           if (!isMountedRef.current || !isGeneratingRef.current || isPollingRef.current) {
@@ -77,6 +141,7 @@ export function useApplicationGeneration() {
           // Timeout check (210s)
           if (Date.now() - startTimeRef.current > TIMEOUT_MS) {
             clearPolling();
+            clearVisualProgress();
             isGeneratingRef.current = false;
             if (isMountedRef.current) {
               setIsGenerating(false);
@@ -95,15 +160,34 @@ export function useApplicationGeneration() {
             }
 
             if (job.status === 'queued') {
-              setProgressPercent(job.progress_percent);
+              setProgressPercent(
+                (current) =>
+                  Math.max(
+                    current,
+                    Math.min(
+                      job.progress_percent || 0,
+                      VISUAL_PROGRESS_CAP
+                    )
+                  )
+              );
               isPollingRef.current = false;
               scheduleNextPoll();
             } else if (job.status === 'processing') {
-              setProgressPercent(job.progress_percent);
+              setProgressPercent(
+                (current) =>
+                  Math.max(
+                    current,
+                    Math.min(
+                      job.progress_percent || 0,
+                      VISUAL_PROGRESS_CAP
+                    )
+                  )
+              );
               isPollingRef.current = false;
               scheduleNextPoll();
             } else if (job.status === 'completed') {
               clearPolling();
+              clearVisualProgress();
               isGeneratingRef.current = false;
               setProgressPercent(100);
               setIsGenerating(false);
@@ -113,6 +197,7 @@ export function useApplicationGeneration() {
               }
             } else if (job.status === 'failed') {
               clearPolling();
+              clearVisualProgress();
               isGeneratingRef.current = false;
               setProgressPercent(100);
               setIsGenerating(false);
@@ -128,6 +213,7 @@ export function useApplicationGeneration() {
 
             if (err instanceof ApiError && err.status === 401) {
               clearPolling();
+              clearVisualProgress();
               isGeneratingRef.current = false;
               setIsGenerating(false);
               setGenerationError('UNAUTHENTICATED');
@@ -153,6 +239,7 @@ export function useApplicationGeneration() {
         }
         console.warn('Failed to enqueue application generation:', err);
         clearPolling();
+        clearVisualProgress();
         isGeneratingRef.current = false;
         setIsGenerating(false);
 

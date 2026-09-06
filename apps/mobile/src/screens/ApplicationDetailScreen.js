@@ -30,6 +30,7 @@ import {
 import haptics from '../services/haptics';
 import { useLocalization } from '../localization/LocalizationContext';
 import { formatLocalizedDate, formatLocalizedDateTime } from '../localization/formatters';
+import useSmoothAIProgress from '../hooks/useSmoothAIProgress';
 import { useSubscription } from '../context/SubscriptionProvider';
 
 const CANONICAL_STATUSES = [
@@ -205,6 +206,14 @@ export default function ApplicationDetailScreen({ route, navigation }) {
     return formatLocalizedDate(dateString, locale);
   };
 
+
+  const interviewPrepProgress =
+    useSmoothAIProgress(
+      interviewPrepLoading,
+      8,
+      94,
+      22000
+    );
 
   const handleGenerateInterviewPrep = async () => {
     if (!applicationId || interviewPrepLoading) {
@@ -683,10 +692,35 @@ export default function ApplicationDetailScreen({ route, navigation }) {
                         )}
                       >
                         {interviewPrepLoading ? (
-                          <ActivityIndicator
-                            size="small"
-                            color={colors.textInverse || colors.white}
-                          />
+                          <View
+                            style={
+                              styles.interviewPrepLoadingRow
+                            }
+                          >
+                            <ActivityIndicator
+                              size="small"
+                              color={
+                                colors.textInverse ||
+                                colors.white
+                              }
+                            />
+                            <Text
+                              style={
+                                styles.interviewPrepLoadingText
+                              }
+                              accessibilityLiveRegion="polite"
+                            >
+                              {t(
+                                'interviewPrep.generating',
+                                {
+                                  progress:
+                                    interviewPrepProgress,
+                                  defaultValue:
+                                    'Preparing interview guidance ({{progress}}%)...',
+                                }
+                              )}
+                            </Text>
+                          </View>
                         ) : (
                           <>
                             <Ionicons
@@ -1570,4 +1604,15 @@ const styles = StyleSheet.create({
     lineHeight: 21,
   },
 
+  interviewPrepLoadingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+  },
+  interviewPrepLoadingText: {
+    color: colors.textInverse || colors.white,
+    fontSize: 13,
+    fontWeight: '700',
+  },
 });

@@ -134,14 +134,13 @@ def evaluate_candidate_identity(
     Rules:
     1. If no existing profile or blank name -> INSUFFICIENT_IDENTITY_EVIDENCE (proceed).
     2. If name similarity is strongly high (>= 0.80) -> SAME_CANDIDATE.
-    3. A name difference ALONE never triggers mismatch.
-    4. A university/employer difference ALONE never triggers mismatch.
-    5. Missing established background history -> INSUFFICIENT_IDENTITY_EVIDENCE.
-    6. POSSIBLE_MISMATCH requires strong multi-signal disagreement:
-       - Low name similarity (< 0.5) with zero token overlap, AND
-       - Established existing background (>= 1 education or experience entry), AND
-       - Established extracted background (>= 1 education or experience entry), AND
-       - Zero overlap across education institutions and zero overlap across companies.
+    3. A radically different name (< 0.5 similarity) always triggers POSSIBLE_MISMATCH;
+       shared education or employer history cannot override a strong name contradiction.
+    4. Moderate name similarity (0.5 to < 0.80) may be rescued by meaningful education
+       or employer overlap.
+    5. Moderate name similarity without independent background overlap triggers a
+       confirmation-only POSSIBLE_MISMATCH rather than silent destructive replacement.
+    6. Missing background history never suppresses a candidate identity warning.
     """
     if (
         not existing_profile
@@ -179,6 +178,29 @@ def evaluate_candidate_identity(
                 "existing_name": existing_name,
                 "extracted_name": extracted_name,
                 "name_similarity": round(name_sim, 3),
+            },
+        )
+
+    # A radically different candidate name is sufficient identity evidence by itself.
+    # Do this before background DB lookups so unavailable history can never bypass
+    # a strong contradictory-name warning.
+    if name_sim < 0.50:
+        existing_name_tokens = _extract_meaningful_tokens(existing_name)
+        extracted_name_tokens = _extract_meaningful_tokens(extracted_name)
+        name_token_overlap = existing_name_tokens.intersection(extracted_name_tokens)
+
+        return IdentityComparisonResult(
+            verdict=IdentityVerdict.POSSIBLE_MISMATCH,
+            reason=(
+                "The candidate name in this CV is significantly different "
+                "from your existing candidate profile."
+            ),
+            confidence=0.9,
+            details={
+                "existing_name": existing_name,
+                "extracted_name": extracted_name,
+                "name_similarity": round(name_sim, 3),
+                "name_token_overlap": sorted(name_token_overlap),
             },
         )
 
@@ -220,74 +242,46 @@ def evaluate_candidate_identity(
     has_existing_history = bool(existing_institutions or existing_companies)
     has_extracted_history = bool(extracted_institutions or extracted_companies)
 
-    # If either side has no background history, we have insufficient multi-signal evidence.
-    # A name difference alone must NEVER trigger possible_mismatch.
-    if not has_existing_history or not has_extracted_history:
-        return IdentityComparisonResult(
-            verdict=IdentityVerdict.INSUFFICIENT_IDENTITY_EVIDENCE,
-            reason="Insufficient background history to establish identity mismatch.",
-            confidence=0.7,
-            details={
-                "has_existing_history": has_existing_history,
-                "has_extracted_history": has_extracted_history,
-                "name_similarity": round(name_sim, 3),
-            },
-        )
-
-    # Check for background overlap (education institution tokens or company tokens)
     edu_overlap = existing_institutions.intersection(extracted_institutions)
     exp_overlap = existing_companies.intersection(extracted_companies)
 
+    existing_name_tokens = _extract_meaningful_tokens(existing_name)
+    extracted_name_tokens = _extract_meaningful_tokens(extracted_name)
+    name_token_overlap = existing_name_tokens.intersection(extracted_name_tokens)
+
+    # For moderate name variation, independent background overlap can connect
+    # the two profiles and avoid an unnecessary confirmation prompt.
     if edu_overlap or exp_overlap:
-        # Background connects the profiles despite name variation
         return IdentityComparisonResult(
             verdict=IdentityVerdict.SAME_CANDIDATE,
             reason="Background history overlap connects candidate to existing profile.",
             confidence=0.85,
             details={
                 "name_similarity": round(name_sim, 3),
-                "edu_overlap": list(edu_overlap),
-                "exp_overlap": list(exp_overlap),
-            },
-        )
-
-    existing_name_tokens = _extract_meaningful_tokens(existing_name)
-    extracted_name_tokens = _extract_meaningful_tokens(extracted_name)
-    name_token_overlap = existing_name_tokens.intersection(extracted_name_tokens)
-
-    # A shared meaningful name token (for example a surname) means identity
-    # disagreement is not strong enough to warn. Prefer a false negative over
-    # blocking a legitimate candidate.
-    if name_token_overlap:
-        return IdentityComparisonResult(
-            verdict=IdentityVerdict.INSUFFICIENT_IDENTITY_EVIDENCE,
-            reason="Name evidence is ambiguous; allowing replacement.",
-            confidence=0.6,
-            details={
-                "name_similarity": round(name_sim, 3),
                 "name_token_overlap": sorted(name_token_overlap),
+                "edu_overlap": sorted(edu_overlap),
+                "exp_overlap": sorted(exp_overlap),
             },
         )
 
-    # Strong multi-signal mismatch requires all of:
-    # 1. No strong fuzzy name match
-    # 2. Zero meaningful name-token overlap
-    # 3. Established history on both profiles
-    # 4. Zero meaningful education/employer overlap
+    # The names are not similar enough to establish identity and there is no
+    # independent background connection. Confirmation is safer than silently
+    # replacing the existing candidate profile.
     return IdentityComparisonResult(
         verdict=IdentityVerdict.POSSIBLE_MISMATCH,
         reason=(
-            "The personal and background information in this CV is significantly "
-            "different from your existing candidate profile."
+            "The identity information in this CV does not clearly match "
+            "your existing candidate profile."
         ),
-        confidence=0.9,
+        confidence=0.75,
         details={
             "existing_name": existing_name,
             "extracted_name": extracted_name,
             "name_similarity": round(name_sim, 3),
-            "existing_institutions_count": len(existing_institutions),
-            "extracted_institutions_count": len(extracted_institutions),
-            "existing_companies_count": len(existing_companies),
-            "extracted_companies_count": len(extracted_companies),
+            "name_token_overlap": sorted(name_token_overlap),
+            "has_existing_history": has_existing_history,
+            "has_extracted_history": has_extracted_history,
+            "edu_overlap": sorted(edu_overlap),
+            "exp_overlap": sorted(exp_overlap),
         },
     )

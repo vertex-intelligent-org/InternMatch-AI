@@ -20,6 +20,7 @@ from app.db.models import (  # noqa: E402
     EducationEntry,
     InternshipListing,
     Match,
+    ProcessingJob,  # noqa: E402
     StudentProfile,
     StudentSkill,
 )
@@ -40,7 +41,10 @@ from app.services.cv_validation import (  # noqa: E402
 from app.services.match_calculation import (  # noqa: E402
     MatchCalculationPreconditionError,
 )
-from tasks.cv_extraction import run_cv_extraction  # noqa: E402
+from tasks.cv_extraction import (  # noqa: E402
+    _publish_progress,
+    run_cv_extraction,
+)
 from tasks.example_task import ping_task  # noqa: E402
 from tasks.job_state import update_job_state  # noqa: E402
 from tasks.match_calculation import run_match_calculation  # noqa: E402
@@ -547,6 +551,84 @@ def test_run_match_calculation_failure_persists_safe_error_and_hides_raw_excepti
         assert "X" * 1000 not in (persisted.error or "")
     finally:
         db.close()
+
+
+def test_cv_publish_progress_updates_active_job():
+    """Progress publication updates an active CV job without changing its contract."""
+    user_id = uuid4()
+    job_id = uuid4()
+
+    db = TestingSessionLocal()
+    try:
+        db.add(
+            ProcessingJob(
+                id=job_id,
+                user_id=user_id,
+                job_type="cv_extraction",
+                status="queued",
+                progress_percent=0,
+            )
+        )
+        db.commit()
+    finally:
+        db.close()
+
+    _publish_progress(job_id, 35)
+
+    fresh_db = TestingSessionLocal()
+    try:
+        persisted = ProcessingJobRepository.get_by_id(
+            fresh_db,
+            job_id=job_id,
+        )
+        assert persisted is not None
+        assert persisted.status == "processing"
+        assert persisted.progress_percent == 35
+    finally:
+        fresh_db.close()
+
+
+def test_cv_publish_progress_does_not_resurrect_cancelled_job():
+    """A progress checkpoint must never reopen a durably cancelled CV job."""
+    user_id = uuid4()
+    job_id = uuid4()
+
+    db = TestingSessionLocal()
+    try:
+        db.add(
+            ProcessingJob(
+                id=job_id,
+                user_id=user_id,
+                job_type="cv_extraction",
+                status="failed",
+                progress_percent=100,
+                result={
+                    "cancel_requested": True,
+                    "cancelled": True,
+                },
+                error="CV analysis cancelled by user.",
+            )
+        )
+        db.commit()
+    finally:
+        db.close()
+
+    _publish_progress(job_id, 70)
+
+    fresh_db = TestingSessionLocal()
+    try:
+        persisted = ProcessingJobRepository.get_by_id(
+            fresh_db,
+            job_id=job_id,
+        )
+        assert persisted is not None
+        assert persisted.status == "failed"
+        assert persisted.progress_percent == 100
+        assert persisted.result["cancel_requested"] is True
+        assert persisted.result["cancelled"] is True
+        assert persisted.error == "CV analysis cancelled by user."
+    finally:
+        fresh_db.close()
 
 
 # RUN_CV_EXTRACTION WORKER PIPELINE TESTS (16 - 28)
