@@ -32,7 +32,11 @@
             "DEFAULT"
           ]
         }
-      ]
+      ],
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/branding/adaptive-icon-foreground.png",
+        "backgroundColor": "#0B5F70"
+      }
     },
     "plugins": [
       "expo-asset",
@@ -47,7 +51,16 @@
           }
         }
       ],
-      "expo-apple-authentication"
+      "expo-apple-authentication",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#075E6E",
+          "image": "./assets/branding/splash-icon.png",
+          "imageWidth": 180,
+          "resizeMode": "contain"
+        }
+      ]
     ],
     "extra": {
       "eas": {
@@ -60,7 +73,9 @@
       "usesAppleSignIn": true,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
-      }
-    }
+      },
+      "icon": "./assets/branding/app-icon.png"
+    },
+    "icon": "./assets/branding/app-icon.png"
   }
 }
