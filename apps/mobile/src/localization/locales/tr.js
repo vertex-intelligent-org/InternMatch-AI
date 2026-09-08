@@ -473,6 +473,7 @@ export default {
     applicationNotesSaveFailed: 'Başvuru notları kaydedilemedi.',
     applicationStatusUpdateFailed: 'Başvuru durumu güncellenemedi.',
     applicationsLoadFailed: 'Başvurular yüklenemedi.',
+    authAccountSetupFailed: 'Giri\u015f yapt\u0131n\u0131z, ancak hesab\u0131n\u0131z\u0131n kurulumu tamamlanamad\u0131. L\u00fctfen tekrar deneyin.',
     authEmailInUse: 'Bu e-posta adresiyle kayıtlı bir hesap zaten var.',
     authInvalidCredentials: 'Girdiğiniz e-posta adresi veya şifre hatalı.',
     authInvalidEmail: 'Lütfen geçerli bir e-posta adresi girin.',

@@ -28,7 +28,7 @@ import motionTokens from '../motion/motionTokens';
 import { signInWithGoogle } from '../services/googleAuth';
 import { signInWithApple } from '../services/appleAuth';
 import { signUpWithEmail, isAuthRateLimitError } from '../services/auth';
-import { syncAuthenticatedUser, upsertProfile } from '../services/api';
+import { ApiError, syncAuthenticatedUser, upsertProfile } from '../services/api';
 import { useProfile } from '../context/ProfileContext';
 import haptics from '../services/haptics';
 
@@ -128,6 +128,7 @@ export default function SignUpScreen({ navigation }) {
     if (loading) return;
 
     setLoading(true);
+    let providerAuthenticated = false;
 
     try {
       const result = await signInWithGoogle();
@@ -142,6 +143,7 @@ export default function SignUpScreen({ navigation }) {
         throw new Error(t('errors.unauthorized'));
       }
 
+      providerAuthenticated = true;
       const syncResult = await syncAuthenticatedUser();
 
       if (syncResult.has_profile) {
@@ -183,9 +185,24 @@ export default function SignUpScreen({ navigation }) {
       console.warn('Google sign-up failed:', error);
       haptics.error();
 
+      let errorKey = 'errors.authSignUpFailed';
+
+      if (providerAuthenticated) {
+        if (error instanceof ApiError && error.status === 0) {
+          errorKey = 'errors.network';
+        } else if (
+          error instanceof ApiError &&
+          (error.status === 401 || error.status === 403)
+        ) {
+          errorKey = 'errors.unauthorized';
+        } else {
+          errorKey = 'errors.authAccountSetupFailed';
+        }
+      }
+
       Alert.alert(
         t('auth.googleSignIn'),
-        t('errors.authSignUpFailed')
+        t(errorKey)
       );
     } finally {
       setLoading(false);
@@ -494,7 +511,7 @@ export default function SignUpScreen({ navigation }) {
               provider="google"
               onPress={handleGoogle}
             />
-            {Platform.OS === 'ios' ? (
+            {Platform.OS === 'ios' && (
               <AppleAuthentication.AppleAuthenticationButton
                 buttonType={
                   AppleAuthentication.AppleAuthenticationButtonType.SIGN_UP
@@ -505,12 +522,6 @@ export default function SignUpScreen({ navigation }) {
                 cornerRadius={24}
                 style={styles.appleAuthButton}
                 onPress={handleApple}
-              />
-            ) : (
-              <SocialAuthButton
-                provider="apple"
-                onPress={handleApple}
-                style={{ marginTop: spacing.md }}
               />
             )}
 

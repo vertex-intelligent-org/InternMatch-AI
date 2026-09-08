@@ -473,6 +473,7 @@ export default {
     applicationNotesSaveFailed: 'Failed to save application notes.',
     applicationStatusUpdateFailed: 'Failed to update application status.',
     applicationsLoadFailed: 'Unable to load applications.',
+    authAccountSetupFailed: 'You are signed in, but we could not finish setting up your account. Please try again.',
     authEmailInUse: 'An account with this email address already exists.',
     authInvalidCredentials: 'The email address or password you entered is incorrect.',
     authInvalidEmail: 'Please enter a valid email address.',

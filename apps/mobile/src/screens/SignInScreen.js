@@ -34,7 +34,7 @@ import {
   isEmailNotConfirmedError,
   isAuthRateLimitError,
 } from '../services/auth';
-import { syncAuthenticatedUser, upsertProfile } from '../services/api';
+import { ApiError, syncAuthenticatedUser, upsertProfile } from '../services/api';
 import { useProfile } from '../context/ProfileContext';
 import haptics from '../services/haptics';
 
@@ -207,6 +207,7 @@ export default function SignInScreen({ navigation, route }) {
 
     setLoading(true);
     setLoadingSource('google');
+    let providerAuthenticated = false;
 
     try {
       const result = await signInWithGoogle();
@@ -221,6 +222,7 @@ export default function SignInScreen({ navigation, route }) {
         throw new Error(t('errors.unauthorized'));
       }
 
+      providerAuthenticated = true;
       setPendingConfirmationEmail('');
 
       const syncResult = await syncAuthenticatedUser();
@@ -260,9 +262,24 @@ export default function SignInScreen({ navigation, route }) {
       console.warn('Google sign-in failed:', error);
       haptics.error();
 
+      let errorKey = 'errors.authSignInFailed';
+
+      if (providerAuthenticated) {
+        if (error instanceof ApiError && error.status === 0) {
+          errorKey = 'errors.network';
+        } else if (
+          error instanceof ApiError &&
+          (error.status === 401 || error.status === 403)
+        ) {
+          errorKey = 'errors.unauthorized';
+        } else {
+          errorKey = 'errors.authAccountSetupFailed';
+        }
+      }
+
       Alert.alert(
         t('auth.googleSignIn'),
-        t('errors.authSignInFailed')
+        t(errorKey)
       );
     } finally {
       setLoading(false);
@@ -536,7 +553,7 @@ export default function SignInScreen({ navigation, route }) {
               onPress={handleGoogle}
             />
 )}
-            {Platform.OS === 'ios' ? (
+            {Platform.OS === 'ios' && (
               <AppleAuthentication.AppleAuthenticationButton
                 buttonType={
                   AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN
@@ -547,12 +564,6 @@ export default function SignInScreen({ navigation, route }) {
                 cornerRadius={24}
                 style={styles.appleAuthButton}
                 onPress={handleApple}
-              />
-            ) : (
-              <SocialAuthButton
-                provider="apple"
-                onPress={handleApple}
-                style={{ marginTop: spacing.md }}
               />
             )}
 
