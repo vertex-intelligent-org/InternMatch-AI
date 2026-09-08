@@ -57,7 +57,10 @@
     "owner": "aiss-uskudar",
     "ios": {
       "bundleIdentifier": "com.aissclub.internmatchai",
-      "usesAppleSignIn": true
+      "usesAppleSignIn": true,
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     }
   }
 }
