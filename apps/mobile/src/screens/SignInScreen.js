@@ -551,21 +551,39 @@ export default function SignInScreen({ navigation, route }) {
 <SocialAuthButton
               provider="google"
               onPress={handleGoogle}
+                disabled={loading}
             />
 )}
             {Platform.OS === 'ios' && (
-              <AppleAuthentication.AppleAuthenticationButton
-                buttonType={
-                  AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN
-                }
-                buttonStyle={
-                  AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
-                }
-                cornerRadius={24}
-                style={styles.appleAuthButton}
-                onPress={handleApple}
-              />
+              loadingSource === 'apple' ? (
+                <View
+                  style={[styles.authLoadingButton, styles.appleAuthButton]}
+                  accessibilityRole="progressbar"
+                  accessibilityLiveRegion="polite"
+                >
+                  <ActivityIndicator
+                    size="small"
+                    color={colors.textInverse || '#FFFFFF'}
+                  />
+                  <Text style={styles.authLoadingButtonText}>
+                    {t('auth.signingIn')}
+                  </Text>
+                </View>
+              ) : (
+                <AppleAuthentication.AppleAuthenticationButton
+                  buttonType={
+                    AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN
+                  }
+                  buttonStyle={
+                    AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
+                  }
+                  cornerRadius={24}
+                  style={styles.appleAuthButton}
+                  onPress={handleApple}
+                />
+              )
             )}
+
 
             {/* Legal Footer inside Panel */}
             <View style={styles.legalFooter}>

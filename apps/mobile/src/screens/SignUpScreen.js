@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import {
+  ActivityIndicator,
   View,
   Text,
   TextInput,
@@ -43,6 +44,7 @@ export default function SignUpScreen({ navigation }) {
   const [department, setDepartment] = useState('');
   const [focusedField, setFocusedField] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [loadingSource, setLoadingSource] = useState(null);
   const { refreshProfile, setProfile } = useProfile();
 
   const handleCreateAccount = async () => {
@@ -65,6 +67,7 @@ export default function SignUpScreen({ navigation }) {
     if (loading) return;
 
     setLoading(true);
+    setLoadingSource('email');
 
     try {
       const metadata = {
@@ -121,6 +124,7 @@ export default function SignUpScreen({ navigation }) {
       Alert.alert(t('common.error'), t(errorKey));
     } finally {
       setLoading(false);
+      setLoadingSource(null);
     }
   };
 
@@ -128,6 +132,7 @@ export default function SignUpScreen({ navigation }) {
     if (loading) return;
 
     setLoading(true);
+    setLoadingSource('google');
     let providerAuthenticated = false;
 
     try {
@@ -206,6 +211,7 @@ export default function SignUpScreen({ navigation }) {
       );
     } finally {
       setLoading(false);
+      setLoadingSource(null);
     }
   };
 
@@ -213,6 +219,7 @@ export default function SignUpScreen({ navigation }) {
     if (loading) return;
 
     setLoading(true);
+    setLoadingSource('apple');
 
     try {
       const result = await signInWithApple({
@@ -248,6 +255,7 @@ export default function SignUpScreen({ navigation }) {
       );
     } finally {
       setLoading(false);
+      setLoadingSource(null);
     }
   };
 
@@ -492,10 +500,15 @@ export default function SignUpScreen({ navigation }) {
 
             {/* Primary CTA */}
             <GradientButton
-              title={loading ? t('auth.creatingAccount') : t('auth.createAccount')}
+              title={
+                loadingSource === 'email'
+                  ? t('auth.creatingAccount')
+                  : t('auth.createAccount')
+              }
               color={colors.accent || colors.teal}
               onPress={handleCreateAccount}
               disabled={loading}
+              loading={loadingSource === 'email'}
               style={styles.primaryCta}
             />
 
@@ -507,22 +520,56 @@ export default function SignUpScreen({ navigation }) {
             </View>
 
             {/* Social Providers */}
-            <SocialAuthButton
-              provider="google"
-              onPress={handleGoogle}
-            />
-            {Platform.OS === 'ios' && (
-              <AppleAuthentication.AppleAuthenticationButton
-                buttonType={
-                  AppleAuthentication.AppleAuthenticationButtonType.SIGN_UP
-                }
-                buttonStyle={
-                  AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
-                }
-                cornerRadius={24}
-                style={styles.appleAuthButton}
-                onPress={handleApple}
+            {loadingSource === 'google' ? (
+              <View
+                style={styles.authLoadingButton}
+                accessibilityRole="progressbar"
+                accessibilityLiveRegion="polite"
+              >
+                <ActivityIndicator
+                  size="small"
+                  color={colors.textInverse || '#FFFFFF'}
+                />
+                <Text style={styles.authLoadingButtonText}>
+                  {t('auth.signingIn')}
+                </Text>
+              </View>
+            ) : (
+              <SocialAuthButton
+                provider="google"
+                onPress={handleGoogle}
+                disabled={loading}
               />
+            )}
+
+            {Platform.OS === 'ios' && (
+              loadingSource === 'apple' ? (
+                <View
+                  style={[styles.authLoadingButton, styles.appleAuthButton]}
+                  accessibilityRole="progressbar"
+                  accessibilityLiveRegion="polite"
+                >
+                  <ActivityIndicator
+                    size="small"
+                    color={colors.textInverse || '#FFFFFF'}
+                  />
+                  <Text style={styles.authLoadingButtonText}>
+                    {t('auth.signingIn')}
+                  </Text>
+                </View>
+              ) : (
+                <AppleAuthentication.AppleAuthenticationButton
+                  buttonType={
+                    AppleAuthentication.AppleAuthenticationButtonType.SIGN_UP
+                  }
+                  buttonStyle={
+                    AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
+                  }
+                  cornerRadius={24}
+                  style={styles.appleAuthButton}
+                  onPress={handleApple}
+                />
+              )
             )}
 
             {/* Legal Footer inside Panel */}
@@ -716,6 +763,22 @@ const styles = StyleSheet.create({
     marginHorizontal: spacing.sm,
     color: colors.textTertiary || colors.textMuted,
     fontSize: 14,
+    fontWeight: '700',
+  },
+  authLoadingButton: {
+    minHeight: 48,
+    borderRadius: spacing.radii.pill,
+    backgroundColor: '#94A3B8',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    opacity: 0.92,
+  },
+  authLoadingButtonText: {
+    color: colors.textInverse || '#FFFFFF',
+    fontSize: 15,
     fontWeight: '700',
   },
   appleAuthButton: {
