@@ -100,6 +100,8 @@ export default {
     checkEmailTitle: 'تحقق من بريدك الإلكتروني',
     continueWithApple: 'المتابعة باستخدام Apple',
     continueWithGoogle: 'المتابعة باستخدام Google',
+    signInWithGoogle: 'تسجيل الدخول باستخدام Google',
+    signUpWithGoogle: 'إنشاء حساب باستخدام Google',
     createAccount: 'إنشاء حساب',
     createAccountButton: 'إنشاء حساب',
     createAccountTitle: 'إنشاء حساب',

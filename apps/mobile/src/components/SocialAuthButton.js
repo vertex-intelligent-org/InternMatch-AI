@@ -45,11 +45,12 @@ export default function SocialAuthButton({
   provider = 'google',
   onPress,
   disabled = false,
+  label,
   style,
 }) {
   const { t } = useTranslation();
   const isGoogle = provider === 'google';
-  const label = isGoogle ? t('auth.continueWithGoogle') : t('auth.continueWithApple');
+  const resolvedLabel = label || (isGoogle ? t('auth.continueWithGoogle') : t('auth.continueWithApple'));
 
   return (
     <PressableScale
@@ -65,7 +66,7 @@ export default function SocialAuthButton({
       activeOpacity={motionTokens.opacities.pressed}
       haptic={disabled ? 'none' : 'light'}
       accessibilityRole="button"
-      accessibilityLabel={label}
+      accessibilityLabel={resolvedLabel}
       hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
     >
       <View style={styles.iconContainer}>
@@ -77,7 +78,7 @@ export default function SocialAuthButton({
           isGoogle ? styles.googleText : styles.appleText,
         ]}
       >
-        {label}
+        {resolvedLabel}
       </Text>
     </PressableScale>
   );
@@ -123,7 +124,7 @@ const styles = StyleSheet.create({
   },
   text: {
     ...typography.button,
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '600',
   },
   googleText: {

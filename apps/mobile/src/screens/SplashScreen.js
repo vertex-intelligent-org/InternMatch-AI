@@ -14,14 +14,14 @@ import Animated, {
 } from 'react-native-reanimated';
 import { gradientColors, colors } from '../theme/colors';
 import { getCurrentSession, signOut } from '../services/auth';
-import { upsertProfile, ApiError } from '../services/api';
+import { ApiError } from '../services/api';
 import { useProfile } from '../context/ProfileContext';
 import useReducedMotion from '../hooks/useReducedMotion';
 import SplashBowArrowAnimation from '../components/motion/SplashBowArrowAnimation';
 
-export default function SplashScreen({ navigation }) {
+export default function SplashScreen({ navigation, route }) {
   const { t } = useTranslation();
-  const { refreshProfile, setProfile, clearProfile } = useProfile();
+  const { refreshProfile, clearProfile } = useProfile();
   const isReducedMotion = useReducedMotion();
 
   const [checking, setChecking] = useState(true);
@@ -63,9 +63,15 @@ export default function SplashScreen({ navigation }) {
   const performNavigationIfReady = useCallback(() => {
     if (hasNavigatedRef.current) return;
     const dest = pendingDestinationRef.current;
+
     if (dest && animationFinishedRef.current) {
       hasNavigatedRef.current = true;
-      navigation.replace(dest);
+
+      if (typeof dest === 'string') {
+        navigation.replace(dest);
+      } else {
+        navigation.replace(dest.name, dest.params);
+      }
     }
   }, [navigation]);
 
@@ -154,37 +160,57 @@ export default function SplashScreen({ navigation }) {
           return;
         }
 
-        // Profile missing; attempt bootstrap from user metadata
+        // Missing backend profile: onboarding is authoritative.
+        // Provider metadata only prefills the form.
         const user = data.session.user;
         const meta = user?.user_metadata || {};
-        const metaName = typeof meta.full_name === 'string' ? meta.full_name.trim() : '';
-        const metaDept = typeof meta.department === 'string' ? meta.department.trim() : '';
-        const metaAccountType = meta.account_type === 'employer' ? 'employer' : 'intern';
+        const hints = route?.params?.onboardingHints || {};
 
-        if (metaName) {
-          try {
-            const created = await upsertProfile({
-              full_name: metaName,
-              headline: null,
-              preferences: {
-                account_type: metaAccountType,
-                department: metaDept || null,
-              },
-            });
-            setProfile(created);
-            if (isMounted) {
-              pendingDestinationRef.current = 'MainTabs';
-              performNavigationIfReady();
-            }
-          } catch (createErr) {
-            console.warn('Metadata bootstrap failed on splash:', createErr);
-            throw createErr;
-          }
-        } else {
-          if (isMounted) {
-            pendingDestinationRef.current = 'OnboardingProfile';
-            performNavigationIfReady();
-          }
+        const metaName =
+          typeof meta.full_name === 'string'
+            ? meta.full_name.trim()
+            : typeof meta.name === 'string'
+              ? meta.name.trim()
+              : '';
+
+        const initialName =
+          typeof hints.fullName === 'string' && hints.fullName.trim()
+            ? hints.fullName.trim()
+            : metaName;
+
+        const initialDepartment =
+          typeof hints.department === 'string' && hints.department.trim()
+            ? hints.department.trim()
+            : typeof meta.department === 'string'
+              ? meta.department.trim()
+              : '';
+
+        const hintedAccountType =
+          hints.accountType === 'intern' || hints.accountType === 'employer'
+            ? hints.accountType
+            : null;
+
+        const metadataAccountType =
+          meta.account_type === 'intern' || meta.account_type === 'employer'
+            ? meta.account_type
+            : null;
+
+        if (isMounted) {
+          pendingDestinationRef.current = {
+            name: 'OnboardingProfile',
+            params: {
+              initialName,
+              initialDepartment,
+              ...(hintedAccountType || metadataAccountType
+                ? {
+                    initialAccountType:
+                      hintedAccountType || metadataAccountType,
+                  }
+                : {}),
+            },
+          };
+
+          performNavigationIfReady();
         }
       } catch (err) {
         console.warn('Session restoration failed on splash:', err);
@@ -215,7 +241,7 @@ export default function SplashScreen({ navigation }) {
     return () => {
       isMounted = false;
     };
-  }, [navigation, refreshProfile, setProfile, clearProfile, retryNonce, performNavigationIfReady, stopTargetRotation]);
+  }, [navigation, route?.params?.onboardingHints, refreshProfile, clearProfile, retryNonce, performNavigationIfReady, stopTargetRotation]);
 
   return (
     <LinearGradient colors={gradientColors} style={styles.container}>
@@ -276,7 +302,11 @@ const styles = StyleSheet.create({
     position: 'relative',
     paddingBottom: 72,
   },
-  logoRow: { flexDirection: 'row', alignItems: 'center' },
+  logoRow: {
+    flexDirection: 'row',
+    direction: 'ltr',
+    alignItems: 'center',
+  },
   logo: {
     fontSize: 28,
     fontStyle: 'italic',

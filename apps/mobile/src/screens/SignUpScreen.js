@@ -16,10 +16,12 @@ import * as AppleAuthentication from 'expo-apple-authentication';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
+import { useLocalization } from '../localization/LocalizationContext';
 import colors from '../theme/colors';
 import { spacing } from '../theme/spacing';
 import { typography } from '../theme/typography';
 import InternMatchLogo from '../components/InternMatchLogo';
+import PreAuthLanguageSwitcher from '../components/PreAuthLanguageSwitcher';
 import AuthGlassPanel from '../components/AuthGlassPanel';
 import AuthSegmentedControl from '../components/AuthSegmentedControl';
 import SocialAuthButton from '../components/SocialAuthButton';
@@ -35,6 +37,7 @@ import haptics from '../services/haptics';
 
 export default function SignUpScreen({ navigation }) {
   const { t } = useTranslation();
+  const { isRTL } = useLocalization();
   const insets = useSafeAreaInsets();
   const [accountType, setAccountType] = useState('intern'); // 'intern' | 'employer'
   const [fullName, setFullName] = useState('');
@@ -133,7 +136,6 @@ export default function SignUpScreen({ navigation }) {
 
     setLoading(true);
     setLoadingSource('google');
-    let providerAuthenticated = false;
 
     try {
       const result = await signInWithGoogle();
@@ -142,79 +144,30 @@ export default function SignUpScreen({ navigation }) {
         return;
       }
 
-      const session = result.session;
-
-      if (!session?.access_token) {
+      if (!result.session?.access_token) {
         throw new Error(t('errors.unauthorized'));
       }
 
-      providerAuthenticated = true;
-      const syncResult = await syncAuthenticatedUser();
-
-      if (syncResult.has_profile) {
-        await refreshProfile();
-        navigation.replace('MainTabs');
-        return;
-      }
-
-      const normalizedName = fullName.trim();
-      const normalizedDepartment = department.trim();
-      const meta = session.user?.user_metadata || {};
-
-      const googleName =
-        typeof meta.full_name === 'string'
-          ? meta.full_name.trim()
-          : typeof meta.name === 'string'
-            ? meta.name.trim()
-            : '';
-
-      const canonicalName = normalizedName || googleName;
-
-      if (!canonicalName) {
-        navigation.replace('OnboardingProfile');
-        return;
-      }
-
-      const createdProfile = await upsertProfile({
-        full_name: canonicalName,
-        headline: null,
-        preferences: {
-          account_type: accountType,
-          department: normalizedDepartment || null,
+      navigation.replace('Splash', {
+        onboardingHints: {
+          fullName: fullName.trim(),
+          department: department.trim(),
+          accountType,
         },
       });
-
-      setProfile(createdProfile);
-      navigation.replace('MainTabs');
     } catch (error) {
       console.warn('Google sign-up failed:', error);
       haptics.error();
 
-      let errorKey = 'errors.authSignUpFailed';
-
-      if (providerAuthenticated) {
-        if (error instanceof ApiError && error.status === 0) {
-          errorKey = 'errors.network';
-        } else if (
-          error instanceof ApiError &&
-          (error.status === 401 || error.status === 403)
-        ) {
-          errorKey = 'errors.unauthorized';
-        } else {
-          errorKey = 'errors.authAccountSetupFailed';
-        }
-      }
-
       Alert.alert(
         t('auth.googleSignIn'),
-        t(errorKey)
+        t('errors.authSignUpFailed')
       );
     } finally {
       setLoading(false);
       setLoadingSource(null);
     }
   };
-
   const handleApple = async () => {
     if (loading) return;
 
@@ -279,6 +232,11 @@ export default function SignUpScreen({ navigation }) {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
+          <PreAuthLanguageSwitcher
+            disabled={loading}
+            style={styles.languageSwitcher}
+          />
+
           {/* Brand Logo Zone */}
           <View style={styles.brandZone}>
             <InternMatchLogo style={styles.brandLogo} />
@@ -450,6 +408,7 @@ export default function SignUpScreen({ navigation }) {
                     styles.input,
                     styles.passwordInput,
                     focusedField === 'password' && styles.inputFocused,
+                    isRTL && styles.passwordInputRTL,
                   ]}
                   placeholder={t('auth.passwordMin')}
                   placeholderTextColor="rgba(22, 35, 46, 0.40)"
@@ -461,7 +420,7 @@ export default function SignUpScreen({ navigation }) {
                   accessibilityLabel={t('auth.password')}
                 />
                 <TouchableOpacity
-                  style={styles.eyeButton}
+                  style={[styles.eyeButton, isRTL && styles.eyeButtonRTL]}
                   onPress={() => {
                     haptics.selection();
                     setPasswordVisible((prev) => !prev);
@@ -537,6 +496,7 @@ export default function SignUpScreen({ navigation }) {
             ) : (
               <SocialAuthButton
                 provider="google"
+                label={t('auth.signUpWithGoogle')}
                 onPress={handleGoogle}
                 disabled={loading}
               />
@@ -618,6 +578,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.screenHorizontalPadding,
     alignItems: 'center',
   },
+  languageSwitcher: {
+    marginBottom: spacing.sm,
+  },
+
   brandZone: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -711,6 +675,12 @@ const styles = StyleSheet.create({
   passwordInput: {
     paddingRight: 48,
   },
+  passwordInputRTL: {
+    paddingRight: spacing.md,
+    paddingLeft: 48,
+    textAlign: 'right',
+    writingDirection: 'rtl',
+  },
   eyeButton: {
     position: 'absolute',
     right: 12,
@@ -718,6 +688,10 @@ const styles = StyleSheet.create({
     width: 40,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  eyeButtonRTL: {
+    right: undefined,
+    left: 12,
   },
   inputFocused: {
     borderColor: colors.accent || colors.teal,

@@ -115,6 +115,8 @@ export default {
     checkEmailTitle: 'Check your email',
     continueWithApple: 'Continue with Apple',
     continueWithGoogle: 'Continue with Google',
+    signInWithGoogle: 'Sign in with Google',
+    signUpWithGoogle: 'Sign up with Google',
     createAccount: 'Create Account',
     createAccountButton: 'Create Account',
     createAccountTitle: 'Create Account',

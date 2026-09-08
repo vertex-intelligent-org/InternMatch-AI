@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
+import { useLocalization } from '../localization/LocalizationContext';
 import * as ImagePicker from 'expo-image-picker';
 import colors from '../theme/colors';
 import { spacing } from '../theme/spacing';
@@ -79,6 +80,7 @@ function normalizeUrl(rawUrl) {
 
 export default function EditProfileScreen({ navigation }) {
   const { t } = useTranslation();
+  const { isRTL } = useLocalization();
   const { profile, setProfile, refreshProfile } = useProfile();
 
   const accountType = profile?.preferences?.account_type
@@ -492,13 +494,13 @@ export default function EditProfileScreen({ navigation }) {
             </Text>
           </View>
 
-          <Text style={styles.sectionTitle}>{t('editProfile.basicInfo')}</Text>
+          <Text style={[styles.sectionTitle, isRTL && styles.textRTL]}>{t('editProfile.basicInfo')}</Text>
 
-          <Text style={styles.label}>
+          <Text style={[styles.label, isRTL && styles.textRTL]}>
             {isEmployer ? t('editProfile.employer.fullName') : t('editProfile.fullName')}
           </Text>
           <TextInput
-            style={[styles.input, styles.compactMultilineInput]}
+            style={[styles.input, styles.compactMultilineInput, isRTL && styles.inputRTL]}
             multiline
             numberOfLines={2}
             textAlignVertical="top"
@@ -509,9 +511,9 @@ export default function EditProfileScreen({ navigation }) {
             onChangeText={setFullName}
           />
 
-          <Text style={styles.label}>{t('editProfile.headline')}</Text>
+          <Text style={[styles.label, isRTL && styles.textRTL]}>{t('editProfile.headline')}</Text>
           <TextInput
-            style={[styles.input, styles.headlineInput]}
+            style={[styles.input, styles.headlineInput, isRTL && styles.inputRTL]}
             multiline
             numberOfLines={2}
             textAlignVertical="top"
@@ -527,9 +529,9 @@ export default function EditProfileScreen({ navigation }) {
 
           {!isEmployer && (
             <>
-              <Text style={styles.label}>{t('editProfile.department')}</Text>
+              <Text style={[styles.label, isRTL && styles.textRTL]}>{t('editProfile.department')}</Text>
               <TextInput
-                style={[styles.input, styles.compactMultilineInput]}
+                style={[styles.input, styles.compactMultilineInput, isRTL && styles.inputRTL]}
                 multiline
                 numberOfLines={2}
                 textAlignVertical="top"
@@ -541,10 +543,10 @@ export default function EditProfileScreen({ navigation }) {
               />
 
               {/* Editable Skills Section */}
-              <Text style={styles.sectionTitle}>{t('editProfile.skills')}</Text>
-              <View style={styles.chipInputRow}>
+              <Text style={[styles.sectionTitle, isRTL && styles.textRTL]}>{t('editProfile.skills')}</Text>
+              <View style={[styles.chipInputRow, isRTL && styles.rowRTL]}>
                 <TextInput
-                  style={[styles.input, styles.chipInput]}
+                  style={[styles.input, styles.chipInput, isRTL && styles.inputRTL]}
                   placeholder={t('editProfile.addSkillPlaceholder')}
                   placeholderTextColor={colors.textTertiary || colors.textMuted}
                   value={newSkill}
@@ -576,15 +578,15 @@ export default function EditProfileScreen({ navigation }) {
                   ))}
                 </View>
               ) : (
-                <Text style={styles.emptyItemsText}>
+                <Text style={[styles.emptyItemsText, isRTL && styles.textRTL]}>
                   {t('editProfile.noSkills')}
                 </Text>
               )}
 
               {/* Career Preferences Section */}
-              <Text style={styles.sectionTitle}>{t('editProfile.careerPreferences')}</Text>
+              <Text style={[styles.sectionTitle, isRTL && styles.textRTL]}>{t('editProfile.careerPreferences')}</Text>
 
-              <Text style={styles.label}>{t('editProfile.workStyle')}</Text>
+              <Text style={[styles.label, isRTL && styles.textRTL]}>{t('editProfile.workStyle')}</Text>
               <View style={styles.chipRow}>
                 {WORK_TYPE_KEYS.map((opt) => {
                   const isSelected = workTypes.includes(opt.id);
@@ -601,10 +603,10 @@ export default function EditProfileScreen({ navigation }) {
                 })}
               </View>
 
-              <Text style={styles.label}>{t('editProfile.desiredLocations')}</Text>
-              <View style={styles.chipInputRow}>
+              <Text style={[styles.label, isRTL && styles.textRTL]}>{t('editProfile.desiredLocations')}</Text>
+              <View style={[styles.chipInputRow, isRTL && styles.rowRTL]}>
                 <TextInput
-                  style={[styles.input, styles.chipInput]}
+                  style={[styles.input, styles.chipInput, isRTL && styles.inputRTL]}
                   placeholder={t('editProfile.addLocationPlaceholder')}
                   placeholderTextColor={colors.textTertiary || colors.textMuted}
                   value={newLocation}
@@ -636,15 +638,15 @@ export default function EditProfileScreen({ navigation }) {
                   ))}
                 </View>
               ) : (
-                <Text style={styles.emptyItemsText}>
+                <Text style={[styles.emptyItemsText, isRTL && styles.textRTL]}>
                   {t('editProfile.noLocations')}
                 </Text>
               )}
 
-              <Text style={styles.label}>{t('editProfile.targetRoles')}</Text>
-              <View style={styles.chipInputRow}>
+              <Text style={[styles.label, isRTL && styles.textRTL]}>{t('editProfile.targetRoles')}</Text>
+              <View style={[styles.chipInputRow, isRTL && styles.rowRTL]}>
                 <TextInput
-                  style={[styles.input, styles.chipInput]}
+                  style={[styles.input, styles.chipInput, isRTL && styles.inputRTL]}
                   placeholder={t('editProfile.addRolePlaceholder')}
                   placeholderTextColor={colors.textTertiary || colors.textMuted}
                   value={newRole}
@@ -676,18 +678,18 @@ export default function EditProfileScreen({ navigation }) {
                   ))}
                 </View>
               ) : (
-                <Text style={styles.emptyItemsText}>
+                <Text style={[styles.emptyItemsText, isRTL && styles.textRTL]}>
                   {t('editProfile.noRoles')}
                 </Text>
               )}
             </>
           )}
 
-          <Text style={styles.sectionTitle}>{t('editProfile.socialLinks')}</Text>
+          <Text style={[styles.sectionTitle, isRTL && styles.textRTL]}>{t('editProfile.socialLinks')}</Text>
 
-          <Text style={styles.label}>{t('editProfile.linkedin')}</Text>
+          <Text style={[styles.label, isRTL && styles.textRTL]}>{t('editProfile.linkedin')}</Text>
           <TextInput
-            style={styles.input}
+            style={[styles.input, styles.urlInput]}
             placeholder="https://linkedin.com/in/username"
             placeholderTextColor={colors.textTertiary || colors.textMuted}
             value={linkedinUrl}
@@ -697,9 +699,9 @@ export default function EditProfileScreen({ navigation }) {
             keyboardType="url"
           />
 
-          <Text style={styles.label}>{t('editProfile.github')}</Text>
+          <Text style={[styles.label, isRTL && styles.textRTL]}>{t('editProfile.github')}</Text>
           <TextInput
-            style={styles.input}
+            style={[styles.input, styles.urlInput]}
             placeholder="https://github.com/username"
             placeholderTextColor={colors.textTertiary || colors.textMuted}
             value={githubUrl}
@@ -709,9 +711,9 @@ export default function EditProfileScreen({ navigation }) {
             keyboardType="url"
           />
 
-          <Text style={styles.label}>{t('editProfile.portfolio')}</Text>
+          <Text style={[styles.label, isRTL && styles.textRTL]}>{t('editProfile.portfolio')}</Text>
           <TextInput
-            style={styles.input}
+            style={[styles.input, styles.urlInput]}
             placeholder="https://yourportfolio.com"
             placeholderTextColor={colors.textTertiary || colors.textMuted}
             value={portfolioUrl}
@@ -725,6 +727,7 @@ export default function EditProfileScreen({ navigation }) {
             title={saving ? t('common.saving') : t('common.save')}
             color={colors.accent || colors.teal}
             onPress={handleSave}
+            disabled={saving || uploadingAvatar}
             style={{ marginTop: spacing.lg }}
           />
         </ScrollView>
@@ -818,6 +821,21 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     color: colors.textPrimary || colors.textDark,
     ...typography.body,
+  },
+  inputRTL: {
+    textAlign: 'right',
+    writingDirection: 'rtl',
+  },
+  urlInput: {
+    textAlign: 'left',
+    writingDirection: 'ltr',
+  },
+  textRTL: {
+    textAlign: 'right',
+    writingDirection: 'rtl',
+  },
+  rowRTL: {
+    flexDirection: 'row-reverse',
   },
   headlineInput: {
     minHeight: 72,

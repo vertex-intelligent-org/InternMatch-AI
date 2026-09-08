@@ -115,6 +115,8 @@ export default {
     checkEmailTitle: 'E-postanızı kontrol edin',
     continueWithApple: 'Apple ile Devam Et',
     continueWithGoogle: 'Google ile Devam Et',
+    signInWithGoogle: 'Google ile Giriş Yap',
+    signUpWithGoogle: 'Google ile Kaydol',
     createAccount: 'Hesap Oluştur',
     createAccountButton: 'Hesap Oluştur',
     createAccountTitle: 'Hesap Oluştur',
