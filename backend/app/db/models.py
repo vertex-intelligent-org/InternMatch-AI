@@ -712,12 +712,12 @@ class AIQuotaOperation(Base):
 
 
 class AIUsageEvent(Base):
-    """Internal server-side telemetry for one Gemini provider invocation."""
+    """Internal server-side telemetry for one AI provider invocation."""
 
     __tablename__ = "ai_usage_events"
     __table_args__ = (
         CheckConstraint(
-            "provider IN ('gemini')",
+            "provider IN ('gemini', 'openai')",
             name="ck_ai_usage_events_provider",
         ),
         CheckConstraint(

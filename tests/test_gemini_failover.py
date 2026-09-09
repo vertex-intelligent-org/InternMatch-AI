@@ -133,6 +133,14 @@ def test_non_transient_400_does_not_fallback(
 def test_all_transient_models_are_attempted_once(
     monkeypatch,
 ):
+    # This test covers Gemini model-level failover only.
+    # Cross-provider behavior is covered separately by
+    # test_provider_failover.py.
+    monkeypatch.setattr(
+        settings,
+        "OPENAI_API_KEY",
+        "",
+    )
     monkeypatch.setattr(
         settings,
         "LLM_FALLBACK_MODEL_NAMES",

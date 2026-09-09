@@ -39,6 +39,11 @@ class Settings(BaseSettings):
     EMBEDDING_MODEL_NAME: str = "gemini-embedding-2"
     EMBEDDING_DIMENSION: int = 1536
 
+    # Independent generation-provider fallback.
+    # Optional: Gemini remains primary when this key is absent.
+    OPENAI_API_KEY: str = ""
+    OPENAI_FALLBACK_MODEL_NAME: str = "gpt-5.6-luna"
+
     # RapidFuzz Skill Matching Threshold (MVP Default: 85)
     SKILL_FUZZY_THRESHOLD: int = 85
 

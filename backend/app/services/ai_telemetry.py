@@ -20,6 +20,7 @@ from app.db.session import SessionLocal
 logger = get_logger(__name__)
 
 PROVIDER_GEMINI = "gemini"
+PROVIDER_OPENAI = "openai"
 STATUS_SUCCESS = "success"
 STATUS_ERROR = "error"
 
@@ -328,6 +329,7 @@ def _record_provider_event(
     response: Any = None,
     embedding: bool = False,
     error: BaseException | None = None,
+    provider: str = PROVIDER_GEMINI,
 ) -> None:
     """Persist one provider event when telemetry context is enabled.
 
@@ -365,7 +367,7 @@ def _record_provider_event(
             user_id=context.user_id,
             processing_job_id=context.processing_job_id,
             quota_operation_id=context.quota_operation_id,
-            provider=PROVIDER_GEMINI,
+            provider=provider,
             operation=_sanitize_operation(
                 context.operation or operation
             ),
@@ -515,6 +517,116 @@ def _is_transient_gemini_error(
     )
 
 
+_CROSS_PROVIDER_FALLBACK_STATUS_CODES = frozenset(
+    {
+        401,
+        403,
+        404,
+        408,
+        429,
+        500,
+        502,
+        503,
+        504,
+    }
+)
+
+
+def _should_try_openai_fallback(
+    exc: Exception,
+) -> bool:
+    status_code = _provider_status_code(exc)
+
+    if status_code in _CROSS_PROVIDER_FALLBACK_STATUS_CODES:
+        return True
+
+    # Network/provider SDK failures may not expose an HTTP status.
+    module_name = type(exc).__module__
+
+    return (
+        isinstance(module_name, str)
+        and (
+            module_name.startswith("google.")
+            or module_name.startswith("httpx.")
+            or module_name.startswith("httpcore.")
+        )
+    )
+
+
+def _try_openai_generation_fallback(
+    *,
+    kwargs: dict[str, Any],
+    operation: str,
+) -> Any | None:
+    from app.services.openai_fallback import (
+        generate_openai_fallback,
+    )
+
+    contents = kwargs.get("contents")
+
+    # All current InternMatch generation call sites pass contents by keyword.
+    # Refuse to guess an unsupported call shape.
+    if contents is None:
+        return None
+
+    config = kwargs.get("config")
+
+    started = perf_counter()
+
+    try:
+        fallback_result = generate_openai_fallback(
+            contents=contents,
+            config=config,
+        )
+    except Exception as exc:
+        latency_ms = round(
+            (perf_counter() - started) * 1000
+        )
+
+        from app.core.config import settings
+
+        fallback_model = (
+            settings.OPENAI_FALLBACK_MODEL_NAME.strip()
+            if settings.OPENAI_FALLBACK_MODEL_NAME
+            else "unknown"
+        )
+
+        _record_provider_event(
+            operation=operation,
+            model=fallback_model,
+            status=STATUS_ERROR,
+            latency_ms=latency_ms,
+            response=None,
+            embedding=False,
+            error=exc,
+            provider=PROVIDER_OPENAI,
+        )
+
+        raise
+
+    if fallback_result is None:
+        return None
+
+    response, fallback_model = fallback_result
+
+    latency_ms = round(
+        (perf_counter() - started) * 1000
+    )
+
+    _record_provider_event(
+        operation=operation,
+        model=fallback_model,
+        status=STATUS_SUCCESS,
+        latency_ms=latency_ms,
+        response=response,
+        embedding=False,
+        error=None,
+        provider=PROVIDER_OPENAI,
+    )
+
+    return response
+
+
 def _replace_provider_model(
     args: tuple[Any, ...],
     kwargs: dict[str, Any],
@@ -638,6 +750,47 @@ class _TrackedModelsProxy:
                         )
                     ):
                         continue
+
+                    provider_status = _provider_status_code(
+                        exc
+                    )
+
+                    # Account/auth/model-access failures are provider-level.
+                    # More Gemini models under the same account cannot recover them.
+                    immediate_cross_provider_failure = (
+                        provider_status
+                        in {
+                            401,
+                            403,
+                            404,
+                        }
+                    )
+
+                    # Transient failures keep the existing Gemini model chain.
+                    # Cross providers only after that chain is exhausted.
+                    exhausted_transient_chain = (
+                        not has_fallback
+                        and _should_try_openai_fallback(
+                            exc
+                        )
+                    )
+
+                    if (
+                        name == "generate_content"
+                        and (
+                            immediate_cross_provider_failure
+                            or exhausted_transient_chain
+                        )
+                    ):
+                        fallback_response = (
+                            _try_openai_generation_fallback(
+                                kwargs=kwargs,
+                                operation=self._operation,
+                            )
+                        )
+
+                        if fallback_response is not None:
+                            return fallback_response
 
                     raise
 
