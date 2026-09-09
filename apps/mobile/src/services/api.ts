@@ -857,7 +857,7 @@ export async function discardApplicationDraft(
 // -----------------------------------------------------------------------------
 
 export type BackendSubscriptionResponse = {
-  plan: 'free' | 'pro_student';
+  plan: 'free' | 'pro_student' | 'employer_pro';
   entitlement_id: string;
   is_active: boolean;
   status: string;

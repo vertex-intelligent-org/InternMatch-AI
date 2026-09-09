@@ -18,7 +18,9 @@ from app.core.config import settings
 from app.db.models import SubscriptionEntitlement
 from app.repositories.subscription import SubscriptionRepository
 from app.services.subscription import (
+    PRO_EMPLOYER_ENTITLEMENT_ID,
     PRO_STUDENT_ENTITLEMENT_ID,
+    get_employer_subscription_snapshot,
     get_student_subscription_snapshot,
 )
 
@@ -295,17 +297,21 @@ def _entitlement_items(subscription: dict[str, Any]) -> list[dict[str, Any]]:
     return [item for item in items if isinstance(item, dict)]
 
 
-def _contains_pro_student_entitlement(
+def _contains_entitlement(
     subscription: dict[str, Any],
+    *,
+    entitlement_id: str,
 ) -> bool:
     return any(
-        item.get("lookup_key") == PRO_STUDENT_ENTITLEMENT_ID
+        item.get("lookup_key") == entitlement_id
         for item in _entitlement_items(subscription)
     )
 
 
-def _pro_student_entitlement_ids(
+def _entitlement_ids(
     subscriptions: list[dict[str, Any]],
+    *,
+    entitlement_id: str,
 ) -> set[str]:
     ids: set[str] = set()
 
@@ -313,7 +319,7 @@ def _pro_student_entitlement_ids(
         for entitlement in _entitlement_items(subscription):
             if (
                 entitlement.get("lookup_key")
-                != PRO_STUDENT_ENTITLEMENT_ID
+                != entitlement_id
             ):
                 continue
 
@@ -329,9 +335,11 @@ def _matching_active_entitlement(
     *,
     subscriptions: list[dict[str, Any]],
     active_entitlements: list[dict[str, Any]],
+    entitlement_id: str,
 ) -> dict[str, Any] | None:
-    pro_entitlement_ids = _pro_student_entitlement_ids(
-        subscriptions
+    pro_entitlement_ids = _entitlement_ids(
+        subscriptions,
+        entitlement_id=entitlement_id,
     )
 
     for active_entitlement in active_entitlements:
@@ -364,11 +372,13 @@ def _subscription_sort_timestamp(subscription: dict[str, Any]) -> int:
 
 def _select_relevant_subscription(
     subscriptions: list[dict[str, Any]],
+    *,
+    entitlement_id: str,
 ) -> dict[str, Any] | None:
     relevant = [
         subscription
         for subscription in subscriptions
-        if _contains_pro_student_entitlement(subscription)
+        if _contains_entitlement(subscription, entitlement_id=entitlement_id)
     ]
 
     if not relevant:
@@ -390,6 +400,8 @@ def _select_relevant_subscription(
 
 def _extract_store_product_identifier(
     subscription: dict[str, Any],
+    *,
+    entitlement_id: str,
 ) -> str | None:
     revenuecat_product_id = subscription.get("product_id")
 
@@ -397,7 +409,7 @@ def _extract_store_product_identifier(
         return None
 
     for entitlement in _entitlement_items(subscription):
-        if entitlement.get("lookup_key") != PRO_STUDENT_ENTITLEMENT_ID:
+        if entitlement.get("lookup_key") != entitlement_id:
             continue
 
         products = entitlement.get("products")
@@ -463,23 +475,24 @@ def _will_renew(subscription: dict[str, Any]) -> bool:
     }
 
 
-def reconcile_student_subscription(
+def _reconcile_subscription(
     db: Session,
     *,
     user_id: UUID,
+    entitlement_id: str,
+    snapshot_getter,
     min_interval_seconds: int = RECONCILIATION_MIN_INTERVAL_SECONDS,
 ) -> dict[str, Any]:
-    """Reconcile Student Pro state against RevenueCat REST API v2."""
+    """Reconcile one supported Pro entitlement against RevenueCat REST API v2."""
 
     now = datetime.now(timezone.utc)
 
     entitlement = SubscriptionRepository.get_entitlement(
         db,
         user_id=user_id,
-        entitlement_id=PRO_STUDENT_ENTITLEMENT_ID,
+        entitlement_id=entitlement_id,
     )
 
-    # Prevent an authenticated client from hammering RevenueCat.
     if (
         entitlement is not None
         and entitlement.updated_at is not None
@@ -495,7 +508,7 @@ def reconcile_student_subscription(
         if (now - updated_at).total_seconds() < min_interval_seconds:
             return {
                 "outcome": "skipped_recent",
-                "subscription": get_student_subscription_snapshot(
+                "subscription": snapshot_getter(
                     db,
                     user_id=user_id,
                 ),
@@ -509,17 +522,21 @@ def reconcile_student_subscription(
         user_id=user_id,
     )
 
-    selected = _select_relevant_subscription(subscriptions)
+    selected = _select_relevant_subscription(
+        subscriptions,
+        entitlement_id=entitlement_id,
+    )
 
     active_entitlement = _matching_active_entitlement(
         subscriptions=subscriptions,
         active_entitlements=active_entitlements,
+        entitlement_id=entitlement_id,
     )
 
     if entitlement is None:
         entitlement = SubscriptionEntitlement(
             user_id=user_id,
-            entitlement_id=PRO_STUDENT_ENTITLEMENT_ID,
+            entitlement_id=entitlement_id,
             status="free",
             is_active=False,
             will_renew=False,
@@ -533,9 +550,7 @@ def reconcile_student_subscription(
         entitlement.current_period_started_at = None
         entitlement.expires_at = None
     else:
-        provider_gives_access = (
-            selected.get("gives_access") is True
-        )
+        provider_gives_access = selected.get("gives_access") is True
 
         period_started_at = _milliseconds_to_datetime(
             selected.get("current_period_starts_at")
@@ -552,12 +567,7 @@ def reconcile_student_subscription(
                 selected.get("current_period_ends_at")
             )
 
-        # RevenueCat defines gives_access as the primary access signal.
-        # Test Store can briefly retain a stale gives_access=True after
-        # accelerated sandbox expiry. For that provider only, an ended
-        # access window plus no active entitlement revokes stale access.
         provider_store = _normalize_upper(selected.get("store"))
-
         gives_access = provider_gives_access
 
         if (
@@ -594,7 +604,8 @@ def reconcile_student_subscription(
             entitlement.expires_at = access_end
 
         store_product_identifier = _extract_store_product_identifier(
-            selected
+            selected,
+            entitlement_id=entitlement_id,
         )
 
         if store_product_identifier is not None:
@@ -616,9 +627,7 @@ def reconcile_student_subscription(
         current_barrier,
         snapshot_timestamp_ms,
     )
-    entitlement.last_event_id = (
-        f"reconcile:v2:{snapshot_timestamp_ms}"
-    )
+    entitlement.last_event_id = f"reconcile:v2:{snapshot_timestamp_ms}"
     entitlement.last_event_type = "RECONCILIATION"
 
     db.commit()
@@ -626,8 +635,42 @@ def reconcile_student_subscription(
 
     return {
         "outcome": "reconciled",
-        "subscription": get_student_subscription_snapshot(
+        "subscription": snapshot_getter(
             db,
             user_id=user_id,
         ),
     }
+
+
+def reconcile_student_subscription(
+    db: Session,
+    *,
+    user_id: UUID,
+    min_interval_seconds: int = RECONCILIATION_MIN_INTERVAL_SECONDS,
+) -> dict[str, Any]:
+    """Reconcile Student Pro state against RevenueCat REST API v2."""
+
+    return _reconcile_subscription(
+        db,
+        user_id=user_id,
+        entitlement_id=PRO_STUDENT_ENTITLEMENT_ID,
+        snapshot_getter=get_student_subscription_snapshot,
+        min_interval_seconds=min_interval_seconds,
+    )
+
+
+def reconcile_employer_subscription(
+    db: Session,
+    *,
+    user_id: UUID,
+    min_interval_seconds: int = RECONCILIATION_MIN_INTERVAL_SECONDS,
+) -> dict[str, Any]:
+    """Reconcile Employer Pro state against RevenueCat REST API v2."""
+
+    return _reconcile_subscription(
+        db,
+        user_id=user_id,
+        entitlement_id=PRO_EMPLOYER_ENTITLEMENT_ID,
+        snapshot_getter=get_employer_subscription_snapshot,
+        min_interval_seconds=min_interval_seconds,
+    )

@@ -1,4 +1,7 @@
-import type { CandidateRevenueCatState } from './revenueCatService';
+import type {
+  CandidateRevenueCatState,
+  EmployerRevenueCatState,
+} from './revenueCatService';
 
 export type AccountType = 'intern' | 'employer';
 
@@ -35,7 +38,7 @@ export interface SubscriptionSnapshot {
 }
 
 export interface BackendSubscriptionState {
-  plan: 'free' | 'pro_student';
+  plan: 'free' | 'pro_student' | 'employer_pro';
   is_active: boolean;
 }
 
@@ -145,25 +148,47 @@ export function getBaselineEntitlements(accountType: AccountType): string[] {
 export function getSubscriptionSnapshot(
   rawAccountType?: string | null,
   candidateRevenueCatState?: CandidateRevenueCatState | null,
-  backendSubscriptionState?: BackendSubscriptionState | null
+  backendSubscriptionState?: BackendSubscriptionState | null,
+  employerRevenueCatState?: EmployerRevenueCatState | null
 ): SubscriptionSnapshot {
   const accountType = normalizeAccountType(rawAccountType);
 
   if (accountType === 'employer') {
+    const providerVerified = Boolean(
+      employerRevenueCatState?.providerVerified
+    );
+    const purchasesAvailable = Boolean(
+      employerRevenueCatState?.purchasesAvailable
+    );
+    const isPro =
+      backendSubscriptionState?.plan === 'employer_pro' &&
+      backendSubscriptionState?.is_active === true;
+
     const purchaseState: PurchaseState = {
       provider: 'revenuecat',
-      providerVerified: false,
-      purchasesAvailable: false,
-      mode: 'preview',
+      providerVerified,
+      purchasesAvailable,
+      mode: employerRevenueCatState ? 'revenuecat' : 'preview',
+    };
+
+    const standardPlan: PlanInfo = {
+      ...EMPLOYER_STANDARD_PLAN,
+      isCurrent: !isPro,
+    };
+
+    const proPlan: PlanInfo = {
+      ...EMPLOYER_PRO_PLAN,
+      isCurrent: isPro,
     };
 
     return {
       accountType: 'employer',
-      currentPlan: EMPLOYER_STANDARD_PLAN,
-      availablePlans: [EMPLOYER_STANDARD_PLAN, EMPLOYER_PRO_PLAN],
-      entitlements: getBaselineEntitlements('employer'),
+      currentPlan: isPro ? proPlan : standardPlan,
+      availablePlans: [standardPlan, proPlan],
+      entitlements: isPro ? ['pro_employer'] : [],
       purchaseState,
-      dynamicPriceString: null,
+      dynamicPriceString:
+        employerRevenueCatState?.priceString || null,
     };
   }
 

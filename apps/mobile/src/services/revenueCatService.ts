@@ -10,6 +10,9 @@ export const REVENUECAT_ENTITLEMENT_ID = 'pro_student';
 export const REVENUECAT_OFFERING_ID = 'default';
 export const REVENUECAT_MONTHLY_PACKAGE_ID = '$rc_monthly';
 export const REVENUECAT_PRODUCT_ID = 'internmatch_pro_student_monthly';
+export const REVENUECAT_EMPLOYER_ENTITLEMENT_ID = 'pro_employer';
+export const REVENUECAT_EMPLOYER_OFFERING_ID = 'employer_default';
+export const REVENUECAT_EMPLOYER_PRODUCT_ID = 'internmatch_pro_employer_monthly';
 
 export interface RevenueCatRuntimeState {
   configured: boolean;
@@ -27,6 +30,45 @@ export interface CandidateRevenueCatState {
   packageIdentifier: string | null;
   productIdentifier: string | null;
   priceString: string | null;
+  reason: string | null;
+}
+
+export interface EmployerRevenueCatState {
+  providerVerified: boolean;
+  proEmployerActive: boolean;
+  activeEntitlementIds: string[];
+  offeringIdentifier: string | null;
+  packageIdentifier: string | null;
+  productIdentifier: string | null;
+  priceString: string | null;
+  purchasesAvailable: boolean;
+  reason: string | null;
+}
+
+export const DEFAULT_EMPLOYER_REVENUECAT_STATE: EmployerRevenueCatState = {
+  providerVerified: false,
+  proEmployerActive: false,
+  activeEntitlementIds: [],
+  offeringIdentifier: null,
+  packageIdentifier: null,
+  productIdentifier: null,
+  priceString: null,
+  purchasesAvailable: false,
+  reason: null,
+};
+
+export interface EmployerPurchaseActionResult {
+  success: boolean;
+  cancelled: boolean;
+  proEmployerActive: boolean;
+  employerState: EmployerRevenueCatState;
+  reason: string | null;
+}
+
+export interface EmployerRestoreActionResult {
+  success: boolean;
+  proEmployerActive: boolean;
+  employerState: EmployerRevenueCatState;
   reason: string | null;
 }
 
@@ -551,9 +593,322 @@ export async function restorePurchases(): Promise<RestoreActionResult> {
   }
 }
 
+
+function matchesEmployerRevenueCatProductIdentifier(
+  identifier: string | null | undefined
+): boolean {
+  if (!identifier) {
+    return false;
+  }
+
+  return (
+    identifier === REVENUECAT_EMPLOYER_PRODUCT_ID ||
+    identifier.startsWith(`${REVENUECAT_EMPLOYER_PRODUCT_ID}:`)
+  );
+}
+
+function resolveCanonicalEmployerPackage(
+  offerings: PurchasesOfferings | null | undefined
+): { package: PurchasesPackage | null; reason: string | null } {
+  const offering = offerings?.all?.[REVENUECAT_EMPLOYER_OFFERING_ID];
+
+  if (!offering) {
+    return { package: null, reason: 'offering_not_found' };
+  }
+
+  const matchingPackage =
+    offering.availablePackages?.find(
+      (pkg) =>
+        pkg.identifier === REVENUECAT_MONTHLY_PACKAGE_ID &&
+        matchesEmployerRevenueCatProductIdentifier(pkg.product?.identifier)
+    ) || null;
+
+  if (!matchingPackage) {
+    return { package: null, reason: 'package_not_found' };
+  }
+
+  return { package: matchingPackage, reason: null };
+}
+
+function normalizeEmployerState(
+  customerInfo: CustomerInfo | null,
+  resolvedPackage: PurchasesPackage | null,
+  baseReason: string | null
+): EmployerRevenueCatState {
+  const activeEntitlementIds = Object.keys(
+    customerInfo?.entitlements?.active || {}
+  );
+
+  const proEmployerActive = Boolean(
+    customerInfo?.entitlements?.active?.[
+      REVENUECAT_EMPLOYER_ENTITLEMENT_ID
+    ]?.isActive ??
+      customerInfo?.entitlements?.active?.[
+        REVENUECAT_EMPLOYER_ENTITLEMENT_ID
+      ]
+  );
+
+  const providerVerified = customerInfo !== null;
+  const purchasesAvailable = resolvedPackage !== null;
+
+  const reason =
+    baseReason ||
+    (!providerVerified
+      ? 'customer_info_fetch_failed'
+      : !purchasesAvailable
+      ? 'purchases_unavailable'
+      : null);
+
+  return {
+    providerVerified,
+    proEmployerActive,
+    activeEntitlementIds,
+    offeringIdentifier:
+      resolvedPackage?.offeringIdentifier ||
+      (resolvedPackage ? REVENUECAT_EMPLOYER_OFFERING_ID : null),
+    packageIdentifier: resolvedPackage?.identifier || null,
+    productIdentifier: resolvedPackage?.product?.identifier || null,
+    priceString: resolvedPackage?.product?.priceString || null,
+    purchasesAvailable,
+    reason,
+  };
+}
+
+export async function getEmployerRevenueCatState(): Promise<EmployerRevenueCatState> {
+  if (!isConfigured) {
+    return {
+      ...DEFAULT_EMPLOYER_REVENUECAT_STATE,
+      reason: 'unconfigured',
+    };
+  }
+
+  if (!currentIdentifiedUserId) {
+    return {
+      ...DEFAULT_EMPLOYER_REVENUECAT_STATE,
+      reason: 'unauthenticated',
+    };
+  }
+
+  let customerInfo: CustomerInfo | null = null;
+  let customerInfoFailed = false;
+
+  try {
+    customerInfo = await Purchases.getCustomerInfo();
+  } catch {
+    customerInfoFailed = true;
+  }
+
+  let resolvedPackage: PurchasesPackage | null = null;
+  let offeringsReason: string | null = null;
+
+  try {
+    const offerings = await Purchases.getOfferings();
+    const resolved = resolveCanonicalEmployerPackage(offerings);
+    resolvedPackage = resolved.package;
+    offeringsReason = resolved.reason;
+  } catch {
+    offeringsReason = 'offerings_fetch_failed';
+  }
+
+  const baseReason = customerInfoFailed
+    ? 'customer_info_fetch_failed'
+    : !resolvedPackage
+    ? offeringsReason || 'purchases_unavailable'
+    : null;
+
+  return normalizeEmployerState(
+    customerInfo,
+    resolvedPackage,
+    baseReason
+  );
+}
+
+export async function purchaseProEmployerMonthly(): Promise<EmployerPurchaseActionResult> {
+  if (!isConfigured) {
+    return {
+      success: false,
+      cancelled: false,
+      proEmployerActive: false,
+      employerState: {
+        ...DEFAULT_EMPLOYER_REVENUECAT_STATE,
+        reason: 'unconfigured',
+      },
+      reason: 'unconfigured',
+    };
+  }
+
+  if (!currentIdentifiedUserId) {
+    return {
+      success: false,
+      cancelled: false,
+      proEmployerActive: false,
+      employerState: {
+        ...DEFAULT_EMPLOYER_REVENUECAT_STATE,
+        reason: 'unauthenticated',
+      },
+      reason: 'unauthenticated',
+    };
+  }
+
+  let pkg: PurchasesPackage | null = null;
+
+  try {
+    const offerings = await Purchases.getOfferings();
+    pkg = resolveCanonicalEmployerPackage(offerings).package;
+  } catch {
+    pkg = null;
+  }
+
+  if (!pkg) {
+    const fallbackState = await getEmployerRevenueCatState();
+
+    return {
+      success: false,
+      cancelled: false,
+      proEmployerActive: fallbackState.proEmployerActive,
+      employerState: fallbackState,
+      reason: 'package_not_found',
+    };
+  }
+
+  try {
+    const purchaseResult = await Purchases.purchasePackage(pkg);
+    const updatedCustomerInfo = purchaseResult.customerInfo;
+    const employerState = normalizeEmployerState(
+      updatedCustomerInfo,
+      pkg,
+      null
+    );
+
+    if (employerState.proEmployerActive) {
+      return {
+        success: true,
+        cancelled: false,
+        proEmployerActive: true,
+        employerState,
+        reason: null,
+      };
+    }
+
+    return {
+      success: false,
+      cancelled: false,
+      proEmployerActive: false,
+      employerState,
+      reason: 'entitlement_not_active',
+    };
+  } catch (error: unknown) {
+    const errorCode =
+      typeof error === 'object' &&
+      error !== null &&
+      'code' in error
+        ? Reflect.get(error, 'code')
+        : null;
+
+    const userCancelled =
+      typeof error === 'object' &&
+      error !== null &&
+      'userCancelled' in error
+        ? Reflect.get(error, 'userCancelled')
+        : false;
+
+    const isCancelled =
+      errorCode === PURCHASES_ERROR_CODE.PURCHASE_CANCELLED_ERROR ||
+      errorCode === '1' ||
+      errorCode === 1 ||
+      userCancelled === true;
+
+    const fallbackState = await getEmployerRevenueCatState();
+
+    return {
+      success: false,
+      cancelled: isCancelled,
+      proEmployerActive: fallbackState.proEmployerActive,
+      employerState: fallbackState,
+      reason: isCancelled ? 'purchase_cancelled' : 'purchase_failed',
+    };
+  }
+}
+
+export async function restoreEmployerPurchases(): Promise<EmployerRestoreActionResult> {
+  if (!isConfigured) {
+    return {
+      success: false,
+      proEmployerActive: false,
+      employerState: {
+        ...DEFAULT_EMPLOYER_REVENUECAT_STATE,
+        reason: 'unconfigured',
+      },
+      reason: 'unconfigured',
+    };
+  }
+
+  if (!currentIdentifiedUserId) {
+    return {
+      success: false,
+      proEmployerActive: false,
+      employerState: {
+        ...DEFAULT_EMPLOYER_REVENUECAT_STATE,
+        reason: 'unauthenticated',
+      },
+      reason: 'unauthenticated',
+    };
+  }
+
+  if (!isRestorePurchasesSupported()) {
+    const fallbackState = await getEmployerRevenueCatState();
+
+    return {
+      success: false,
+      proEmployerActive: fallbackState.proEmployerActive,
+      employerState: fallbackState,
+      reason: 'restore_unsupported_test_store',
+    };
+  }
+
+  try {
+    const customerInfo = await Purchases.restorePurchases();
+
+    let resolvedPackage: PurchasesPackage | null = null;
+
+    try {
+      const offerings = await Purchases.getOfferings();
+      resolvedPackage = resolveCanonicalEmployerPackage(
+        offerings
+      ).package;
+    } catch {
+      resolvedPackage = null;
+    }
+
+    const employerState = normalizeEmployerState(
+      customerInfo,
+      resolvedPackage,
+      null
+    );
+
+    return {
+      success: true,
+      proEmployerActive: employerState.proEmployerActive,
+      employerState,
+      reason: null,
+    };
+  } catch {
+    const fallbackState = await getEmployerRevenueCatState();
+
+    return {
+      success: false,
+      proEmployerActive: fallbackState.proEmployerActive,
+      employerState: fallbackState,
+      reason: 'restore_failed',
+    };
+  }
+}
+
+
 export type CustomerInfoCallback = (state: {
   providerVerified: boolean;
   proStudentActive: boolean;
+  proEmployerActive: boolean;
   activeEntitlementIds: string[];
 }) => void;
 
@@ -570,10 +925,19 @@ export function addRevenueCatCustomerInfoListener(
       customerInfo.entitlements?.active?.[REVENUECAT_ENTITLEMENT_ID]?.isActive ??
         customerInfo.entitlements?.active?.[REVENUECAT_ENTITLEMENT_ID]
     );
+    const proEmployerActive = Boolean(
+      customerInfo.entitlements?.active?.[
+        REVENUECAT_EMPLOYER_ENTITLEMENT_ID
+      ]?.isActive ??
+        customerInfo.entitlements?.active?.[
+          REVENUECAT_EMPLOYER_ENTITLEMENT_ID
+        ]
+    );
 
     callback({
       providerVerified: true,
       proStudentActive,
+      proEmployerActive,
       activeEntitlementIds,
     });
   };

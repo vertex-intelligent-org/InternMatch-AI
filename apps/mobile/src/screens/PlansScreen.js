@@ -49,9 +49,11 @@ export default function PlansScreen({ navigation }) {
   const {
     runtimeState,
     candidateState,
+    employerState,
     isPurchasing,
     isRestoring,
     purchaseProStudent,
+    purchaseProEmployer,
     restorePurchases,
   } = useRevenueCat();
 
@@ -63,7 +65,8 @@ export default function PlansScreen({ navigation }) {
   const subscriptionSnapshot = getSubscriptionSnapshot(
     profile?.preferences?.account_type,
     candidateState,
-    backendSubscription
+    backendSubscription,
+    employerState
   );
   const {
     accountType,
@@ -85,14 +88,99 @@ export default function PlansScreen({ navigation }) {
   const isPurchaseFlowBusy =
     isPurchasing || isPurchaseFlowPending;
 
-  const handleEmployerUpgrade = useCallback((planTitle) => {
+  const handleEmployerUpgrade = useCallback(async () => {
+    if (
+      purchaseFlowInFlightRef.current ||
+      isPurchasing ||
+      isRestoring ||
+      !isPurchaseReady
+    ) {
+      return;
+    }
+
+    purchaseFlowInFlightRef.current = true;
+    setIsPurchaseFlowPending(true);
     haptics.selection();
-    Alert.alert(
-      t('plans.previewAlert.title'),
-      t('plans.previewAlert.message'),
-      [{ text: t('common.close', { defaultValue: 'OK' }), style: 'default' }]
-    );
-  }, [t]);
+
+    try {
+      let result;
+
+      try {
+        result = await purchaseProEmployer();
+      } catch {
+        Alert.alert(
+          t('plans.purchaseFailed.title'),
+          t('plans.purchaseFailed.message'),
+          [{ text: t('common.close', { defaultValue: 'OK' }), style: 'default' }]
+        );
+        return;
+      }
+
+      if (result.reason === 'identity_changed') {
+        return;
+      }
+
+      if (result.success) {
+        let reconciliation;
+
+        try {
+          reconciliation = await reconcileSubscription();
+        } catch {
+          Alert.alert(
+            t('plans.pendingVerification.title'),
+            t('plans.pendingVerification.message'),
+            [{ text: t('common.close', { defaultValue: 'OK' }), style: 'default' }]
+          );
+          return;
+        }
+
+        const backendConfirmedPro =
+          reconciliation?.subscription?.plan === 'employer_pro' &&
+          reconciliation?.subscription?.is_active === true;
+
+        if (!backendConfirmedPro) {
+          Alert.alert(
+            t('plans.pendingVerification.title'),
+            t('plans.pendingVerification.message'),
+            [{ text: t('common.close', { defaultValue: 'OK' }), style: 'default' }]
+          );
+          return;
+        }
+
+        haptics.success();
+        Alert.alert(
+          t('plans.purchaseSuccess.title'),
+          t('plans.purchaseSuccess.message'),
+          [{ text: t('common.close', { defaultValue: 'OK' }), style: 'default' }]
+        );
+      } else if (result.cancelled) {
+        // Quiet dismissal for user cancellation
+      } else if (result.reason === 'entitlement_not_active') {
+        Alert.alert(
+          t('plans.pendingVerification.title'),
+          t('plans.pendingVerification.message'),
+          [{ text: t('common.close', { defaultValue: 'OK' }), style: 'default' }]
+        );
+      } else {
+        haptics.selection();
+        Alert.alert(
+          t('plans.purchaseFailed.title'),
+          t('plans.purchaseFailed.message'),
+          [{ text: t('common.close', { defaultValue: 'OK' }), style: 'default' }]
+        );
+      }
+    } finally {
+      purchaseFlowInFlightRef.current = false;
+      setIsPurchaseFlowPending(false);
+    }
+  }, [
+    isPurchasing,
+    isRestoring,
+    isPurchaseReady,
+    purchaseProEmployer,
+    reconcileSubscription,
+    t,
+  ]);
 
   const handleCandidateUpgrade = useCallback(async () => {
     if (
@@ -200,7 +288,7 @@ export default function PlansScreen({ navigation }) {
 
     let result;
     try {
-      result = await restorePurchases();
+      result = await restorePurchases(isEmployer ? 'employer' : 'intern');
     } catch {
       Alert.alert(
         t('plans.restoreFailed.title'),
@@ -228,8 +316,9 @@ export default function PlansScreen({ navigation }) {
         return;
       }
 
+      const expectedPlan = isEmployer ? 'employer_pro' : 'pro_student';
       const backendConfirmedPro =
-        reconciliation?.subscription?.plan === 'pro_student' &&
+        reconciliation?.subscription?.plan === expectedPlan &&
         reconciliation?.subscription?.is_active === true;
 
       if (backendConfirmedPro) {
@@ -239,7 +328,11 @@ export default function PlansScreen({ navigation }) {
           t('plans.restoreSuccess.message'),
           [{ text: t('common.close', { defaultValue: 'OK' }), style: 'default' }]
         );
-      } else if (!result.proStudentActive) {
+      } else if (
+        isEmployer
+          ? !result.proEmployerActive
+          : !result.proStudentActive
+      ) {
         Alert.alert(
           t('plans.nothingToRestore.title'),
           t('plans.nothingToRestore.message'),
@@ -262,6 +355,7 @@ export default function PlansScreen({ navigation }) {
   }, [
     isPurchasing,
     isRestoring,
+    isEmployer,
     reconcileSubscription,
     restorePurchases,
     t,
@@ -529,9 +623,15 @@ export default function PlansScreen({ navigation }) {
                     </View>
                   ) : isEmployer ? (
                     <GradientButton
-                      title={t('plans.employerUpgradeCta')}
-                      onPress={() => handleEmployerUpgrade(planTitle)}
+                      title={
+                        isPurchaseFlowBusy
+                          ? t('plans.purchasing')
+                          : t('plans.employerUpgradeCta')
+                      }
+                      onPress={handleEmployerUpgrade}
                       color={colors.primaryBlue}
+                      disabled={isPurchaseFlowBusy || isRestoring || !isPurchaseReady}
+                      loading={isPurchaseFlowBusy}
                       accessibilityLabel={t('plans.accessibility.upgradeButton', {
                         plan: planTitle,
                       })}
@@ -560,8 +660,8 @@ export default function PlansScreen({ navigation }) {
           })}
         </View>
 
-        {/* Restore Purchases CTA (Candidate Only - supported platform stores only) */}
-        {!isEmployer && runtimeState?.restorePurchasesSupported === true ? (
+        {/* Restore Purchases CTA — supported platform stores only */}
+        {runtimeState?.restorePurchasesSupported === true ? (
           <View style={styles.restoreContainer}>
             <GradientButton
               title={isRestoring ? t('plans.restoring') : t('plans.restorePurchases')}

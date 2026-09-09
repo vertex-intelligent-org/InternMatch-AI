@@ -4,10 +4,14 @@ import {
   syncRevenueCatUser,
   getRevenueCatRuntimeState,
   getCandidateRevenueCatState,
+  getEmployerRevenueCatState,
   purchaseProStudentMonthly,
+  purchaseProEmployerMonthly,
   restorePurchases as restoreRevenueCatPurchases,
+  restoreEmployerPurchases as restoreRevenueCatEmployerPurchases,
   addRevenueCatCustomerInfoListener,
   DEFAULT_CANDIDATE_REVENUECAT_STATE,
+  DEFAULT_EMPLOYER_REVENUECAT_STATE,
 } from '../services/revenueCatService';
 
 const RevenueCatContext = createContext({
@@ -18,6 +22,7 @@ const RevenueCatContext = createContext({
     reason: null,
   },
   candidateState: DEFAULT_CANDIDATE_REVENUECAT_STATE,
+  employerState: DEFAULT_EMPLOYER_REVENUECAT_STATE,
   isRefreshing: false,
   isPurchasing: false,
   isRestoring: false,
@@ -27,6 +32,13 @@ const RevenueCatContext = createContext({
     cancelled: false,
     proStudentActive: false,
     candidateState: DEFAULT_CANDIDATE_REVENUECAT_STATE,
+    reason: 'uninitialized',
+  }),
+  purchaseProEmployer: async () => ({
+    success: false,
+    cancelled: false,
+    proEmployerActive: false,
+    employerState: DEFAULT_EMPLOYER_REVENUECAT_STATE,
     reason: 'uninitialized',
   }),
   restorePurchases: async () => ({
@@ -40,6 +52,7 @@ const RevenueCatContext = createContext({
 export function RevenueCatProvider({ children }) {
   const [runtimeState, setRuntimeState] = useState(getRevenueCatRuntimeState());
   const [candidateState, setCandidateState] = useState(DEFAULT_CANDIDATE_REVENUECAT_STATE);
+  const [employerState, setEmployerState] = useState(DEFAULT_EMPLOYER_REVENUECAT_STATE);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isPurchasing, setIsPurchasing] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
@@ -115,6 +128,9 @@ export function RevenueCatProvider({ children }) {
         if (result.candidateState) {
           setCandidateState(result.candidateState);
         }
+        if (result.employerState) {
+          setEmployerState(result.employerState);
+        }
         return result;
       }
 
@@ -135,7 +151,53 @@ export function RevenueCatProvider({ children }) {
     }
   }, []);
 
-  const restorePurchases = useCallback(async () => {
+  const purchaseProEmployer = useCallback(async () => {
+    const expectedGeneration = authGenerationRef.current;
+    const expectedUserId = activeUserIdRef.current;
+
+    if (!expectedUserId) {
+      return {
+        success: false,
+        cancelled: false,
+        proEmployerActive: false,
+        employerState: DEFAULT_EMPLOYER_REVENUECAT_STATE,
+        reason: 'unauthenticated',
+      };
+    }
+
+    setIsPurchasing(true);
+    try {
+      const result = await purchaseProEmployerMonthly();
+
+      if (
+        isMountedRef.current &&
+        expectedGeneration === authGenerationRef.current &&
+        expectedUserId === activeUserIdRef.current
+      ) {
+        if (result.employerState) {
+          setEmployerState(result.employerState);
+        }
+        return result;
+      }
+
+      return {
+        success: false,
+        cancelled: false,
+        proEmployerActive: false,
+        employerState: DEFAULT_EMPLOYER_REVENUECAT_STATE,
+        reason: 'identity_changed',
+      };
+    } finally {
+      if (
+        isMountedRef.current &&
+        expectedGeneration === authGenerationRef.current
+      ) {
+        setIsPurchasing(false);
+      }
+    }
+  }, []);
+
+  const restorePurchases = useCallback(async (accountType = 'intern') => {
     const expectedGeneration = authGenerationRef.current;
     const expectedUserId = activeUserIdRef.current;
 
@@ -150,7 +212,10 @@ export function RevenueCatProvider({ children }) {
 
     setIsRestoring(true);
     try {
-      const result = await restoreRevenueCatPurchases();
+      const result =
+        accountType === 'employer'
+          ? await restoreRevenueCatEmployerPurchases()
+          : await restoreRevenueCatPurchases();
       if (
         isMountedRef.current &&
         expectedGeneration === authGenerationRef.current &&
@@ -193,6 +258,7 @@ export function RevenueCatProvider({ children }) {
 
       if (isMountedRef.current) {
         setCandidateState(DEFAULT_CANDIDATE_REVENUECAT_STATE);
+        setEmployerState(DEFAULT_EMPLOYER_REVENUECAT_STATE);
         setIsRefreshing(false);
         setIsPurchasing(false);
         setIsRestoring(false);
@@ -212,9 +278,14 @@ export function RevenueCatProvider({ children }) {
             nextRuntimeState.configured &&
             nextRuntimeState.identifiedUserId === targetUserId
           ) {
-            const nextCandidateState = await getCandidateRevenueCatState();
+            const [nextCandidateState, nextEmployerState] = await Promise.all([
+              getCandidateRevenueCatState(),
+              getEmployerRevenueCatState(),
+            ]);
+
             if (isMountedRef.current && currentGen === authGenerationRef.current) {
               setCandidateState(nextCandidateState);
+              setEmployerState(nextEmployerState);
 
               // Register CustomerInfo listener bound to this generation/user
               removeCustomerInfoListener();
@@ -236,11 +307,19 @@ export function RevenueCatProvider({ children }) {
                   proStudentActive: update.proStudentActive,
                   activeEntitlementIds: update.activeEntitlementIds,
                 }));
+
+                setEmployerState((prev) => ({
+                  ...prev,
+                  providerVerified: update.providerVerified,
+                  proEmployerActive: update.proEmployerActive,
+                  activeEntitlementIds: update.activeEntitlementIds,
+                }));
               });
             }
           } else {
             if (isMountedRef.current && currentGen === authGenerationRef.current) {
               setCandidateState(DEFAULT_CANDIDATE_REVENUECAT_STATE);
+              setEmployerState(DEFAULT_EMPLOYER_REVENUECAT_STATE);
             }
             removeCustomerInfoListener();
           }
@@ -284,11 +363,13 @@ export function RevenueCatProvider({ children }) {
   const contextValue = {
     runtimeState,
     candidateState,
-    isRefreshing,
+    employerState,
+    isRefreshing:
     isPurchasing,
     isRestoring,
     refreshCandidateState,
     purchaseProStudent,
+    purchaseProEmployer,
     restorePurchases,
   };
 

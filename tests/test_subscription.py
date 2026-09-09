@@ -851,3 +851,272 @@ def test_active_entitlement_does_not_override_provider_denial(
     assert body["plan"] == "free"
     assert body["is_active"] is False
     assert body["status"] == "billing_issue"
+
+# -----------------------------------------------------------------------------
+# Employer Pro billing authority
+# -----------------------------------------------------------------------------
+
+
+def _as_employer_event(payload: dict) -> dict:
+    """Convert a fresh Student RevenueCat webhook fixture to Employer Pro."""
+
+    event = payload["event"]
+    event["entitlement_id"] = "pro_employer"
+    event["entitlement_ids"] = ["pro_employer"]
+    event["product_id"] = "internmatch_pro_employer_monthly:monthly-v2"
+    return payload
+
+
+def _as_employer_revenuecat_fixture(value):
+    """Convert existing Student RevenueCat v2 fixtures to Employer equivalents."""
+
+    if isinstance(value, dict):
+        return {
+            key: _as_employer_revenuecat_fixture(item)
+            for key, item in value.items()
+        }
+
+    if isinstance(value, list):
+        return [
+            _as_employer_revenuecat_fixture(item)
+            for item in value
+        ]
+
+    if isinstance(value, str):
+        return (
+            value
+            .replace(
+                "internmatch_pro_student_monthly",
+                "internmatch_pro_employer_monthly:monthly-v2",
+            )
+            .replace("pro_student", "pro_employer")
+            .replace("pro-student", "pro-employer")
+        )
+
+    return value
+
+
+def test_employer_subscription_defaults_to_free():
+    from app.services.subscription import get_employer_subscription_snapshot
+
+    user_id = uuid4()
+
+    with TestingSessionLocal() as db:
+        body = get_employer_subscription_snapshot(
+            db,
+            user_id=user_id,
+        )
+
+    assert body["plan"] == "free"
+    assert body["entitlement_id"] == "pro_employer"
+    assert body["is_active"] is False
+    assert body["status"] == "free"
+    assert body["will_renew"] is False
+
+
+def test_employer_initial_purchase_creates_backend_pro_entitlement(client):
+    from app.services.subscription import get_employer_subscription_snapshot
+
+    user_id = uuid4()
+    now_ms = int(time.time() * 1000)
+    expiry_ms = int(
+        (datetime.now(timezone.utc) + timedelta(days=30)).timestamp()
+        * 1000
+    )
+
+    payload = _as_employer_event(
+        _event_payload(
+            user_id=user_id,
+            event_id=f"employer-initial-{uuid4()}",
+            event_type="INITIAL_PURCHASE",
+            event_timestamp_ms=now_ms,
+            expiration_at_ms=expiry_ms,
+        )
+    )
+
+    response = _post_webhook(client, payload)
+
+    assert response.status_code == 200
+    assert response.json()["outcome"] == "processed"
+
+    with TestingSessionLocal() as db:
+        body = get_employer_subscription_snapshot(
+            db,
+            user_id=user_id,
+        )
+
+    assert body["plan"] == "employer_pro"
+    assert body["entitlement_id"] == "pro_employer"
+    assert body["is_active"] is True
+    assert body["status"] == "active"
+    assert body["will_renew"] is True
+    assert (
+        body["product_id"]
+        == "internmatch_pro_employer_monthly:monthly-v2"
+    )
+
+
+def test_employer_cancellation_keeps_access_until_expiration(client):
+    from app.services.subscription import get_employer_subscription_snapshot
+
+    user_id = uuid4()
+    now_ms = int(time.time() * 1000)
+    expiry_ms = int(
+        (datetime.now(timezone.utc) + timedelta(days=30)).timestamp()
+        * 1000
+    )
+
+    initial = _as_employer_event(
+        _event_payload(
+            user_id=user_id,
+            event_id=f"employer-initial-{uuid4()}",
+            event_type="INITIAL_PURCHASE",
+            event_timestamp_ms=now_ms,
+            expiration_at_ms=expiry_ms,
+        )
+    )
+
+    cancellation = _as_employer_event(
+        _event_payload(
+            user_id=user_id,
+            event_id=f"employer-cancel-{uuid4()}",
+            event_type="CANCELLATION",
+            event_timestamp_ms=now_ms + 1,
+            expiration_at_ms=expiry_ms,
+            cancel_reason="UNSUBSCRIBE",
+        )
+    )
+
+    assert _post_webhook(client, initial).status_code == 200
+
+    cancel_response = _post_webhook(client, cancellation)
+
+    assert cancel_response.status_code == 200
+    assert cancel_response.json()["outcome"] == "processed"
+
+    with TestingSessionLocal() as db:
+        body = get_employer_subscription_snapshot(
+            db,
+            user_id=user_id,
+        )
+
+    assert body["plan"] == "employer_pro"
+    assert body["is_active"] is True
+    assert body["status"] == "cancelled"
+    assert body["will_renew"] is False
+
+
+def test_employer_expiration_revokes_pro_access(client):
+    from app.services.subscription import get_employer_subscription_snapshot
+
+    user_id = uuid4()
+    now_ms = int(time.time() * 1000)
+
+    future_expiry_ms = int(
+        (datetime.now(timezone.utc) + timedelta(days=30)).timestamp()
+        * 1000
+    )
+    expired_ms = int(
+        (datetime.now(timezone.utc) - timedelta(seconds=1)).timestamp()
+        * 1000
+    )
+
+    initial = _as_employer_event(
+        _event_payload(
+            user_id=user_id,
+            event_id=f"employer-initial-{uuid4()}",
+            event_type="INITIAL_PURCHASE",
+            event_timestamp_ms=now_ms,
+            expiration_at_ms=future_expiry_ms,
+        )
+    )
+
+    expiration = _as_employer_event(
+        _event_payload(
+            user_id=user_id,
+            event_id=f"employer-expiry-{uuid4()}",
+            event_type="EXPIRATION",
+            event_timestamp_ms=now_ms + 2,
+            expiration_at_ms=expired_ms,
+            expiration_reason="UNSUBSCRIBE",
+        )
+    )
+
+    assert _post_webhook(client, initial).status_code == 200
+
+    expire_response = _post_webhook(client, expiration)
+
+    assert expire_response.status_code == 200
+    assert expire_response.json()["outcome"] == "processed"
+
+    with TestingSessionLocal() as db:
+        body = get_employer_subscription_snapshot(
+            db,
+            user_id=user_id,
+        )
+
+    assert body["plan"] == "free"
+    assert body["entitlement_id"] == "pro_employer"
+    assert body["is_active"] is False
+    assert body["status"] == "expired"
+    assert body["will_renew"] is False
+
+
+def test_employer_reconciliation_recovers_lost_purchase(monkeypatch):
+    from app.services import revenuecat_reconciliation
+
+    user_id = uuid4()
+    now_ms = int(time.time() * 1000)
+    future_expiry_ms = int(
+        (datetime.now(timezone.utc) + timedelta(days=30)).timestamp()
+        * 1000
+    )
+
+    student_subscription = _revenuecat_v2_subscription(
+        user_id=user_id,
+        gives_access=True,
+        status="active",
+        auto_renewal_status="will_renew",
+        ends_at_ms=future_expiry_ms,
+    )
+    employer_subscription = _as_employer_revenuecat_fixture(
+        student_subscription
+    )
+
+    student_active_entitlement = _active_pro_student_entitlement(
+        expires_at_ms=future_expiry_ms,
+    )
+    employer_active_entitlement = _as_employer_revenuecat_fixture(
+        student_active_entitlement
+    )
+
+    monkeypatch.setattr(
+        revenuecat_reconciliation,
+        "_fetch_revenuecat_subscriptions",
+        lambda *, user_id: (
+            [employer_subscription],
+            [employer_active_entitlement],
+            now_ms,
+        ),
+    )
+
+    with TestingSessionLocal() as db:
+        result = revenuecat_reconciliation.reconcile_employer_subscription(
+            db,
+            user_id=user_id,
+            min_interval_seconds=0,
+        )
+
+    assert result["outcome"] == "reconciled"
+
+    body = result["subscription"]
+
+    assert body["plan"] == "employer_pro"
+    assert body["entitlement_id"] == "pro_employer"
+    assert body["is_active"] is True
+    assert body["status"] == "active"
+    assert body["will_renew"] is True
+    assert (
+        body["product_id"]
+        == "internmatch_pro_employer_monthly:monthly-v2"
+    )

@@ -5,6 +5,7 @@ from typing import Optional
 
 from app.core.security import AuthenticatedUser, get_current_user
 from app.db.session import get_db
+from app.repositories.student_profile import StudentProfileRepository
 from app.services.ai_quota import (
     AIQuotaConfigurationError,
     get_ai_usage_snapshot,
@@ -12,14 +13,41 @@ from app.services.ai_quota import (
 from app.services.revenuecat_reconciliation import (
     RevenueCatReconciliationConfigurationError,
     RevenueCatReconciliationProviderError,
+    reconcile_employer_subscription,
     reconcile_student_subscription,
 )
-from app.services.subscription import get_student_subscription_snapshot
+from app.services.subscription import (
+    get_employer_subscription_snapshot,
+    get_student_subscription_snapshot,
+)
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 router = APIRouter()
+
+
+def _is_employer_account(
+    db: Session,
+    *,
+    user_id,
+) -> bool:
+    """Resolve canonical account type from the backend profile."""
+
+    profile = StudentProfileRepository.get_by_user_id(
+        db,
+        user_id=user_id,
+    )
+
+    if profile is None:
+        return False
+
+    account_type = (profile.preferences or {}).get("account_type")
+
+    return (
+        isinstance(account_type, str)
+        and account_type.strip().lower() == "employer"
+    )
 
 
 class AIQuotaFeatureResponse(BaseModel):
@@ -43,7 +71,7 @@ class AIUsageResponse(BaseModel):
 
 
 class SubscriptionResponse(BaseModel):
-    """Backend-authoritative Student subscription snapshot."""
+    """Backend-authoritative subscription snapshot."""
 
     plan: str
     entitlement_id: str
@@ -71,8 +99,17 @@ def get_my_subscription(
 ):
     """Return the authenticated user's backend-authoritative subscription."""
 
+    snapshot_getter = (
+        get_employer_subscription_snapshot
+        if _is_employer_account(
+            db,
+            user_id=current_user.user_id,
+        )
+        else get_student_subscription_snapshot
+    )
+
     return SubscriptionResponse(
-        **get_student_subscription_snapshot(
+        **snapshot_getter(
             db,
             user_id=current_user.user_id,
         )
@@ -114,7 +151,16 @@ def reconcile_my_subscription(
     """Refresh the authenticated user's subscription from RevenueCat."""
 
     try:
-        result = reconcile_student_subscription(
+        reconcile_subscription = (
+            reconcile_employer_subscription
+            if _is_employer_account(
+                db,
+                user_id=current_user.user_id,
+            )
+            else reconcile_student_subscription
+        )
+
+        result = reconcile_subscription(
             db,
             user_id=current_user.user_id,
         )

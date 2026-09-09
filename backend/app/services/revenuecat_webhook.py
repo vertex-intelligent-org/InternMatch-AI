@@ -13,7 +13,10 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.db.models import RevenueCatWebhookEvent, SubscriptionEntitlement
 from app.repositories.subscription import SubscriptionRepository
-from app.services.subscription import PRO_STUDENT_ENTITLEMENT_ID
+from app.services.subscription import (
+    PRO_EMPLOYER_ENTITLEMENT_ID,
+    PRO_STUDENT_ENTITLEMENT_ID,
+)
 
 SUPPORTED_STATE_EVENTS = {
     "INITIAL_PURCHASE",
@@ -167,15 +170,27 @@ def _resolve_internal_user_id(event: dict[str, Any]) -> UUID | None:
     return None
 
 
-def _contains_pro_student_entitlement(event: dict[str, Any]) -> bool:
+def _resolve_supported_entitlement_id(
+    event: dict[str, Any],
+) -> str | None:
+    supported = (
+        PRO_STUDENT_ENTITLEMENT_ID,
+        PRO_EMPLOYER_ENTITLEMENT_ID,
+    )
+
     entitlement_ids = event.get("entitlement_ids")
 
     if isinstance(entitlement_ids, list):
-        if PRO_STUDENT_ENTITLEMENT_ID in entitlement_ids:
-            return True
+        for entitlement_id in supported:
+            if entitlement_id in entitlement_ids:
+                return entitlement_id
 
     # Backward-compatible fallback for RevenueCat's deprecated singular field.
-    return event.get("entitlement_id") == PRO_STUDENT_ENTITLEMENT_ID
+    singular_entitlement_id = event.get("entitlement_id")
+    if singular_entitlement_id in supported:
+        return singular_entitlement_id
+
+    return None
 
 
 def _update_common_fields(
@@ -279,7 +294,7 @@ def process_revenuecat_webhook(
     payload: dict[str, Any],
 ) -> dict[str, str]:
     """
-    Persist one RevenueCat event exactly once and update pro_student state.
+    Persist one RevenueCat event exactly once and update supported Pro entitlement state.
 
     Unknown/unrelated events are acknowledged and recorded without mutating
     entitlement authority.
@@ -353,7 +368,9 @@ def process_revenuecat_webhook(
             "outcome": ledger_event.outcome,
         }
 
-    if not _contains_pro_student_entitlement(event):
+    entitlement_id = _resolve_supported_entitlement_id(event)
+
+    if entitlement_id is None:
         ledger_event.outcome = "ignored_entitlement"
         ledger_event.processed_at = now
         db.commit()
@@ -392,7 +409,7 @@ def process_revenuecat_webhook(
     entitlement = SubscriptionRepository.get_entitlement(
         db,
         user_id=user_id,
-        entitlement_id=PRO_STUDENT_ENTITLEMENT_ID,
+        entitlement_id=entitlement_id,
     )
 
     if (
@@ -413,7 +430,7 @@ def process_revenuecat_webhook(
     if entitlement is None:
         entitlement = SubscriptionEntitlement(
             user_id=user_id,
-            entitlement_id=PRO_STUDENT_ENTITLEMENT_ID,
+            entitlement_id=entitlement_id,
         )
         db.add(entitlement)
 
