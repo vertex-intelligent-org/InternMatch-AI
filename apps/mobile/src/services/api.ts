@@ -72,12 +72,38 @@ async function getAccessToken(): Promise<string> {
   return token;
 }
 
-function extractApiError(payload: any, fallback: string) {
-  const error = payload?.detail?.error ?? payload?.error;
+type JsonRecord = Record<string, unknown>;
+
+function isJsonRecord(value: unknown): value is JsonRecord {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function extractApiError(payload: unknown, fallback: string) {
+  const root = isJsonRecord(payload) ? payload : {};
+  const detail = root.detail;
+  const detailRecord = isJsonRecord(detail) ? detail : null;
+
+  const rawError =
+    detailRecord?.error ??
+    root.error;
+
+  const error = isJsonRecord(rawError) ? rawError : null;
+
+  const message =
+    typeof error?.message === 'string'
+      ? error.message
+      : typeof detail === 'string'
+        ? detail
+        : fallback;
+
+  const code =
+    typeof error?.code === 'string'
+      ? error.code
+      : undefined;
 
   return {
-    message: error?.message ?? payload?.detail ?? fallback,
-    code: error?.code,
+    message,
+    code,
     details: error?.details,
   };
 }
@@ -217,6 +243,33 @@ export async function upsertProfile(
   });
 }
 
+type ReactNativeFormDataFile = {
+  uri: string;
+  name: string;
+  type: string;
+};
+
+/**
+ * React Native's native FormData implementation accepts URI-backed file
+ * descriptors, while the DOM TypeScript declaration only models string/Blob.
+ *
+ * Keep the compatibility boundary isolated here rather than spreading unsafe
+ * casts or TypeScript suppressions across upload call sites.
+ */
+function appendReactNativeFile(
+  formData: FormData,
+  fieldName: string,
+  file: ReactNativeFormDataFile
+): void {
+  const nativeAppend = Reflect.get(formData, 'append');
+
+  if (typeof nativeAppend !== 'function') {
+    throw new Error('FormData.append is unavailable.');
+  }
+
+  nativeAppend.call(formData, fieldName, file);
+}
+
 export type AvatarUploadResponse = {
   avatar_url: string;
   message: string;
@@ -233,11 +286,11 @@ export async function uploadAvatar(file: {
   type?: string;
 }): Promise<AvatarUploadResponse> {
   const formData = new FormData();
-  formData.append('file', {
+  appendReactNativeFile(formData, 'file', {
     uri: file.uri,
     name: file.name || 'avatar.jpg',
     type: file.type || 'image/jpeg',
-  } as any);
+  });
 
   return apiRequest<AvatarUploadResponse>('/profile/avatar', {
     method: 'POST',
@@ -273,11 +326,11 @@ export async function uploadCV(file: {
   type?: string;
 }): Promise<CVProcessingResponse> {
   const formData = new FormData();
-  formData.append('file', {
+  appendReactNativeFile(formData, 'file', {
     uri: file.uri,
     name: file.name,
     type: file.type || 'application/pdf',
-  } as any);
+  });
 
   return apiRequest<CVProcessingResponse>('/profile/cv', {
     method: 'POST',

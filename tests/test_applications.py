@@ -369,17 +369,16 @@ def test_enqueue_failure_updates_job_to_failed_and_returns_503(client: TestClien
 
 
 def test_enqueue_application_generation_service(monkeypatch):
-    """Test 8: enqueue_application_generation service dispatches to RQ."""
-    mock_queue = MagicMock()
-    mock_redis = MagicMock()
+    """Test 8: application generation delegates exact job data to shared RQ."""
+    calls = []
+
+    def mock_enqueue(task_path, *args, **kwargs):
+        calls.append((task_path, args, kwargs))
+        return MagicMock()
 
     monkeypatch.setattr(
-        "app.services.application_enqueue.Redis.from_url",
-        lambda url: mock_redis,
-    )
-    monkeypatch.setattr(
-        "app.services.application_enqueue.Queue",
-        lambda connection: mock_queue,
+        "app.services.application_enqueue.enqueue_with_backpressure",
+        mock_enqueue,
     )
 
     job_id = uuid4()
@@ -394,21 +393,26 @@ def test_enqueue_application_generation_service(monkeypatch):
         content_locale="tr",
     )
 
-    mock_queue.enqueue.assert_called_once_with(
-        "tasks.application_generation.run_application_generation",
+    assert len(calls) == 1
+
+    task_path, args, kwargs = calls[0]
+
+    assert task_path == (
+        "tasks.application_generation.run_application_generation"
+    )
+
+    assert args == (
         str(job_id),
         str(user_id),
         str(match_id),
         "confident",
         "tr",
-        job_id=str(job_id),
-        job_timeout=180,
     )
 
-
-# ---------------------------------------------------------------------------
-# 2. GENERATION SERVICE UNIT TESTS (9 - 13)
-# ---------------------------------------------------------------------------
+    assert kwargs == {
+        "job_id": str(job_id),
+        "job_timeout": 180,
+    }
 
 
 def test_generate_grounded_cover_letter_service_success(monkeypatch):

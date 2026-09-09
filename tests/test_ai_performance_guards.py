@@ -131,3 +131,35 @@ def test_ai_grounding_context_uses_one_postgres_round_trip():
     assert "education_entries" in sql
     assert "experience_entries" in sql
     assert "project_entries" in sql
+
+def test_mobile_cv_generic_failure_message_does_not_blame_candidate_document():
+    """Generic processing failures must not tell users their CV is invalid."""
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1]
+
+    en_locale = (
+        root
+        / "apps"
+        / "mobile"
+        / "src"
+        / "localization"
+        / "locales"
+        / "en.js"
+    ).read_text(encoding="utf-8")
+
+    assert (
+        "processing service encountered a temporary problem"
+        in en_locale
+    )
+    assert (
+        "Your CV may be valid"
+        in en_locale
+    )
+
+    # CV processing UX must not accidentally overwrite unrelated profile-photo
+    # upload messaging.
+    assert (
+        "Failed to upload profile photo. Please try again."
+        in en_locale
+    )

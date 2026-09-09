@@ -363,9 +363,9 @@ def test_13_cv_extraction_merges_with_existing_skills():
         )
         db.commit()
 
-        # Verify extracted skills replaced previous skills
+        # CV extraction adds/updates CV evidence while preserving manual skills.
         skills = MatchingDataRepository.get_skill_names_for_student(db, prof.id)
-        assert sorted(skills) == ["FastAPI", "PostgreSQL", "Python"]
+        assert sorted(skills) == ["Docker", "FastAPI", "PostgreSQL", "Python"]
     finally:
         db.close()
 
@@ -408,8 +408,8 @@ def test_14_cv_extraction_does_not_duplicate_existing_skills():
         db.close()
 
 
-def test_15_extracted_skills_replace_prior_skills():
-    """Test 15: Newly extracted skills replace prior student skills."""
+def test_15_extracted_skills_preserve_manual_skills():
+    """Test 15: Newly extracted CV skills preserve existing manual skills."""
     user_id = uuid4()
     db = TestingSessionLocal()
     try:
@@ -443,7 +443,7 @@ def test_15_extracted_skills_replace_prior_skills():
         db.commit()
 
         skills = MatchingDataRepository.get_skill_names_for_student(db, prof.id)
-        assert sorted(skills) == ["Python", "React"]
+        assert sorted(skills) == ["Python", "React", "SpecializedManualSkill"]
     finally:
         db.close()
 
@@ -590,6 +590,6 @@ def test_19_cv_extraction_preserves_manual_metadata_and_updates_semantic_prefere
         assert updated.preferences['target_roles'] == ['Backend Engineer']
 
         skills = MatchingDataRepository.get_skill_names_for_student(db, updated.id)
-        assert sorted(skills) == ['Python']
+        assert sorted(skills) == ['ManualOnlySkill', 'Python']
     finally:
         db.close()

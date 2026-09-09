@@ -6,10 +6,7 @@ Provides small Redis/RQ enqueue boundary for dispatching match calculation jobs.
 from typing import Any
 from uuid import UUID
 
-from redis import Redis
-from rq import Queue
-
-from app.core.config import settings
+from app.services.rq_enqueue import enqueue_with_backpressure
 
 
 def enqueue_match_calculation(
@@ -25,11 +22,8 @@ def enqueue_match_calculation(
     if candidate_limit <= 0:
         raise ValueError(f"Invalid candidate_limit {candidate_limit}. Limit must be > 0.")
 
-    redis_conn = Redis.from_url(settings.REDIS_URL)
-    queue = Queue(connection=redis_conn)
-
     task_path = "tasks.match_calculation.run_match_calculation"
-    rq_job = queue.enqueue(
+    rq_job = enqueue_with_backpressure(
         task_path,
         str(job_id),
         str(user_id),

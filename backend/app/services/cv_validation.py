@@ -144,7 +144,7 @@ def validate_cv_document(
             config=types.GenerateContentConfig(
                 system_instruction=system_prompt,
                 response_mime_type="application/json",
-                response_schema=CVValidationResult,
+                response_json_schema=CVValidationResult.model_json_schema(),
             ),
         )
     except Exception as exc:
@@ -221,7 +221,7 @@ def validate_cv_document_multimodal(
             config=types.GenerateContentConfig(
                 system_instruction=system_prompt,
                 response_mime_type="application/json",
-                response_schema=CVValidationResult,
+                response_json_schema=CVValidationResult.model_json_schema(),
             ),
         )
     except Exception as exc:

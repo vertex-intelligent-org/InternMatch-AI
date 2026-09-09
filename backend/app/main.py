@@ -35,12 +35,17 @@ async def lifespan(app: FastAPI):
     logger.info(f"Shutting down {settings.PROJECT_NAME} backend service.")
 
 
+_IS_PRODUCTION = (
+    (settings.ENVIRONMENT or "").strip().lower() == "production"
+)
+
 app = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.VERSION,
     description="AI-powered personalized internship matching and application assistant REST API.",
-    docs_url="/docs",
-    redoc_url="/redoc",
+    docs_url=None if _IS_PRODUCTION else "/docs",
+    redoc_url=None if _IS_PRODUCTION else "/redoc",
+    openapi_url=None if _IS_PRODUCTION else "/openapi.json",
     lifespan=lifespan,
 )
 
@@ -69,6 +74,29 @@ async def handle_ai_idempotency_conflict(
         status_code=409,
         content=format_ai_idempotency_conflict_payload(),
     )
+
+@app.middleware("http")
+async def add_security_headers(
+    request: Request,
+    call_next,
+):
+    """Apply defensive browser-facing headers to every API response."""
+    response = await call_next(request)
+
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    response.headers["Permissions-Policy"] = (
+        "camera=(), microphone=(), geolocation=()"
+    )
+
+    if _IS_PRODUCTION:
+        response.headers["Strict-Transport-Security"] = (
+            "max-age=31536000; includeSubDomains"
+        )
+
+    return response
+
 
 # CORS Configuration
 if settings.cors_origins_list:

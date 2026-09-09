@@ -1255,3 +1255,26 @@ def test_ranking_skills_exclude_known_manual_claims_but_preserve_legacy_unknown(
         assert manual_name in visible_skills
     finally:
         db.close()
+
+def test_cv_validation_uses_json_schema_contract_consistently():
+    """CV validation must use the same Gemini JSON-schema contract as other AI flows."""
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1]
+
+    source = (
+        root
+        / "backend"
+        / "app"
+        / "services"
+        / "cv_validation.py"
+    ).read_text(encoding="utf-8")
+
+    assert source.count(
+        "response_json_schema=CVValidationResult.model_json_schema()"
+    ) == 2
+
+    assert (
+        "response_schema=CVValidationResult"
+        not in source
+    )

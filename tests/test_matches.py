@@ -430,97 +430,156 @@ def test_post_calculate_db_create_failure_prevents_enqueue(client: TestClient, m
 # ENQUEUE SERVICE HELPER TESTS (12 - 17)
 
 
-def test_enqueue_helper_redis_from_url_uses_settings_redis_url(monkeypatch):
-    """Test 12: Redis.from_url receives settings.REDIS_URL."""
-    redis_urls = []
+def test_enqueue_helper_delegates_to_shared_backpressure(monkeypatch):
+    """Test 12: Match enqueue delegates to the shared bounded RQ boundary."""
+    calls = []
 
-    mock_redis_conn = MagicMock()
-    mock_queue = MagicMock()
+    def mock_enqueue(task_path, *args, **kwargs):
+        calls.append((task_path, args, kwargs))
+        return MagicMock()
 
-    def mock_from_url(url):
-        redis_urls.append(url)
-        return mock_redis_conn
-
-    monkeypatch.setattr("app.services.match_enqueue.Redis.from_url", mock_from_url)
-    monkeypatch.setattr("app.services.match_enqueue.Queue", lambda connection: mock_queue)
-
-    job_id = uuid4()
-    user_id = uuid4()
-    enqueue_match_calculation(job_id=job_id, user_id=user_id, candidate_limit=50)
-
-    assert redis_urls == [settings.REDIS_URL]
-
-
-def test_enqueue_helper_queue_constructed_with_redis_conn(monkeypatch):
-    """Test 13: Default Queue is constructed with the mocked Redis connection."""
-    mock_redis_conn = MagicMock()
-    mock_queue = MagicMock()
-    connections = []
-
-    monkeypatch.setattr("app.services.match_enqueue.Redis.from_url", lambda url: mock_redis_conn)
-
-    def mock_queue_cls(connection):
-        connections.append(connection)
-        return mock_queue
-
-    monkeypatch.setattr("app.services.match_enqueue.Queue", mock_queue_cls)
+    monkeypatch.setattr(
+        "app.services.match_enqueue.enqueue_with_backpressure",
+        mock_enqueue,
+    )
 
     job_id = uuid4()
     user_id = uuid4()
-    enqueue_match_calculation(job_id=job_id, user_id=user_id, candidate_limit=50)
 
-    assert connections == [mock_redis_conn]
+    enqueue_match_calculation(
+        job_id=job_id,
+        user_id=user_id,
+        candidate_limit=25,
+    )
+
+    assert len(calls) == 1
+
+    task_path, args, kwargs = calls[0]
+
+    assert task_path == "tasks.match_calculation.run_match_calculation"
+    assert args == (
+        str(job_id),
+        str(user_id),
+        25,
+    )
+    assert kwargs == {
+        "job_id": str(job_id),
+        "job_timeout": 180,
+    }
+
+
+def test_enqueue_helper_default_candidate_limit_is_forwarded(monkeypatch):
+    """Test 13: Default candidate_limit=50 reaches the shared enqueue boundary."""
+    calls = []
+
+    def mock_enqueue(task_path, *args, **kwargs):
+        calls.append((task_path, args, kwargs))
+        return MagicMock()
+
+    monkeypatch.setattr(
+        "app.services.match_enqueue.enqueue_with_backpressure",
+        mock_enqueue,
+    )
+
+    job_id = uuid4()
+    user_id = uuid4()
+
+    enqueue_match_calculation(
+        job_id=job_id,
+        user_id=user_id,
+    )
+
+    assert len(calls) == 1
+
+    _, args, _ = calls[0]
+
+    assert args == (
+        str(job_id),
+        str(user_id),
+        50,
+    )
 
 
 def test_enqueue_helper_rq_call_shape_and_keyword_protection(monkeypatch):
     """
-    Tests 14 & 15 & 16: Queue.enqueue receives exact dotted path, positional durable primitives,
-    and RQ job_id keyword parameter to protect against parameter collision.
+    Tests 14 & 15 & 16: shared enqueue receives exact dotted task path,
+    durable positional primitives, and protected RQ job_id keyword.
     """
-    mock_redis_conn = MagicMock()
-    mock_queue = MagicMock()
-
     enqueue_calls = []
 
     def mock_enqueue(task_path, *args, **kwargs):
         enqueue_calls.append((task_path, args, kwargs))
         return MagicMock()
 
-    mock_queue.enqueue = mock_enqueue
-
-    monkeypatch.setattr("app.services.match_enqueue.Redis.from_url", lambda url: mock_redis_conn)
-    monkeypatch.setattr("app.services.match_enqueue.Queue", lambda connection: mock_queue)
-
-    job_id = uuid4()
-    user_id = uuid4()
-    enqueue_match_calculation(job_id=job_id, user_id=user_id, candidate_limit=50)
-
-    assert len(enqueue_calls) == 1
-    task_path, args, kwargs = enqueue_calls[0]
-
-    assert task_path == "tasks.match_calculation.run_match_calculation"
-    assert args == (str(job_id), str(user_id), 50)
-    assert kwargs == {"job_id": str(job_id), "job_timeout": 180}
-
-
-def test_enqueue_helper_candidate_limit_zero_or_negative_raises_value_error(monkeypatch):
-    """Test 17: candidate_limit <= 0 raises ValueError before Redis/Queue calls."""
-    redis_calls = []
     monkeypatch.setattr(
-        "app.services.match_enqueue.Redis.from_url",
-        lambda url: redis_calls.append(url),
+        "app.services.match_enqueue.enqueue_with_backpressure",
+        mock_enqueue,
     )
 
     job_id = uuid4()
     user_id = uuid4()
 
-    with pytest.raises(ValueError, match="Limit must be > 0"):
-        enqueue_match_calculation(job_id=job_id, user_id=user_id, candidate_limit=0)
+    enqueue_match_calculation(
+        job_id=job_id,
+        user_id=user_id,
+        candidate_limit=50,
+    )
 
-    with pytest.raises(ValueError, match="Limit must be > 0"):
-        enqueue_match_calculation(job_id=job_id, user_id=user_id, candidate_limit=-10)
+    assert len(enqueue_calls) == 1
 
-    assert redis_calls == []
+    task_path, args, kwargs = enqueue_calls[0]
+
+    assert task_path == "tasks.match_calculation.run_match_calculation"
+    assert args == (
+        str(job_id),
+        str(user_id),
+        50,
+    )
+    assert kwargs == {
+        "job_id": str(job_id),
+        "job_timeout": 180,
+    }
+
+
+def test_enqueue_helper_candidate_limit_zero_or_negative_raises_value_error(
+    monkeypatch,
+):
+    """Test 17: invalid candidate limits fail before shared enqueue is called."""
+    enqueue_calls = []
+
+    def mock_enqueue(*args, **kwargs):
+        enqueue_calls.append((args, kwargs))
+        return MagicMock()
+
+    monkeypatch.setattr(
+        "app.services.match_enqueue.enqueue_with_backpressure",
+        mock_enqueue,
+    )
+
+    job_id = uuid4()
+    user_id = uuid4()
+
+    with pytest.raises(
+        ValueError,
+        match="Limit must be > 0",
+    ):
+        enqueue_match_calculation(
+            job_id=job_id,
+            user_id=user_id,
+            candidate_limit=0,
+        )
+
+    with pytest.raises(
+        ValueError,
+        match="Limit must be > 0",
+    ):
+        enqueue_match_calculation(
+            job_id=job_id,
+            user_id=user_id,
+            candidate_limit=-10,
+        )
+
+    assert enqueue_calls == []
 
 
 def test_calculate_matches_rate_limited_returns_429_before_job_creation(

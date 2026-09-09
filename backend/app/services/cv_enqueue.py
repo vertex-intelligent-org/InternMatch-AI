@@ -6,10 +6,7 @@ Provides small Redis/RQ enqueue boundary for dispatching CV extraction jobs.
 from typing import Any
 from uuid import UUID
 
-from redis import Redis
-from rq import Queue
-
-from app.core.config import settings
+from app.services.rq_enqueue import enqueue_with_backpressure
 
 
 def enqueue_cv_extraction(
@@ -37,11 +34,8 @@ def enqueue_cv_extraction(
     if not clean_locale:
         clean_locale = "en"
 
-    redis_conn = Redis.from_url(settings.REDIS_URL)
-    queue = Queue(connection=redis_conn)
-
     task_path = "tasks.cv_extraction.run_cv_extraction"
-    rq_job = queue.enqueue(
+    rq_job = enqueue_with_backpressure(
         task_path,
         str(job_id),
         str(user_id),

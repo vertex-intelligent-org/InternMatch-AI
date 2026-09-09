@@ -21,7 +21,6 @@ services:
     build:
       context: .
       dockerfile: worker/Dockerfile
-    container_name: internmatch_worker
     env_file:
       - .env
     environment:

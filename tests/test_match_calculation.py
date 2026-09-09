@@ -259,7 +259,7 @@ def test_22_test_23_test_24_skill_gap_empty_summary_and_recommendations():
 # ORCHESTRATION TESTS (8 - 12)
 
 def test_8_student_skills_loaded_once_per_calculation(db, monkeypatch):
-    """Test 8: MatchingDataRepository.get_skill_names_for_student is called exactly once."""
+    """Test 8: MatchingDataRepository.get_ranking_skill_names_for_student is called exactly once."""
     user_id = uuid4()
     dummy_vec = [0.1] * settings.EMBEDDING_DIMENSION
     prof = StudentProfile(user_id=user_id, full_name="Spy Student", summary_embedding=dummy_vec)
@@ -278,13 +278,13 @@ def test_8_student_skills_loaded_once_per_calculation(db, monkeypatch):
     )
 
     calls = []
-    original_get_skills = MatchingDataRepository.get_skill_names_for_student
+    original_get_skills = MatchingDataRepository.get_ranking_skill_names_for_student
 
     def spy_get_skills(d, student_id):
         calls.append(student_id)
         return original_get_skills(d, student_id)
 
-    monkeypatch.setattr(MatchingDataRepository, "get_skill_names_for_student", spy_get_skills)
+    monkeypatch.setattr(MatchingDataRepository, "get_ranking_skill_names_for_student", spy_get_skills)
 
     calculate_and_persist_matches(db, user_id, candidate_limit=5)
     assert len(calls) == 1

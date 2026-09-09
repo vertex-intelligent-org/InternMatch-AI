@@ -6,10 +6,7 @@ Provides Redis/RQ enqueue boundary for dispatching application generation jobs.
 from typing import Any
 from uuid import UUID
 
-from redis import Redis
-from rq import Queue
-
-from app.core.config import settings
+from app.services.rq_enqueue import enqueue_with_backpressure
 
 
 def enqueue_application_generation(
@@ -24,11 +21,8 @@ def enqueue_application_generation(
     Passes worker task positional arguments as durable strings and specifies
     RQ job_id keyword.
     """
-    redis_conn = Redis.from_url(settings.REDIS_URL)
-    queue = Queue(connection=redis_conn)
-
     task_path = "tasks.application_generation.run_application_generation"
-    rq_job = queue.enqueue(
+    rq_job = enqueue_with_backpressure(
         task_path,
         str(job_id),
         str(user_id),
