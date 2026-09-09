@@ -93,6 +93,18 @@ class StudentSkill(Base):
     proficiency_level: Mapped[Optional[str]] = mapped_column(
         String, nullable=True, default="intermediate"
     )
+    cv_evidenced: Mapped[bool] = mapped_column(
+        default=False,
+        nullable=False,
+    )
+    self_declared: Mapped[bool] = mapped_column(
+        default=True,
+        nullable=False,
+    )
+    cv_provenance_known: Mapped[bool] = mapped_column(
+        default=False,
+        nullable=False,
+    )
 
     skill: Mapped["Skill"] = relationship("Skill")
 

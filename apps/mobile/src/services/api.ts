@@ -704,6 +704,13 @@ export type EmployerApplicantCandidate = {
   skills: string[];
 };
 
+export type EmployerSkillEvidence = {
+  name: string;
+  cv_evidenced: boolean;
+  self_declared: boolean;
+  cv_provenance_known: boolean;
+};
+
 export type EmployerApplicantItem = {
   application_id: string;
   internship_id: string;
@@ -717,6 +724,7 @@ export type EmployerApplicantItem = {
   ai_rank: number | null;
   matching_skills: string[];
   missing_skills: string[];
+  skill_evidence: EmployerSkillEvidence[];
   interview_scheduled_at: string | null;
   interview_mode: 'online' | 'onsite' | null;
   interview_location: string | null;
@@ -784,6 +792,21 @@ export async function getEmployerApplicants(
     {
       method: 'GET',
     }
+  );
+}
+
+export type EmployerCVAccessResponse = {
+  cv_url: string;
+  expires_in: number;
+  file_type: 'pdf' | 'docx';
+};
+
+export async function getEmployerApplicantCV(
+  internshipId: string,
+  applicationId: string
+): Promise<EmployerCVAccessResponse> {
+  return apiRequest<EmployerCVAccessResponse>(
+    `/internships/${encodeURIComponent(internshipId)}/applicants/${encodeURIComponent(applicationId)}/cv`
   );
 }
 

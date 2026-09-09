@@ -47,6 +47,72 @@ class MatchingDataRepository:
         return list(db.scalars(stmt).all())
 
     @staticmethod
+    def get_ranking_skill_names_for_student(
+        db: Session,
+        student_id: UUID,
+    ) -> List[str]:
+        """
+        Return candidate skills permitted to influence canonical ranking.
+
+        Included:
+          - current CV-evidenced skills
+          - pre-provenance legacy skills whose historical CV source is unknown
+
+        Excluded:
+          - known self-declared-only skills
+
+        The legacy compatibility branch prevents migration-time score collapse,
+        while newly-added profile claims cannot improve ranking without CV
+        evidence.
+        """
+        stmt = (
+            select(Skill.name)
+            .join(StudentSkill, StudentSkill.skill_id == Skill.id)
+            .where(
+                StudentSkill.student_id == student_id,
+                (
+                    StudentSkill.cv_evidenced.is_(True)
+                    | StudentSkill.cv_provenance_known.is_(False)
+                ),
+            )
+            .order_by(Skill.name.asc())
+        )
+        return list(db.scalars(stmt).all())
+
+    @staticmethod
+    def get_skill_evidence_for_student(
+        db: Session,
+        student_id: UUID,
+    ) -> List[dict]:
+        """
+        Return deterministic skill provenance for a candidate.
+
+        Provenance is backend-owned and derived from StudentSkill state.
+        """
+        stmt = (
+            select(
+                Skill.name,
+                StudentSkill.cv_evidenced,
+                StudentSkill.self_declared,
+                StudentSkill.cv_provenance_known,
+            )
+            .join(StudentSkill, StudentSkill.skill_id == Skill.id)
+            .where(StudentSkill.student_id == student_id)
+            .order_by(Skill.name.asc())
+        )
+
+        return [
+            {
+                "name": name,
+                "cv_evidenced": bool(cv_evidenced),
+                "self_declared": bool(self_declared),
+                "cv_provenance_known": bool(cv_provenance_known),
+            }
+            for name, cv_evidenced, self_declared, cv_provenance_known
+            in db.execute(stmt).all()
+        ]
+
+    @staticmethod
     def get_education_for_student(db: Session, student_id: UUID) -> List[EducationEntry]:
         """
         Retrieve EducationEntry records for a given student_id.

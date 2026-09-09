@@ -218,6 +218,15 @@ class CandidateApplicantSummary(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class EmployerSkillEvidence(BaseModel):
+    """Server-authoritative candidate skill provenance shown to employers."""
+
+    name: str
+    cv_evidenced: bool
+    self_declared: bool
+    cv_provenance_known: bool
+
+
 class EmployerApplicantResponse(BaseModel):
     """Schema representing an applicant in an employer's internship applicant list/detail."""
 
@@ -233,6 +242,7 @@ class EmployerApplicantResponse(BaseModel):
     ai_rank: Optional[int] = None
     matching_skills: List[str] = Field(default_factory=list)
     missing_skills: List[str] = Field(default_factory=list)
+    skill_evidence: List[EmployerSkillEvidence] = Field(default_factory=list)
     interview_scheduled_at: Optional[datetime] = None
     interview_mode: Optional[Literal["online", "onsite"]] = None
     interview_location: Optional[str] = None
@@ -250,6 +260,7 @@ class EmployerApplicantResponse(BaseModel):
         profile: Any,
         match: Optional[Any],
         skills: Optional[List[str]] = None,
+        skill_evidence: Optional[List[dict]] = None,
         ai_rank: Optional[int] = None,
     ) -> "EmployerApplicantResponse":
         """Factory mapping Application, StudentProfile, and optional Match."""
@@ -282,6 +293,20 @@ class EmployerApplicantResponse(BaseModel):
             ai_rank=ai_rank,
             matching_skills=matching_skills,
             missing_skills=missing_skills,
+            skill_evidence=[
+                EmployerSkillEvidence(
+                    name=item["name"],
+                    cv_evidenced=bool(item["cv_evidenced"]),
+                    self_declared=bool(item["self_declared"]),
+                    cv_provenance_known=bool(
+                        item.get("cv_provenance_known", False)
+                    ),
+                )
+                for item in (skill_evidence or [])
+                if isinstance(item, dict)
+                and isinstance(item.get("name"), str)
+                and item["name"].strip()
+            ],
             interview_scheduled_at=application.interview_scheduled_at,
             interview_mode=application.interview_mode,
             interview_location=application.interview_location,
@@ -304,3 +329,11 @@ class EmployerApplicantListResponse(BaseModel):
     items: List[EmployerApplicantResponse]
     total: int
     internship_id: UUID
+
+
+class EmployerCVAccessResponse(BaseModel):
+    """Short-lived authorized employer access to a submitted candidate CV."""
+
+    cv_url: str
+    expires_in: int
+    file_type: str

@@ -16,6 +16,7 @@ from app.repositories.application import ApplicationRepository
 from app.repositories.internship import InternshipRepository
 from app.repositories.matching_data import MatchingDataRepository
 from app.schemas.application import (
+    EmployerCVAccessResponse,
     EmployerApplicantListResponse,
     EmployerApplicantResponse,
     EmployerApplicantStatusUpdateRequest,
@@ -35,6 +36,12 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 logger = get_logger(__name__)
+from app.services.cv_storage import (
+    CV_SIGNED_URL_EXPIRY_SECONDS,
+    CVStorageValidationError,
+    generate_candidate_cv_signed_url,
+)
+
 router = APIRouter()
 
 
@@ -316,6 +323,81 @@ def list_internship_applicants(
     )
 
 
+
+@router.get(
+    "/{id}/applicants/{application_id}/cv",
+    response_model=EmployerCVAccessResponse,
+)
+def get_employer_applicant_cv(
+    id: UUID,
+    application_id: UUID,
+    current_user: AuthenticatedUser = Depends(require_employer_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Return short-lived access to the current CV for a submitted applicant.
+
+    Authorization is application-scoped and server-authoritative:
+    - authenticated account must be an employer
+    - opportunity must belong to that employer
+    - application must belong to that opportunity
+    - draft/saved applications are not visible
+    - candidate identity and CV storage path are resolved server-side
+    """
+    record = ApplicationRepository.get_applicant_detail_for_employer(
+        db=db,
+        internship_id=id,
+        application_id=application_id,
+        employer_user_id=current_user.user_id,
+    )
+
+    if not record:
+        return JSONResponse(
+            status_code=status.HTTP_404_NOT_FOUND,
+            content=format_not_found_error(
+                "Applicant record not found for this opportunity."
+            ),
+        )
+
+    application, profile, _match = record
+
+    if application.status == "saved":
+        return JSONResponse(
+            status_code=status.HTTP_404_NOT_FOUND,
+            content=format_not_found_error(
+                "Applicant record not found for this opportunity."
+            ),
+        )
+
+    storage_path = profile.cv_storage_path
+
+    if not storage_path:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Candidate CV is not available.",
+        )
+
+    try:
+        signed_url = generate_candidate_cv_signed_url(
+            user_id=profile.user_id,
+            storage_path=storage_path,
+            expires_in=CV_SIGNED_URL_EXPIRY_SECONDS,
+        )
+    except CVStorageValidationError:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Candidate CV is temporarily unavailable.",
+        )
+
+    extension = storage_path.rsplit(".", 1)[-1].lower()
+
+    return EmployerCVAccessResponse(
+        cv_url=signed_url,
+        expires_in=CV_SIGNED_URL_EXPIRY_SECONDS,
+        file_type=extension,
+    )
+
+
 @router.post("/{id}/close", response_model=InternshipDetailResponse)
 def close_internship_opportunity(
     id: UUID,
@@ -378,11 +460,17 @@ def get_internship_applicant_detail(
 
     app, profile, match = record
     skills = MatchingDataRepository.get_skill_names_for_student(db, profile.id)
+    skill_evidence = MatchingDataRepository.get_skill_evidence_for_student(
+        db,
+        profile.id,
+    )
+
     return EmployerApplicantResponse.from_orm_data(
         application=app,
         profile=profile,
         match=match,
         skills=skills,
+        skill_evidence=skill_evidence,
     )
 
 

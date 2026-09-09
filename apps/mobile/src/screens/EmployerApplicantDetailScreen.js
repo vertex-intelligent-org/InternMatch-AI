@@ -10,6 +10,7 @@ import {
   RefreshControl,
   TouchableOpacity,
   Alert,
+  Linking,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
@@ -25,7 +26,11 @@ import Card from '../components/Card';
 import Chip from '../components/Chip';
 import MatchBadge from '../components/MatchBadge';
 import Reveal from '../components/motion/Reveal';
-import { getEmployerApplicantDetail, updateEmployerApplicantStatus } from '../services/api';
+import {
+  getEmployerApplicantCV,
+  getEmployerApplicantDetail,
+  updateEmployerApplicantStatus,
+} from '../services/api';
 
 function getStatusBadgeStyle(status) {
   switch (status) {
@@ -75,6 +80,7 @@ export default function EmployerApplicantDetailScreen({ route, navigation }) {
   const [interviewLocation, setInterviewLocation] = useState('');
   const [interviewMessage, setInterviewMessage] = useState('');
   const [error, setError] = useState(null);
+  const [openingCV, setOpeningCV] = useState(false);
 
   const fetchDetail = useCallback(
     async (isRefresh = false) => {
@@ -291,11 +297,73 @@ export default function EmployerApplicantDetailScreen({ route, navigation }) {
     );
   }, [t, handleUpdateStatus]);
 
+  const handleViewCV = useCallback(async () => {
+    if (!internshipId || !applicationId || openingCV) {
+      return;
+    }
+
+    setOpeningCV(true);
+
+    try {
+      // Security: request the short-lived URL only when the employer explicitly
+      // asks to view the CV. The mobile client never receives the storage path.
+      const access = await getEmployerApplicantCV(
+        internshipId,
+        applicationId
+      );
+
+      const url = access?.cv_url;
+
+      if (!url) {
+        throw new Error('Candidate CV URL was not returned.');
+      }
+
+      const supported = await Linking.canOpenURL(url);
+
+      if (!supported) {
+        throw new Error('This CV link cannot be opened on this device.');
+      }
+
+      await Linking.openURL(url);
+    } catch (cvError) {
+      Alert.alert(
+        t('employerCandidateEvidence.cvErrorTitle', 'Unable to open CV'),
+        t(
+          'employerCandidateEvidence.cvErrorMessage',
+          'The candidate CV is unavailable right now. Please try again.'
+        )
+      );
+    } finally {
+      setOpeningCV(false);
+    }
+  }, [applicationId, internshipId, openingCV, t]);
+
   const candidate = applicant?.candidate;
   const statusStyle = getStatusBadgeStyle(applicant?.status);
   const appliedDateStr = applicant?.applied_date
     ? formatLocalizedDate(applicant.applied_date, locale)
     : '';
+
+  const skillEvidence = Array.isArray(applicant?.skill_evidence)
+    ? applicant.skill_evidence
+    : [];
+
+  const cvEvidencedSkills = skillEvidence.filter(
+    (item) => item?.cv_evidenced === true
+  );
+
+  const selfDeclaredOnlySkills = skillEvidence.filter(
+    (item) =>
+      item?.self_declared === true &&
+      item?.cv_evidenced !== true &&
+      item?.cv_provenance_known === true
+  );
+
+  const legacyUnknownSkills = skillEvidence.filter(
+    (item) =>
+      item?.cv_evidenced !== true &&
+      item?.cv_provenance_known !== true
+  );
 
   return (
     <ScreenContainer edges={['top', 'bottom']}>
@@ -975,6 +1043,224 @@ export default function EmployerApplicantDetailScreen({ route, navigation }) {
               </Card>
             </Reveal>
 
+            {/* Candidate documents — CV access is requested only on demand. */}
+            <Reveal delay={70}>
+              <Card style={styles.documentsCard} padding="lg">
+                <View style={[styles.evidenceCardHeader, isRTL && styles.rowRTL]}>
+                  <View style={styles.evidenceHeaderIcon}>
+                    <Ionicons
+                      name="folder-open-outline"
+                      size={20}
+                      color={colors.accent || colors.teal}
+                    />
+                  </View>
+
+                  <View style={styles.evidenceHeaderText}>
+                    <Text style={[styles.sectionTitle, isRTL && styles.rtlText]}>
+                      {t(
+                        'employerCandidateEvidence.documentsTitle',
+                        'Candidate Documents'
+                      )}
+                    </Text>
+                    <Text style={[styles.evidenceSubtitle, isRTL && styles.rtlText]}>
+                      {t(
+                        'employerCandidateEvidence.documentsSubtitle',
+                        'Access documents shared with this submitted application.'
+                      )}
+                    </Text>
+                  </View>
+                </View>
+
+                <TouchableOpacity
+                  style={[
+                    styles.viewCVButton,
+                    isRTL && styles.rowRTL,
+                    openingCV && styles.viewCVButtonDisabled,
+                  ]}
+                  onPress={handleViewCV}
+                  disabled={openingCV}
+                  accessibilityRole="button"
+                  accessibilityLabel={t(
+                    'employerCandidateEvidence.viewCV',
+                    'View CV'
+                  )}
+                >
+                  {openingCV ? (
+                    <ActivityIndicator
+                      size="small"
+                      color={colors.textInverse || colors.white}
+                    />
+                  ) : (
+                    <Ionicons
+                      name="document-outline"
+                      size={18}
+                      color={colors.textInverse || colors.white}
+                    />
+                  )}
+
+                  <Text style={styles.viewCVButtonText}>
+                    {openingCV
+                      ? t(
+                          'employerCandidateEvidence.openingCV',
+                          'Opening CV...'
+                        )
+                      : t(
+                          'employerCandidateEvidence.viewCV',
+                          'View CV'
+                        )}
+                  </Text>
+                </TouchableOpacity>
+
+                <Text style={[styles.secureAccessNote, isRTL && styles.rtlText]}>
+                  {t(
+                    'employerCandidateEvidence.secureAccessNote',
+                    'CV access is private and temporary. A secure link is created only when you open the document.'
+                  )}
+                </Text>
+              </Card>
+            </Reveal>
+
+            {/* Candidate skill provenance — separate CV evidence from profile claims. */}
+            <Reveal delay={80}>
+              <Card style={styles.skillProvenanceCard} padding="lg">
+                <View style={[styles.evidenceCardHeader, isRTL && styles.rowRTL]}>
+                  <View style={styles.evidenceHeaderIcon}>
+                    <Ionicons
+                      name="shield-checkmark-outline"
+                      size={20}
+                      color={colors.accent || colors.teal}
+                    />
+                  </View>
+
+                  <View style={styles.evidenceHeaderText}>
+                    <Text style={[styles.sectionTitle, isRTL && styles.rtlText]}>
+                      {t(
+                        'employerCandidateEvidence.skillsTitle',
+                        'Skills Evidence'
+                      )}
+                    </Text>
+                    <Text style={[styles.evidenceSubtitle, isRTL && styles.rtlText]}>
+                      {t(
+                        'employerCandidateEvidence.skillsSubtitle',
+                        'CV evidence is separated from skills the candidate added to their profile.'
+                      )}
+                    </Text>
+                  </View>
+                </View>
+
+                {cvEvidencedSkills.length > 0 ? (
+                  <View style={styles.provenanceSection}>
+                    <Text style={[styles.provenanceSectionTitle, isRTL && styles.rtlText]}>
+                      {t(
+                        'employerCandidateEvidence.cvEvidenceTitle',
+                        'Evidenced in current CV'
+                      )}
+                    </Text>
+
+                    <View style={[styles.provenanceSkillWrap, isRTL && styles.rowRTL]}>
+                      {cvEvidencedSkills.map((item) => (
+                        <View
+                          key={`cv-evidence-${item.name}`}
+                          style={styles.cvEvidenceChip}
+                        >
+                          <Ionicons
+                            name="checkmark-circle"
+                            size={14}
+                            color={colors.success || '#10B981'}
+                          />
+
+                          <Text style={[styles.cvEvidenceText, isRTL && styles.rtlText]}>
+                            {item.name}
+                          </Text>
+
+                          {item.self_declared === true ? (
+                            <Text style={styles.bothSourcesLabel}>
+                              {t(
+                                'employerCandidateEvidence.alsoProfile',
+                                'CV + profile'
+                              )}
+                            </Text>
+                          ) : null}
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                ) : (
+                  <Text style={[styles.evidenceEmptyText, isRTL && styles.rtlText]}>
+                    {t(
+                      'employerCandidateEvidence.noCVEvidence',
+                      'No skill evidence is currently available from the uploaded CV.'
+                    )}
+                  </Text>
+                )}
+
+                {selfDeclaredOnlySkills.length > 0 ? (
+                  <View style={styles.provenanceSection}>
+                    <Text style={[styles.provenanceSectionTitle, isRTL && styles.rtlText]}>
+                      {t(
+                        'employerCandidateEvidence.selfDeclaredTitle',
+                        'Self-declared — not evidenced in current CV'
+                      )}
+                    </Text>
+
+                    <View style={[styles.provenanceSkillWrap, isRTL && styles.rowRTL]}>
+                      {selfDeclaredOnlySkills.map((item) => (
+                        <View
+                          key={`self-declared-${item.name}`}
+                          style={styles.selfDeclaredChip}
+                        >
+                          <Ionicons
+                            name="person-outline"
+                            size={14}
+                            color={colors.warning || '#D97706'}
+                          />
+                          <Text style={[styles.selfDeclaredText, isRTL && styles.rtlText]}>
+                            {item.name}
+                          </Text>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                ) : null}
+
+                {legacyUnknownSkills.length > 0 ? (
+                  <View style={styles.provenanceSection}>
+                    <Text style={[styles.provenanceSectionTitle, isRTL && styles.rtlText]}>
+                      {t(
+                        'employerCandidateEvidence.legacyTitle',
+                        'Historical skills — CV source not yet confirmed'
+                      )}
+                    </Text>
+
+                    <View style={[styles.provenanceSkillWrap, isRTL && styles.rowRTL]}>
+                      {legacyUnknownSkills.map((item) => (
+                        <View
+                          key={`legacy-skill-${item.name}`}
+                          style={styles.legacySkillChip}
+                        >
+                          <Ionicons
+                            name="help-circle-outline"
+                            size={14}
+                            color={colors.textSecondary || colors.textMuted}
+                          />
+                          <Text style={[styles.legacySkillText, isRTL && styles.rtlText]}>
+                            {item.name}
+                          </Text>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                ) : null}
+
+                <Text style={[styles.evidenceFootnote, isRTL && styles.rtlText]}>
+                  {t(
+                    'employerCandidateEvidence.evidenceFootnote',
+                    'Not appearing in a CV does not prove a candidate lacks a skill. Use this evidence together with the full application.'
+                  )}
+                </Text>
+              </Card>
+            </Reveal>
+
             {/* Sequence 4: Generated Cover Letter */}
             <Reveal delay={90}>
               <Card style={styles.letterCard} padding="lg">
@@ -1607,4 +1893,130 @@ const styles = StyleSheet.create({
     textAlign: 'right',
   },
 
+  documentsCard: {
+    marginBottom: spacing.xs,
+  },
+  skillProvenanceCard: {
+    marginBottom: spacing.xs,
+  },
+  evidenceCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: spacing.md,
+  },
+  evidenceHeaderIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.accentSoft || '#E6F4F6',
+    marginEnd: spacing.sm,
+  },
+  evidenceHeaderText: {
+    flex: 1,
+  },
+  evidenceSubtitle: {
+    ...typography.caption,
+    color: colors.textSecondary || colors.textMuted,
+    lineHeight: 18,
+  },
+  viewCVButton: {
+    minHeight: spacing.minimumTouchTarget,
+    borderRadius: spacing.radii.sm,
+    backgroundColor: colors.accent || colors.teal,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+  },
+  viewCVButtonDisabled: {
+    opacity: 0.7,
+  },
+  viewCVButtonText: {
+    ...typography.button,
+    color: colors.textInverse || colors.white,
+  },
+  secureAccessNote: {
+    ...typography.caption,
+    color: colors.textTertiary || colors.textMuted,
+    lineHeight: 17,
+    marginTop: spacing.sm,
+  },
+  provenanceSection: {
+    marginTop: spacing.sm,
+  },
+  provenanceSectionTitle: {
+    ...typography.label,
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.textPrimary || colors.textDark,
+    marginBottom: spacing.xs,
+  },
+  provenanceSkillWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
+  },
+  cvEvidenceChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    borderRadius: spacing.radii.pill,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    backgroundColor: colors.successSoft || '#DCFCE7',
+  },
+  cvEvidenceText: {
+    ...typography.caption,
+    fontWeight: '600',
+    color: '#065F46',
+  },
+  bothSourcesLabel: {
+    ...typography.caption,
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#047857',
+  },
+  selfDeclaredChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    borderRadius: spacing.radii.pill,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    backgroundColor: colors.warningSoft || '#FEF3C7',
+  },
+  selfDeclaredText: {
+    ...typography.caption,
+    fontWeight: '600',
+    color: '#92400E',
+  },
+  evidenceEmptyText: {
+    ...typography.caption,
+    color: colors.textSecondary || colors.textMuted,
+    lineHeight: 18,
+  },
+  evidenceFootnote: {
+    ...typography.caption,
+    color: colors.textTertiary || colors.textMuted,
+    lineHeight: 17,
+    marginTop: spacing.md,
+  },
+  legacySkillChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    borderRadius: spacing.radii.pill,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    backgroundColor: colors.surfaceMuted || '#F3F4F6',
+  },
+  legacySkillText: {
+    ...typography.caption,
+    fontWeight: '600',
+    color: colors.textSecondary || colors.textMuted,
+  },
 });

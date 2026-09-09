@@ -93,71 +93,106 @@ class StudentProfileRepository:
         skills: Sequence[str],
     ) -> bool:
         """
-        Synchronize candidate skills with the provided list.
-        Normalizes and deduplicates incoming skills case-insensitively.
-        If effective skills differ from existing skills:
-          - Removes deleted StudentSkill associations (does not delete master Skill rows).
-          - Adds new StudentSkill associations (creating Skill taxonomy rows if needed).
-          - Flushes session state.
-          - Returns True (skills meaningfully changed).
-        If effective skills are identical:
-          - Leaves associations untouched and returns False.
-        """
-        # 1. Fetch current candidate skills
-        current_skills = MatchingDataRepository.get_skill_names_for_student(db, student_id)
-        current_norm_map: Dict[str, str] = {
-            re.sub(r"\s+", " ", s.strip()).casefold(): s.strip()
-            for s in current_skills
-            if re.sub(r"\s+", " ", s.strip())
-        }
-        current_keys: Set[str] = set(current_norm_map.keys())
+        Synchronize candidate self-declared/profile skills with the provided list.
 
-        # 2. Process incoming skills
+        CV evidence is server-authoritative and is never removed by manual profile
+        editing. A skill may therefore be:
+          - CV-evidenced only
+          - self-declared only
+          - both CV-evidenced and self-declared
+
+        Returns True when self-declared/profile state meaningfully changes.
+        """
         incoming_norm_map: Dict[str, str] = {}
-        for s in skills:
-            if not isinstance(s, str):
+
+        for skill_name in skills:
+            if not isinstance(skill_name, str):
                 continue
-            clean = re.sub(r"\s+", " ", s.strip())
+
+            clean = re.sub(r"\s+", " ", skill_name.strip())
             if not clean:
                 continue
+
             folded = clean.casefold()
             if folded not in incoming_norm_map:
                 incoming_norm_map[folded] = clean
+
         incoming_keys: Set[str] = set(incoming_norm_map.keys())
 
-        # 3. Check for meaningful change
-        if current_keys == incoming_keys:
+        rows = list(
+            db.execute(
+                select(StudentSkill, Skill)
+                .join(Skill, StudentSkill.skill_id == Skill.id)
+                .where(StudentSkill.student_id == student_id)
+            ).all()
+        )
+
+        existing_by_folded: Dict[str, tuple[StudentSkill, Skill]] = {}
+
+        for student_skill, skill_row in rows:
+            folded = re.sub(
+                r"\s+",
+                " ",
+                skill_row.name.strip(),
+            ).casefold()
+
+            if folded:
+                existing_by_folded[folded] = (
+                    student_skill,
+                    skill_row,
+                )
+
+        current_self_declared = {
+            folded
+            for folded, (student_skill, _skill_row)
+            in existing_by_folded.items()
+            if student_skill.self_declared
+        }
+
+        if current_self_declared == incoming_keys:
             return False
 
-        # 4. Remove dropped skills
-        to_remove = current_keys - incoming_keys
-        if to_remove:
-            stmt_delete = delete(StudentSkill).where(
-                StudentSkill.student_id == student_id,
-                StudentSkill.skill_id.in_(
-                    select(Skill.id).where(func.lower(Skill.name).in_(to_remove))
-                ),
+        # Remove self-declared state for omitted skills.
+        for folded in current_self_declared - incoming_keys:
+            student_skill, _skill_row = existing_by_folded[folded]
+
+            student_skill.self_declared = False
+
+            # Delete association only when no CV evidence remains.
+            if not student_skill.cv_evidenced:
+                db.delete(student_skill)
+
+        # Add self-declared state for newly selected/manual skills.
+        for folded in incoming_keys - current_self_declared:
+            existing = existing_by_folded.get(folded)
+
+            if existing is not None:
+                student_skill, _skill_row = existing
+                student_skill.self_declared = True
+                continue
+
+            display_name = incoming_norm_map[folded]
+
+            stmt_find = select(Skill).where(
+                func.lower(Skill.name) == folded
             )
-            db.execute(stmt_delete)
+            skill_row = db.scalar(stmt_find)
 
-        # 5. Add new skills
-        to_add = incoming_keys - current_keys
-        if to_add:
-            for folded in to_add:
-                display_name = incoming_norm_map[folded]
-                stmt_find = select(Skill).where(func.lower(Skill.name) == folded)
-                skill_row = db.scalar(stmt_find)
-                if not skill_row:
-                    skill_row = Skill(name=display_name)
-                    db.add(skill_row)
-                    db.flush()
+            if not skill_row:
+                skill_row = Skill(name=display_name)
+                db.add(skill_row)
+                db.flush()
 
-                student_skill = StudentSkill(
+            db.add(
+                StudentSkill(
                     student_id=student_id,
                     skill_id=skill_row.id,
                     proficiency_level="intermediate",
+                    cv_evidenced=False,
+                    self_declared=True,
+                    cv_provenance_known=True,
                 )
-                db.add(student_skill)
+            )
 
         db.flush()
         return True

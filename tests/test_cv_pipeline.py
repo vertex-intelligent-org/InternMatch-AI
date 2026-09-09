@@ -12,6 +12,7 @@ from uuid import uuid4
 
 import pytest
 from app.db.models import (
+    StudentProfile,
     Skill,
     StudentSkill,
 )
@@ -946,3 +947,311 @@ def test_extract_structured_candidate_profile_multimodal_pdf(monkeypatch):
     assert extracted.skills[0].name == "Figma"
     assert len(extracted.education) == 1
     assert extracted.education[0].institution == "Design Academy"
+
+def test_cv_extraction_preserves_manual_skill_provenance():
+    """
+    A newly accepted CV must reconcile CV evidence without destroying
+    self-declared/profile skills.
+    """
+    user_id = uuid4()
+
+    db = TestingSessionLocal()
+    try:
+        profile = StudentProfile(
+            id=uuid4(),
+            user_id=user_id,
+            full_name="Skill Provenance Candidate",
+            preferences={"account_type": "intern"},
+        )
+        db.add(profile)
+        db.flush()
+
+        manual_skill = Skill(name="ManualOnlySkill")
+        shared_skill = Skill(name="SharedSkill")
+        old_cv_skill = Skill(name="OldCVSkill")
+
+        db.add_all(
+            [
+                manual_skill,
+                shared_skill,
+                old_cv_skill,
+            ]
+        )
+        db.flush()
+
+        db.add_all(
+            [
+                StudentSkill(
+                    student_id=profile.id,
+                    skill_id=manual_skill.id,
+                    proficiency_level="intermediate",
+                    cv_evidenced=False,
+                    self_declared=True,
+                ),
+                StudentSkill(
+                    student_id=profile.id,
+                    skill_id=shared_skill.id,
+                    proficiency_level="intermediate",
+                    cv_evidenced=False,
+                    self_declared=True,
+                ),
+                StudentSkill(
+                    student_id=profile.id,
+                    skill_id=old_cv_skill.id,
+                    proficiency_level="intermediate",
+                    cv_evidenced=True,
+                    self_declared=False,
+                ),
+            ]
+        )
+        db.commit()
+
+        extracted = ExtractedCandidateProfile(
+            full_name="Skill Provenance Candidate",
+            headline="Engineering Student",
+            skills=[
+                {
+                    "name": "SharedSkill",
+                    "proficiency_level": "advanced",
+                },
+                {
+                    "name": "NewCVSkill",
+                    "proficiency_level": "intermediate",
+                },
+            ],
+            education=[],
+            experience=[],
+            projects=[],
+            preferences={},
+        )
+
+        replace_candidate_profile_from_extraction(
+            db=db,
+            user_id=user_id,
+            cv_storage_path=f"{user_id}/new-cv.pdf",
+            extracted=extracted,
+        )
+        db.commit()
+
+        evidence = MatchingDataRepository.get_skill_evidence_for_student(
+            db,
+            profile.id,
+        )
+
+        evidence_by_name = {
+            item["name"]: item
+            for item in evidence
+        }
+
+        assert evidence_by_name["ManualOnlySkill"] == {
+            "name": "ManualOnlySkill",
+            "cv_evidenced": False,
+            "self_declared": True,
+            "cv_provenance_known": True,
+        }
+
+        assert evidence_by_name["SharedSkill"] == {
+            "name": "SharedSkill",
+            "cv_evidenced": True,
+            "self_declared": True,
+            "cv_provenance_known": True,
+        }
+
+        assert evidence_by_name["NewCVSkill"] == {
+            "name": "NewCVSkill",
+            "cv_evidenced": True,
+            "self_declared": False,
+            "cv_provenance_known": True,
+        }
+
+        assert "OldCVSkill" not in evidence_by_name
+    finally:
+        db.close()
+
+
+def test_manual_skill_sync_cannot_remove_cv_evidence():
+    """
+    Manual profile edits may remove self-declared state, but cannot erase
+    trusted CV evidence.
+    """
+    user_id = uuid4()
+
+    db = TestingSessionLocal()
+    try:
+        profile = StudentProfile(
+            id=uuid4(),
+            user_id=user_id,
+            full_name="Manual Sync Candidate",
+            preferences={"account_type": "intern"},
+        )
+        db.add(profile)
+        db.flush()
+
+        cv_skill = Skill(name="CVProtectedSkill")
+        both_skill = Skill(name="BothSourceSkill")
+
+        db.add_all([cv_skill, both_skill])
+        db.flush()
+
+        db.add_all(
+            [
+                StudentSkill(
+                    student_id=profile.id,
+                    skill_id=cv_skill.id,
+                    proficiency_level="intermediate",
+                    cv_evidenced=True,
+                    self_declared=False,
+                ),
+                StudentSkill(
+                    student_id=profile.id,
+                    skill_id=both_skill.id,
+                    proficiency_level="intermediate",
+                    cv_evidenced=True,
+                    self_declared=True,
+                ),
+            ]
+        )
+        db.commit()
+
+        changed = StudentProfileRepository.sync_student_skills(
+            db=db,
+            student_id=profile.id,
+            skills=[],
+        )
+
+        assert changed is True
+        db.commit()
+
+        evidence = MatchingDataRepository.get_skill_evidence_for_student(
+            db,
+            profile.id,
+        )
+
+        evidence_by_name = {
+            item["name"]: item
+            for item in evidence
+        }
+
+        assert evidence_by_name["CVProtectedSkill"] == {
+            "name": "CVProtectedSkill",
+            "cv_evidenced": True,
+            "self_declared": False,
+            "cv_provenance_known": False,
+        }
+
+        assert evidence_by_name["BothSourceSkill"] == {
+            "name": "BothSourceSkill",
+            "cv_evidenced": True,
+            "self_declared": False,
+            "cv_provenance_known": False,
+        }
+    finally:
+        db.close()
+
+def test_ranking_skills_exclude_known_manual_claims_but_preserve_legacy_unknown():
+    """
+    Newly-added self-declared skills remain visible on the candidate profile but
+    cannot improve canonical ranking.
+
+    Pre-provenance legacy rows remain temporarily eligible until a current
+    accepted CV establishes authoritative provenance.
+    """
+    user_id = uuid4()
+
+    db = TestingSessionLocal()
+    try:
+        profile = StudentProfile(
+            id=uuid4(),
+            user_id=user_id,
+            full_name="Ranking Integrity Candidate",
+            preferences={"account_type": "intern"},
+        )
+        db.add(profile)
+        db.flush()
+
+        trusted_cv_skill = Skill(name=f"CVTrusted-{uuid4()}")
+        legacy_skill = Skill(name=f"LegacyUnknown-{uuid4()}")
+
+        db.add_all([trusted_cv_skill, legacy_skill])
+        db.flush()
+
+        db.add_all(
+            [
+                StudentSkill(
+                    student_id=profile.id,
+                    skill_id=trusted_cv_skill.id,
+                    proficiency_level="intermediate",
+                    cv_evidenced=True,
+                    self_declared=False,
+                    cv_provenance_known=True,
+                ),
+                StudentSkill(
+                    student_id=profile.id,
+                    skill_id=legacy_skill.id,
+                    proficiency_level="intermediate",
+                    cv_evidenced=False,
+                    self_declared=True,
+                    cv_provenance_known=False,
+                ),
+            ]
+        )
+        db.flush()
+
+        manual_name = f"ManualOnly-{uuid4()}"
+
+        changed = StudentProfileRepository.sync_student_skills(
+            db=db,
+            student_id=profile.id,
+            skills=[
+                legacy_skill.name,
+                manual_name,
+            ],
+        )
+
+        assert changed is True
+        db.commit()
+
+        evidence = MatchingDataRepository.get_skill_evidence_for_student(
+            db,
+            profile.id,
+        )
+
+        evidence_by_name = {
+            item["name"]: item
+            for item in evidence
+        }
+
+        assert evidence_by_name[manual_name] == {
+            "name": manual_name,
+            "cv_evidenced": False,
+            "self_declared": True,
+            "cv_provenance_known": True,
+        }
+
+        ranking_skills = (
+            MatchingDataRepository
+            .get_ranking_skill_names_for_student(
+                db,
+                profile.id,
+            )
+        )
+
+        # Current CV evidence remains ranking-authoritative even if the manual
+        # profile list does not include it.
+        assert trusted_cv_skill.name in ranking_skills
+
+        # Historical compatibility is preserved until provenance is refreshed.
+        assert legacy_skill.name in ranking_skills
+
+        # Newly-added manual claim cannot game ranking.
+        assert manual_name not in ranking_skills
+
+        # But profile/UI reads still show the manual skill normally.
+        visible_skills = MatchingDataRepository.get_skill_names_for_student(
+            db,
+            profile.id,
+        )
+
+        assert manual_name in visible_skills
+    finally:
+        db.close()

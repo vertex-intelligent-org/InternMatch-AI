@@ -1786,3 +1786,422 @@ def test_employer_unscored_applicant_has_no_fabricated_score_breakdown(client):
     assert detail["attribute_score"] is None
     assert detail["matching_skills"] == []
     assert detail["missing_skills"] == []
+
+def test_employer_cv_access_is_application_scoped_and_private(
+    client,
+    monkeypatch,
+):
+    owner_id = uuid4()
+    other_employer_id = uuid4()
+    candidate_user_id = uuid4()
+
+    _create_profile(
+        owner_id,
+        "CV Owner Employer",
+        account_type="employer",
+    )
+    _create_profile(
+        other_employer_id,
+        "Other CV Employer",
+        account_type="employer",
+    )
+    candidate_profile = _create_profile(
+        candidate_user_id,
+        "CV Candidate",
+        account_type="intern",
+    )
+
+    owner_headers = {
+        "Authorization": f"Bearer valid-user-{owner_id}"
+    }
+    other_headers = {
+        "Authorization": f"Bearer valid-user-{other_employer_id}"
+    }
+    candidate_headers = {
+        "Authorization": f"Bearer valid-user-{candidate_user_id}"
+    }
+
+    create_response = client.post(
+        "/api/v1/internships",
+        json={
+            "title": "Secure CV Intern",
+            "company": "Private Hiring Labs",
+            "location": "Remote",
+            "work_type": "remote",
+            "description": "Application-scoped CV authorization test.",
+            "required_skills": ["Python"],
+            "preferred_skills": [],
+        },
+        headers=owner_headers,
+    )
+
+    assert create_response.status_code == 201
+    internship_id = UUID(create_response.json()["id"])
+
+    db = TestingSessionLocal()
+    try:
+        candidate_profile = db.merge(candidate_profile)
+        candidate_profile.cv_storage_path = (
+            f"{candidate_user_id}/candidate-resume.pdf"
+        )
+
+        application = Application(
+            id=uuid4(),
+            student_id=candidate_profile.id,
+            internship_id=internship_id,
+            status="applied",
+            generated_cover_letter="Candidate cover letter",
+            applied_date=datetime.now(timezone.utc).date(),
+            created_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc),
+        )
+
+        db.add(application)
+        db.commit()
+        application_id = application.id
+    finally:
+        db.close()
+
+    signer_calls = []
+
+    def fake_signer(*, user_id, storage_path, expires_in):
+        signer_calls.append(
+            {
+                "user_id": user_id,
+                "storage_path": storage_path,
+                "expires_in": expires_in,
+            }
+        )
+        return (
+            "https://mock-storage.example/signed/candidate-resume.pdf"
+            "?token=short-lived"
+        )
+
+    monkeypatch.setattr(
+        "app.api.v1.endpoints.internships.generate_candidate_cv_signed_url",
+        fake_signer,
+    )
+
+    # Owner employer can access the submitted applicant CV.
+    response = client.get(
+        (
+            f"/api/v1/internships/{internship_id}"
+            f"/applicants/{application_id}/cv"
+        ),
+        headers=owner_headers,
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+
+    assert body["cv_url"].startswith(
+        "https://mock-storage.example/signed/"
+    )
+    assert body["expires_in"] == 300
+    assert body["file_type"] == "pdf"
+
+    # Never expose the private Supabase object key in the response contract.
+    assert "cv_storage_path" not in body
+    assert str(candidate_user_id) not in body["cv_url"]
+
+    assert len(signer_calls) == 1
+    assert signer_calls[0]["user_id"] == candidate_user_id
+    assert signer_calls[0]["storage_path"] == (
+        f"{candidate_user_id}/candidate-resume.pdf"
+    )
+
+    # Another employer must get owner-hiding 404 and must not trigger signing.
+    other_response = client.get(
+        (
+            f"/api/v1/internships/{internship_id}"
+            f"/applicants/{application_id}/cv"
+        ),
+        headers=other_headers,
+    )
+
+    assert other_response.status_code == 404
+    assert len(signer_calls) == 1
+
+    # Candidate accounts cannot invoke an employer-only CV endpoint.
+    candidate_response = client.get(
+        (
+            f"/api/v1/internships/{internship_id}"
+            f"/applicants/{application_id}/cv"
+        ),
+        headers=candidate_headers,
+    )
+
+    assert candidate_response.status_code == 403
+    assert len(signer_calls) == 1
+
+    # Unauthenticated requests are rejected before any storage signing.
+    unauthenticated_response = client.get(
+        (
+            f"/api/v1/internships/{internship_id}"
+            f"/applicants/{application_id}/cv"
+        ),
+    )
+
+    assert unauthenticated_response.status_code == 401
+    assert len(signer_calls) == 1
+
+    # Tampered/nonexistent application IDs do not disclose candidate existence.
+    tampered_response = client.get(
+        (
+            f"/api/v1/internships/{internship_id}"
+            f"/applicants/{uuid4()}/cv"
+        ),
+        headers=owner_headers,
+    )
+
+    assert tampered_response.status_code == 404
+    assert len(signer_calls) == 1
+
+
+def test_employer_cv_access_rejects_draft_application(
+    client,
+    monkeypatch,
+):
+    employer_id = uuid4()
+    candidate_user_id = uuid4()
+
+    _create_profile(
+        employer_id,
+        "Draft CV Employer",
+        account_type="employer",
+    )
+    candidate_profile = _create_profile(
+        candidate_user_id,
+        "Draft CV Candidate",
+        account_type="intern",
+    )
+
+    employer_headers = {
+        "Authorization": f"Bearer valid-user-{employer_id}"
+    }
+
+    create_response = client.post(
+        "/api/v1/internships",
+        json={
+            "title": "Draft Privacy Intern",
+            "company": "Draft Privacy Labs",
+            "location": "Remote",
+            "work_type": "remote",
+            "description": "Draft applications must never expose CV access.",
+            "required_skills": ["Python"],
+            "preferred_skills": [],
+        },
+        headers=employer_headers,
+    )
+
+    assert create_response.status_code == 201
+    internship_id = UUID(create_response.json()["id"])
+
+    db = TestingSessionLocal()
+    try:
+        candidate_profile = db.merge(candidate_profile)
+        candidate_profile.cv_storage_path = (
+            f"{candidate_user_id}/draft-resume.pdf"
+        )
+
+        application = Application(
+            id=uuid4(),
+            student_id=candidate_profile.id,
+            internship_id=internship_id,
+            status="saved",
+            applied_date=None,
+            created_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc),
+        )
+
+        db.add(application)
+        db.commit()
+        application_id = application.id
+    finally:
+        db.close()
+
+    signer_called = False
+
+    def forbidden_signer(**kwargs):
+        nonlocal signer_called
+        signer_called = True
+        raise AssertionError(
+            "CV signing must not occur for an unsubmitted draft"
+        )
+
+    monkeypatch.setattr(
+        "app.api.v1.endpoints.internships.generate_candidate_cv_signed_url",
+        forbidden_signer,
+    )
+
+    response = client.get(
+        (
+            f"/api/v1/internships/{internship_id}"
+            f"/applicants/{application_id}/cv"
+        ),
+        headers=employer_headers,
+    )
+
+    assert response.status_code == 404
+    assert signer_called is False
+
+def test_employer_applicant_detail_exposes_server_authoritative_skill_provenance(client):
+    from app.db.models import Application, Skill, StudentSkill
+
+    employer_id = uuid4()
+    candidate_user_id = uuid4()
+
+    _create_profile(
+        employer_id,
+        "Evidence Employer",
+        account_type="employer",
+    )
+
+    candidate_profile = _create_profile(
+        candidate_user_id,
+        "Evidence Candidate",
+        account_type="intern",
+    )
+
+    headers = {
+        "Authorization": f"Bearer valid-user-{employer_id}"
+    }
+
+    create_response = client.post(
+        "/api/v1/internships",
+        json={
+            "title": "Evidence Intern",
+            "company": "Evidence Labs",
+            "location": "Remote",
+            "work_type": "remote",
+            "description": "Employer candidate evidence contract test.",
+            "required_skills": ["Python"],
+            "preferred_skills": ["React"],
+        },
+        headers=headers,
+    )
+
+    assert create_response.status_code == 201
+    internship_id = UUID(create_response.json()["id"])
+
+    db = TestingSessionLocal()
+    try:
+        candidate_profile = db.merge(candidate_profile)
+
+        cv_only = Skill(name=f"CVOnly-{uuid4()}")
+        self_only = Skill(name=f"SelfOnly-{uuid4()}")
+        both = Skill(name=f"Both-{uuid4()}")
+
+        db.add_all([cv_only, self_only, both])
+        db.flush()
+
+        db.add_all(
+            [
+                StudentSkill(
+                    student_id=candidate_profile.id,
+                    skill_id=cv_only.id,
+                    proficiency_level="intermediate",
+                    cv_evidenced=True,
+                    self_declared=False,
+                ),
+                StudentSkill(
+                    student_id=candidate_profile.id,
+                    skill_id=self_only.id,
+                    proficiency_level="intermediate",
+                    cv_evidenced=False,
+                    self_declared=True,
+                ),
+                StudentSkill(
+                    student_id=candidate_profile.id,
+                    skill_id=both.id,
+                    proficiency_level="advanced",
+                    cv_evidenced=True,
+                    self_declared=True,
+                ),
+            ]
+        )
+
+        application = Application(
+            id=uuid4(),
+            student_id=candidate_profile.id,
+            internship_id=internship_id,
+            status="applied",
+            generated_cover_letter="Application-specific evidence cover letter.",
+            applied_date=datetime.now(timezone.utc).date(),
+            created_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc),
+        )
+
+        db.add(application)
+        db.commit()
+
+        application_id = application.id
+        expected_names = {
+            cv_only.name,
+            self_only.name,
+            both.name,
+        }
+    finally:
+        db.close()
+
+    response = client.get(
+        (
+            f"/api/v1/internships/{internship_id}"
+            f"/applicants/{application_id}"
+        ),
+        headers=headers,
+    )
+
+    assert response.status_code == 200
+
+    payload = response.json()
+
+    assert payload["generated_cover_letter"] == (
+        "Application-specific evidence cover letter."
+    )
+
+    evidence = payload["skill_evidence"]
+
+    assert {
+        item["name"]
+        for item in evidence
+    } == expected_names
+
+    evidence_by_name = {
+        item["name"]: item
+        for item in evidence
+    }
+
+    cv_only_name = next(
+        name for name in expected_names if name.startswith("CVOnly-")
+    )
+    self_only_name = next(
+        name for name in expected_names if name.startswith("SelfOnly-")
+    )
+    both_name = next(
+        name for name in expected_names if name.startswith("Both-")
+    )
+
+    assert evidence_by_name[cv_only_name] == {
+        "name": cv_only_name,
+        "cv_evidenced": True,
+        "self_declared": False,
+        "cv_provenance_known": False,
+    }
+
+    assert evidence_by_name[self_only_name] == {
+        "name": self_only_name,
+        "cv_evidenced": False,
+        "self_declared": True,
+        "cv_provenance_known": False,
+    }
+
+    assert evidence_by_name[both_name] == {
+        "name": both_name,
+        "cv_evidenced": True,
+        "self_declared": True,
+        "cv_provenance_known": False,
+    }
+
+    # Employer detail must not expose private storage implementation details.
+    assert "cv_storage_path" not in payload

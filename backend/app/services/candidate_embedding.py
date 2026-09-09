@@ -176,7 +176,13 @@ def generate_and_persist_candidate_embedding(
             f"No StudentProfile found for user_id '{user_id}'"
         )
 
-    skills = MatchingDataRepository.get_skill_names_for_student(db, profile.id)
+    # Keep semantic ranking grounded consistently with direct skill scoring.
+    # Known self-declared-only skills stay visible on the profile but do not
+    # influence the candidate embedding used by ranking.
+    skills = MatchingDataRepository.get_ranking_skill_names_for_student(
+        db,
+        profile.id,
+    )
     education = MatchingDataRepository.get_education_for_student(db, profile.id)
     experience = MatchingDataRepository.get_experience_for_student(db, profile.id)
     projects = MatchingDataRepository.get_projects_for_student(db, profile.id)

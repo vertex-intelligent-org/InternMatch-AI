@@ -142,8 +142,14 @@ def calculate_and_persist_matches(
     # 3. Parse preferences safely
     work_types, desired_locations = parse_preferences(profile.preferences)
 
-    # 4. Load candidate skills using authoritative repository method
-    candidate_skills = MatchingDataRepository.get_skill_names_for_student(db, profile.id)
+    # 4. Load only skills permitted to influence canonical ranking.
+    #
+    # This preserves legacy unknown rows for migration compatibility while
+    # excluding known self-declared-only claims from the 50% skill component.
+    candidate_skills = MatchingDataRepository.get_ranking_skill_names_for_student(
+        db,
+        profile.id,
+    )
 
     if progress_callback is not None:
         progress_callback(35)

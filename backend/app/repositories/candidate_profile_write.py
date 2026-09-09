@@ -3,7 +3,7 @@ Candidate Profile Structured Write Repository Foundation
 Provides atomic transactional replacement of candidate profile data
 (StudentProfile, StudentSkill, EducationEntry, ExperienceEntry, ProjectEntry)
 from extracted CV schemas without performing commit/rollback.
-Preserves and merges existing candidate skills with CV-extracted skills.
+Preserves manual skills and reconciles CV-evidenced skill provenance.
 """
 
 import re
@@ -88,42 +88,95 @@ def replace_candidate_profile_from_extraction(
     db.execute(delete(ExperienceEntry).where(ExperienceEntry.student_id == profile.id))
     db.execute(delete(ProjectEntry).where(ProjectEntry.student_id == profile.id))
 
-    # 5. Replace previous candidate skills with skills from the new CV.
-    # StudentSkill associations are profile-specific; master Skill taxonomy rows remain intact.
-    db.execute(delete(StudentSkill).where(StudentSkill.student_id == profile.id))
+    # 5. Reconcile CV-evidenced skills while preserving manual/profile skills.
+    #
+    # Existing self-declared skills are never destroyed by CV replacement.
+    # The latest accepted CV is authoritative only for cv_evidenced state.
+    existing_rows = list(
+        db.scalars(
+            select(StudentSkill).where(
+                StudentSkill.student_id == profile.id
+            )
+        ).all()
+    )
 
-    seen_skills: Set[str] = set()
+    existing_by_folded: Dict[str, StudentSkill] = {}
+    for row in existing_rows:
+        skill_name = row.skill.name if row.skill else None
+        if not skill_name:
+            skill_row = db.get(Skill, row.skill_id)
+            skill_name = skill_row.name if skill_row else None
+
+        if not skill_name:
+            continue
+
+        folded = re.sub(r"\s+", " ", skill_name.strip()).casefold()
+        if folded:
+            existing_by_folded[folded] = row
+
+    extracted_by_folded: Dict[str, tuple[str, str]] = {}
 
     for s in extracted.skills:
         if not s.name or not isinstance(s.name, str):
             continue
+
         norm_name = re.sub(r"\s+", " ", s.name.strip())
         if not norm_name:
             continue
-        folded = norm_name.casefold()
-        if folded in seen_skills:
-            continue
-        seen_skills.add(folded)
 
-        # Reuse the global Skill taxonomy row when it already exists.
-        stmt = select(Skill).where(func.lower(Skill.name) == folded)
-        skill_row = db.scalar(stmt)
-        if not skill_row:
-            skill_row = Skill(name=norm_name)
-            db.add(skill_row)
-            db.flush()
+        folded = norm_name.casefold()
+        if folded in extracted_by_folded:
+            continue
 
         prof_level = (
             s.proficiency_level.strip()
             if s.proficiency_level and s.proficiency_level.strip()
             else "intermediate"
         )
-        student_skill = StudentSkill(
-            student_id=profile.id,
-            skill_id=skill_row.id,
-            proficiency_level=prof_level,
+
+        extracted_by_folded[folded] = (norm_name, prof_level)
+
+    # Any previous CV evidence absent from the newly accepted CV is removed.
+    # Self-declared evidence remains intact.
+    for folded, row in list(existing_by_folded.items()):
+        # The accepted current CV makes CV provenance authoritative for every
+        # pre-existing skill row, whether the skill appears in this CV or not.
+        row.cv_provenance_known = True
+
+        if folded not in extracted_by_folded and row.cv_evidenced:
+            row.cv_evidenced = False
+
+            if not row.self_declared:
+                db.delete(row)
+
+    # Add or upgrade every skill evidenced by the newly accepted CV.
+    for folded, (display_name, prof_level) in extracted_by_folded.items():
+        existing_row = existing_by_folded.get(folded)
+
+        if existing_row is not None:
+            existing_row.cv_evidenced = True
+            existing_row.cv_provenance_known = True
+            existing_row.proficiency_level = prof_level
+            continue
+
+        stmt = select(Skill).where(func.lower(Skill.name) == folded)
+        skill_row = db.scalar(stmt)
+
+        if not skill_row:
+            skill_row = Skill(name=display_name)
+            db.add(skill_row)
+            db.flush()
+
+        db.add(
+            StudentSkill(
+                student_id=profile.id,
+                skill_id=skill_row.id,
+                proficiency_level=prof_level,
+                cv_evidenced=True,
+                self_declared=False,
+                cv_provenance_known=True,
+            )
         )
-        db.add(student_skill)
 
     # 6. Insert Education History Entries
     for edu in extracted.education:
