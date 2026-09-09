@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.db.models import SubscriptionEntitlement
 from app.repositories.subscription import SubscriptionRepository
+from app.services.account_deletion import is_account_deleted
 from app.services.subscription import (
     PRO_EMPLOYER_ENTITLEMENT_ID,
     PRO_STUDENT_ENTITLEMENT_ID,
@@ -484,6 +485,15 @@ def _reconcile_subscription(
     min_interval_seconds: int = RECONCILIATION_MIN_INTERVAL_SECONDS,
 ) -> dict[str, Any]:
     """Reconcile one supported Pro entitlement against RevenueCat REST API v2."""
+
+    if is_account_deleted(db, user_id=user_id):
+        return {
+            "outcome": "ignored_deleted_account",
+            "subscription": snapshot_getter(
+                db,
+                user_id=user_id,
+            ),
+        }
 
     now = datetime.now(timezone.utc)
 

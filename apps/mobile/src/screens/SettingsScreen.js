@@ -8,6 +8,7 @@ import {
   Alert,
   Modal,
   ActivityIndicator,
+  Linking,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import colors from '../theme/colors';
@@ -16,7 +17,7 @@ import { typography } from '../theme/typography';
 import ScreenContainer from '../components/ScreenContainer';
 import ScreenHeader from '../components/ScreenHeader';
 import GlassSurface from '../components/GlassSurface';
-import { signOut, getCurrentUser, sendPasswordResetEmail } from '../services/auth';
+import { signOut, clearLocalSessionAfterAccountDeletion, getCurrentUser, sendPasswordResetEmail } from '../services/auth';
 import { PASSWORD_RESET_REDIRECT_URL } from '../services/passwordRecovery';
 import { useProfile } from '../context/ProfileContext';
 import { useRevenueCat } from '../context/RevenueCatProvider';
@@ -27,8 +28,11 @@ import { useTranslation } from 'react-i18next';
 import { useLocalization } from '../localization/LocalizationContext';
 import { getLocalizedErrorMessage } from '../localization/errorMessages';
 import LocaleFlag from '../components/LocaleFlag';
+import { deleteAccount } from '../services/api';
 
 const appVersion = require('../../app.json').expo.version || '1.0.0';
+const DATA_DELETION_URL = 'https://internmatch.college/data-deletion';
+const SUPPORT_EMAIL_URL = 'mailto:internmatch@vertexintelligent.com';
 
 const LANGUAGE_OPTIONS = [
   { code: 'en', label: 'English' },
@@ -100,6 +104,8 @@ function SettingsRow({
 export default function SettingsScreen({ navigation }) {
   const [userEmail, setUserEmail] = useState('');
   const [signingOut, setSigningOut] = useState(false);
+
+  const [deletingAccount, setDeletingAccount] = useState(false);
   const { profile, clearProfile } = useProfile();
   const { candidateState } = useRevenueCat();
   const { backendSubscription } = useSubscription();
@@ -208,6 +214,83 @@ export default function SettingsScreen({ navigation }) {
       const msg = getLocalizedErrorMessage(err, t);
       Alert.alert(t('common.error'), msg);
     }
+  };
+
+  const handleOpenExternalUrl = async (url) => {
+    try {
+      const supported = await Linking.canOpenURL(url);
+
+      if (!supported) {
+        throw new Error('Unsupported external URL');
+      }
+
+      await Linking.openURL(url);
+    } catch (error) {
+      const message = getLocalizedErrorMessage(error, t);
+      Alert.alert(t('common.error'), message);
+    }
+  };
+
+  const handleDeleteAccount = () => {
+    if (deletingAccount) return;
+
+    Alert.alert(
+      t('settings.deleteAccountTitle'),
+      t('settings.deleteAccountMessage'),
+      [
+        {
+          text: t('common.cancel'),
+          style: 'cancel',
+        },
+        {
+          text: t('settings.deleteAccountContinue'),
+          style: 'destructive',
+          onPress: () => {
+            Alert.alert(
+              t('settings.deleteAccountFinalTitle'),
+              t('settings.deleteAccountFinalMessage'),
+              [
+                {
+                  text: t('common.cancel'),
+                  style: 'cancel',
+                },
+                {
+                  text: t('settings.deleteAccountConfirm'),
+                  style: 'destructive',
+                  onPress: async () => {
+                    if (deletingAccount) return;
+
+                    setDeletingAccount(true);
+
+                    try {
+                      await deleteAccount();
+
+                      await clearLocalSessionAfterAccountDeletion();
+
+                      clearProfile();
+                      haptics.success();
+
+                      navigation.reset({
+                        index: 0,
+                        routes: [{ name: 'SignIn' }],
+                      });
+                    } catch (error) {
+                      const message = getLocalizedErrorMessage(error, t);
+                      Alert.alert(
+                        t('settings.deleteAccountFailedTitle'),
+                        message
+                      );
+                    } finally {
+                      setDeletingAccount(false);
+                    }
+                  },
+                },
+              ]
+            );
+          },
+        },
+      ]
+    );
   };
 
   const handleSignOut = () => {
@@ -346,8 +429,31 @@ export default function SettingsScreen({ navigation }) {
             icon="document-outline"
             label={t('settings.termsOfUse')}
             onPress={() => navigation.navigate('TermsOfUse')}
-            isLast={true}
             accessibilityLabel={t('settings.accessibility.termsOfUse')}
+          />
+          <SettingsRow
+            icon="open-outline"
+            label={t('settings.dataDeletion')}
+            onPress={() => handleOpenExternalUrl(DATA_DELETION_URL)}
+            accessibilityLabel={t('settings.dataDeletion')}
+          />
+          <SettingsRow
+            icon="mail-outline"
+            label={t('settings.supportContact')}
+            onPress={() => handleOpenExternalUrl(SUPPORT_EMAIL_URL)}
+            accessibilityLabel={t('settings.supportContact')}
+          />
+          <SettingsRow
+            icon="trash-outline"
+            iconColor={colors.danger || colors.red}
+            label={
+              deletingAccount
+                ? t('settings.deletingAccount')
+                : t('settings.deleteAccount')
+            }
+            onPress={handleDeleteAccount}
+            isLast={true}
+            accessibilityLabel={t('settings.deleteAccount')}
           />
         </GlassSurface>
 

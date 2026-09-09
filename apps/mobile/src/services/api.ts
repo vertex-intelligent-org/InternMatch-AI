@@ -1013,3 +1013,14 @@ export async function reconcileMySubscription(): Promise<SubscriptionReconciliat
     }
   );
 }
+
+export type AccountDeletionResponse = {
+  deleted: boolean;
+  message: string;
+};
+
+export async function deleteAccount(): Promise<AccountDeletionResponse> {
+  return apiRequest<AccountDeletionResponse>('/auth/account', {
+    method: 'DELETE',
+  });
+}

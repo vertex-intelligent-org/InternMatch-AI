@@ -229,6 +229,37 @@ export async function signOut(): Promise<{ error: Error | null }> {
 }
 
 /**
+ * Clear only the persisted Supabase session on this device and verify that
+ * no authenticated session remains locally.
+ *
+ * This is used after permanent account deletion, where the server-side Auth
+ * identity may already be gone and a normal remote sign-out is no longer a
+ * reliable cleanup mechanism.
+ */
+export async function clearLocalSessionAfterAccountDeletion(): Promise<void> {
+  const { error } = await supabase.auth.signOut({ scope: 'local' });
+
+  if (error) {
+    throw error;
+  }
+
+  const {
+    data: { session },
+    error: sessionError,
+  } = await supabase.auth.getSession();
+
+  if (sessionError) {
+    throw sessionError;
+  }
+
+  if (session) {
+    throw new Error(
+      'Local authentication session remained after account deletion.'
+    );
+  }
+}
+
+/**
  * Retrieve the current active Supabase authentication session object.
  */
 export async function getCurrentSession() {

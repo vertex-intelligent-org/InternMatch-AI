@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.db.models import RevenueCatWebhookEvent, SubscriptionEntitlement
 from app.repositories.subscription import SubscriptionRepository
+from app.services.account_deletion import is_account_deleted
 from app.services.subscription import (
     PRO_EMPLOYER_ENTITLEMENT_ID,
     PRO_STUDENT_ENTITLEMENT_ID,
@@ -395,6 +396,20 @@ def process_revenuecat_webhook(
     user_id = _resolve_internal_user_id(event)
     if user_id is None:
         ledger_event.outcome = "ignored_identity"
+        ledger_event.processed_at = now
+        db.commit()
+        return {
+            "status": "ok",
+            "event_id": event_id,
+            "event_type": event_type,
+            "outcome": ledger_event.outcome,
+        }
+
+    if is_account_deleted(db, user_id=user_id):
+        # Keep the incoming provider event only as an anonymized idempotency
+        # record. Never recreate subscription state for a deleted account.
+        ledger_event.user_id = None
+        ledger_event.outcome = "ignored_deleted_account"
         ledger_event.processed_at = now
         db.commit()
         return {
