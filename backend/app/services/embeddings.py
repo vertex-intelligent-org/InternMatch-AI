@@ -10,11 +10,13 @@ from typing import List
 from google import genai
 from google.genai import types
 
+from openai import OpenAI
+
 from app.core.config import settings
 from app.services.ai_telemetry import create_tracked_gemini_client
 
 
-def generate_embedding(text: str) -> List[float]:
+def _generate_gemini_embedding(text: str) -> List[float]:
     """
     Generate floating point embedding vector for text using Google Gemini API.
     Validates inputs, constructs Gemini client dynamically, requests embeddings
@@ -70,3 +72,121 @@ def generate_embedding(text: str) -> List[float]:
         result_vector.append(float_val)
 
     return result_vector
+
+def _generate_openai_embedding(
+    text: str,
+) -> list[float]:
+    """
+    Generate one embedding in the canonical OpenAI vector space.
+
+    This function never falls back to Gemini. Mixing providers in one
+    vector index would make cosine similarity semantically invalid.
+    """
+    if not isinstance(text, str) or not text.strip():
+        raise ValueError(
+            "Embedding input text must be a non-empty string."
+        )
+
+    api_key = (
+        settings.OPENAI_API_KEY.strip()
+        if settings.OPENAI_API_KEY
+        else ""
+    )
+
+    if (
+        not api_key
+        or "placeholder" in api_key.lower()
+    ):
+        raise ValueError(
+            "OPENAI_API_KEY configuration is missing or placeholder."
+        )
+
+    model = (
+        settings.OPENAI_EMBEDDING_MODEL_NAME or ""
+    ).strip()
+
+    if not model:
+        raise ValueError(
+            "OPENAI_EMBEDDING_MODEL_NAME configuration is missing."
+        )
+
+    dimension = settings.EMBEDDING_DIMENSION
+
+    if dimension <= 0:
+        raise ValueError(
+            "EMBEDDING_DIMENSION must be greater than zero."
+        )
+
+    client = OpenAI(
+        api_key=api_key,
+    )
+
+    response = client.embeddings.create(
+        model=model,
+        input=text,
+        dimensions=dimension,
+    )
+
+    data = getattr(
+        response,
+        "data",
+        None,
+    )
+
+    if not data:
+        raise ValueError(
+            "OpenAI embedding response contained no embedding data."
+        )
+
+    raw_embedding = getattr(
+        data[0],
+        "embedding",
+        None,
+    )
+
+    if not isinstance(raw_embedding, list):
+        raise ValueError(
+            "OpenAI embedding response contained an invalid vector."
+        )
+
+    embedding = [
+        float(value)
+        for value in raw_embedding
+    ]
+
+    if len(embedding) != dimension:
+        raise ValueError(
+            "OpenAI embedding dimension mismatch: "
+            f"expected {dimension}, got {len(embedding)}."
+        )
+
+    return embedding
+
+
+def generate_embedding(
+    text: str,
+) -> list[float]:
+    """
+    Generate an embedding using exactly one canonical vector provider.
+
+    There is intentionally no Gemini -> OpenAI or OpenAI -> Gemini
+    per-request fallback. Changing providers requires re-embedding the
+    entire candidate + internship vector space.
+    """
+    provider = (
+        settings.EMBEDDING_PROVIDER or ""
+    ).strip().lower()
+
+    if provider == "openai":
+        return _generate_openai_embedding(
+            text
+        )
+
+    if provider == "gemini":
+        return _generate_gemini_embedding(
+            text
+        )
+
+    raise ValueError(
+        "Unsupported EMBEDDING_PROVIDER configuration."
+    )

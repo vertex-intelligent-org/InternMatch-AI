@@ -89,6 +89,104 @@ def _cleanup_cv_pipeline_created_skills():
         cleanup_db.close()
 
 
+
+def test_extracted_experience_normalizes_month_precision_dates():
+    experience = ExtractedExperience(
+        company="Example Corp",
+        role="Engineering Intern",
+        start_date="2025-06",
+        end_date="2025-08",
+    )
+
+    assert experience.start_date == date(
+        2025,
+        6,
+        1,
+    )
+    assert experience.end_date == date(
+        2025,
+        8,
+        31,
+    )
+
+
+def test_extracted_experience_normalizes_year_precision_dates():
+    experience = ExtractedExperience(
+        company="Example Corp",
+        role="Software Engineer",
+        start_date="2023",
+        end_date="2025",
+    )
+
+    assert experience.start_date == date(
+        2023,
+        1,
+        1,
+    )
+    assert experience.end_date == date(
+        2025,
+        12,
+        31,
+    )
+
+
+def test_extracted_experience_preserves_full_iso_dates():
+    experience = ExtractedExperience(
+        company="Example Corp",
+        role="Developer",
+        start_date="2023-06-15",
+        end_date="2024-02-20",
+    )
+
+    assert experience.start_date == date(
+        2023,
+        6,
+        15,
+    )
+    assert experience.end_date == date(
+        2024,
+        2,
+        20,
+    )
+
+
+@pytest.mark.parametrize(
+    "current_value",
+    [
+        "Present",
+        "Current",
+        "currently",
+        "ongoing",
+        "Now",
+    ],
+)
+def test_extracted_experience_normalizes_current_end_date(
+    current_value,
+):
+    experience = ExtractedExperience(
+        company="Example Corp",
+        role="Developer",
+        start_date="2024-01",
+        end_date=current_value,
+    )
+
+    assert experience.start_date == date(
+        2024,
+        1,
+        1,
+    )
+    assert experience.end_date is None
+
+
+def test_extracted_experience_rejects_invalid_partial_date():
+    with pytest.raises(ValueError):
+        ExtractedExperience(
+            company="Example Corp",
+            role="Developer",
+            start_date="summer sometime",
+        )
+
+
 # ---------------------------------------------------------------------------
 # 1. PARSER TESTS (1 - 6)
 # ---------------------------------------------------------------------------

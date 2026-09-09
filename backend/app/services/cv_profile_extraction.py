@@ -5,12 +5,20 @@ grounded candidate profile details (skills, education, experience, projects, pre
 from raw parsed CV document text or visual multimodal PDF documents.
 """
 
+import calendar
+import re
 from datetime import date
 from typing import List, Optional
 
 from google import genai
 from google.genai import types
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    ValidationInfo,
+    field_validator,
+)
 
 from app.core.config import settings
 from app.services.ai_telemetry import create_tracked_gemini_client
@@ -38,6 +46,89 @@ class ExtractedEducation(BaseModel):
     end_year: Optional[int] = Field(None, description="Graduation / end year of studies")
 
 
+def _normalize_cv_experience_date(
+    value: object,
+    *,
+    is_end_date: bool,
+) -> object:
+    """
+    Normalize common CV date granularities before strict Pydantic
+    date validation.
+
+    CVs frequently state employment dates as YYYY or YYYY-MM rather
+    than exact calendar days. Storage still uses date, so deterministic
+    period boundaries are used without inventing unsupported precision:
+    starts use the beginning of the stated period and ends use the end.
+    """
+
+    if value is None or isinstance(value, date):
+        return value
+
+    if not isinstance(value, str):
+        return value
+
+    cleaned = value.strip()
+
+    if not cleaned:
+        return None
+
+    normalized_token = cleaned.casefold()
+
+    if is_end_date and normalized_token in {
+        "present",
+        "current",
+        "currently",
+        "ongoing",
+        "now",
+        "today",
+    }:
+        return None
+
+    year_match = re.fullmatch(
+        r"(\d{4})",
+        cleaned,
+    )
+
+    if year_match:
+        year = int(year_match.group(1))
+
+        if is_end_date:
+            return date(year, 12, 31)
+
+        return date(year, 1, 1)
+
+    month_match = re.fullmatch(
+        r"(\d{4})-(\d{1,2})",
+        cleaned,
+    )
+
+    if month_match:
+        year = int(month_match.group(1))
+        month = int(month_match.group(2))
+
+        if month < 1 or month > 12:
+            return value
+
+        if is_end_date:
+            last_day = calendar.monthrange(
+                year,
+                month,
+            )[1]
+            return date(
+                year,
+                month,
+                last_day,
+            )
+
+        return date(
+            year,
+            month,
+            1,
+        )
+
+    return value
+
+
 class ExtractedExperience(BaseModel):
     """Structured work experience entry extracted from candidate CV."""
 
@@ -48,8 +139,30 @@ class ExtractedExperience(BaseModel):
     description: Optional[str] = Field(
         None, description="Description of duties and accomplishments"
     )
-    start_date: Optional[date] = Field(None, description="Start date of employment (YYYY-MM-DD)")
-    end_date: Optional[date] = Field(None, description="End date of employment (YYYY-MM-DD)")
+    start_date: Optional[date] = Field(
+        None,
+        description="Start date of employment (YYYY-MM-DD)",
+    )
+    end_date: Optional[date] = Field(
+        None,
+        description="End date of employment (YYYY-MM-DD)",
+    )
+
+    @field_validator(
+        "start_date",
+        "end_date",
+        mode="before",
+    )
+    @classmethod
+    def normalize_partial_cv_dates(
+        cls,
+        value: object,
+        info: ValidationInfo,
+    ) -> object:
+        return _normalize_cv_experience_date(
+            value,
+            is_end_date=info.field_name == "end_date",
+        )
 
 
 class ExtractedProject(BaseModel):

@@ -52,6 +52,9 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy.orm import Session
 
 logger = get_logger(__name__)
+from app.services.ai_quota_integration import ensure_job_ai_quota_reserved_if_present
+from app.services.ai_quota_integration import settle_job_ai_quota_if_present
+
 router = APIRouter()
 
 
@@ -678,6 +681,14 @@ def confirm_cv_replacement(
     cv_storage_path = job_result.get("cv_storage_path")
 
     if not extracted_data or not cv_storage_path:
+        release_job_ai_quota_if_present(
+            db,
+            feature_key=FEATURE_CV_ANALYSIS,
+            job_id=job.id,
+            reason="cv_confirmation_invalid_payload",
+        )
+        db.commit()
+
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=format_error_payload(
@@ -693,6 +704,15 @@ def confirm_cv_replacement(
             "Pending CV replacement payload validation failed: %s",
             type(exc).__name__,
         )
+
+        release_job_ai_quota_if_present(
+            db,
+            feature_key=FEATURE_CV_ANALYSIS,
+            job_id=job.id,
+            reason="cv_confirmation_invalid_payload",
+        )
+        db.commit()
+
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=format_error_payload(
@@ -702,16 +722,21 @@ def confirm_cv_replacement(
         ) from None
 
     try:
+        # A previously failed confirmation may have released the
+        # reservation. Re-reserve idempotently before doing any
+        # expensive/destructive confirmation work.
+        ensure_job_ai_quota_reserved_if_present(
+            db,
+            user_id=current_user.user_id,
+            feature_key=FEATURE_CV_ANALYSIS,
+            job_id=job.id,
+        )
+
         profile = replace_candidate_profile_from_extraction(
             db=db,
             user_id=current_user.user_id,
             cv_storage_path=cv_storage_path,
             extracted=extracted_profile,
-        )
-
-        generate_and_persist_candidate_embedding(
-            db=db,
-            user_id=current_user.user_id,
         )
 
         updated_result = dict(job_result)
@@ -721,10 +746,54 @@ def confirm_cv_replacement(
         updated_result["confirmed_at"] = datetime.now(timezone.utc).isoformat()
         job.result = updated_result
 
+        # Consumption happens only after the confirmed replacement
+        # and embedding both succeeded. Settlement is committed in
+        # the same transaction as confirmed=True.
+        settle_job_ai_quota_if_present(
+            db,
+            feature_key=FEATURE_CV_ANALYSIS,
+            job_id=job.id,
+        )
+
         db.commit()
     except Exception:
         db.rollback()
+
+        # No completed user benefit means no consumed allowance.
+        try:
+            release_job_ai_quota_if_present(
+                db,
+                feature_key=FEATURE_CV_ANALYSIS,
+                job_id=job.id,
+                reason="cv_confirmation_failure",
+            )
+            db.commit()
+        except Exception as quota_exc:
+            db.rollback()
+            logger.exception(
+                "Failed to release CV quota after confirmation failure: %s",
+                type(quota_exc).__name__,
+            )
+
         raise
+
+    # Candidate embedding is derived post-processing.
+    # The confirmed CV/profile replacement above is already canonical
+    # user benefit and must not be rolled back if embedding temporarily
+    # fails. Embedding can be regenerated independently.
+    try:
+        generate_and_persist_candidate_embedding(
+            db=db,
+            user_id=current_user.user_id,
+        )
+        db.commit()
+    except Exception as embedding_exc:
+        db.rollback()
+        logger.warning(
+            "Candidate embedding generation failed after confirmed "
+            "CV replacement: %s",
+            type(embedding_exc).__name__,
+        )
 
     # Trigger initial match calculation after successful confirmed commit
     try:

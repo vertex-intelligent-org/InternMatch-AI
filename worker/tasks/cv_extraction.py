@@ -353,10 +353,14 @@ def run_cv_extraction(
                 "cv_storage_path": clean_path,
                 "extracted_profile": extracted_profile.model_dump(mode="json"),
             }
-            settle_job_ai_quota_if_present(
+            # Identity mismatch is only a pending decision.
+            # The user has not received the confirmed replacement yet,
+            # so this state must consume and reserve ZERO allowance.
+            release_job_ai_quota_if_present(
                 db,
                 feature_key=FEATURE_CV_ANALYSIS,
                 job_id=norm_job_id,
+                reason="cv_identity_confirmation_pending",
             )
             db.commit()
 

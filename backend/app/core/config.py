@@ -36,7 +36,14 @@ class Settings(BaseSettings):
     LLM_FALLBACK_MODEL_NAMES: str = (
         "gemini-3.8-flash,gemini-3.7-flash,gemini-3.6-flash"
     )
+    # Canonical vector-space provider.
+    #
+    # Every candidate and internship vector MUST use the same provider/model.
+    # Cross-provider embedding fallback is intentionally forbidden because
+    # equal dimensions do not imply a compatible semantic vector space.
+    EMBEDDING_PROVIDER: str = "openai"
     EMBEDDING_MODEL_NAME: str = "gemini-embedding-2"
+    OPENAI_EMBEDDING_MODEL_NAME: str = "text-embedding-3-small"
     EMBEDDING_DIMENSION: int = 1536
 
     # Independent generation-provider fallback.
@@ -112,6 +119,30 @@ def validate_production_config(cfg: Settings) -> None:
     gemini_key = (cfg.GEMINI_API_KEY or "").strip()
     if not gemini_key or "placeholder" in gemini_key.lower():
         errors.append("GEMINI_API_KEY (must be non-placeholder)")
+
+    # Canonical embedding provider
+    embedding_provider = (
+        cfg.EMBEDDING_PROVIDER or ""
+    ).strip().lower()
+
+    if embedding_provider not in {"gemini", "openai"}:
+        errors.append(
+            "EMBEDDING_PROVIDER (must be 'gemini' or 'openai')"
+        )
+
+    if embedding_provider == "openai":
+        openai_key = (
+            cfg.OPENAI_API_KEY or ""
+        ).strip()
+
+        if (
+            not openai_key
+            or "placeholder" in openai_key.lower()
+        ):
+            errors.append(
+                "OPENAI_API_KEY "
+                "(required when EMBEDDING_PROVIDER=openai)"
+            )
 
     # CV_STORAGE_BUCKET
     cv_bucket = (cfg.CV_STORAGE_BUCKET or "").strip()

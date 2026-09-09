@@ -517,6 +517,36 @@ def _is_transient_gemini_error(
     )
 
 
+def _is_gemini_account_wide_failure(
+    exc: Exception,
+) -> bool:
+    """
+    Detect Gemini project/account failures that cannot recover
+    by trying another Gemini generation model.
+
+    A generic HTTP 429 is NOT enough: normal temporary rate
+    limits keep the existing Gemini model failover chain.
+    """
+    status_code = _provider_status_code(exc)
+
+    if status_code != 429:
+        return False
+
+    message = str(exc).lower()
+
+    account_wide_markers = (
+        "prepayment credits are depleted",
+        "manage your project and billing",
+        "billing account",
+        "payment required",
+    )
+
+    return any(
+        marker in message
+        for marker in account_wide_markers
+    )
+
+
 _CROSS_PROVIDER_FALLBACK_STATUS_CODES = frozenset(
     {
         401,
@@ -742,12 +772,19 @@ class _TrackedModelsProxy:
                         < len(model_attempts) - 1
                     )
 
+                    project_wide_failure = (
+                        _is_gemini_account_wide_failure(
+                            exc
+                        )
+                    )
+
                     if (
                         name == "generate_content"
-                        and has_fallback
                         and _is_transient_gemini_error(
                             exc
                         )
+                        and has_fallback
+                        and not project_wide_failure
                     ):
                         continue
 
@@ -764,6 +801,7 @@ class _TrackedModelsProxy:
                             403,
                             404,
                         }
+                        or project_wide_failure
                     )
 
                     # Transient failures keep the existing Gemini model chain.

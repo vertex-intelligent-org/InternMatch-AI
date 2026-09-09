@@ -80,6 +80,8 @@ export default function CVUploadScreen({ route, navigation }) {
   const isPollingRef = useRef(false);
   const confirmInFlightRef = useRef(false);
   const cancelInFlightRef = useRef(false);
+  const cancelPromptVisibleRef = useRef(false);
+  const allowNavigationRef = useRef(false);
   const cancelledJobIdRef = useRef(null);
   const startTimeRef = useRef(0);
   const visualProgressTimerRef = useRef(null);
@@ -484,57 +486,115 @@ export default function CVUploadScreen({ route, navigation }) {
   const handleConfirmReplacement = async () => {
     if (!jobId || confirmInFlightRef.current) return;
 
-    // Ref guard is synchronous, unlike React state updates, so rapid taps
-    // cannot start multiple confirmation requests in the same render cycle.
+    const activeJobId = jobId;
+
     confirmInFlightRef.current = true;
     setIsConfirming(true);
 
-    try {
-      await confirmCVReplacement(jobId);
-
+    const finishConfirmedReplacement = async () => {
       try {
         await refreshProfile();
       } catch (profileErr) {
-        // Confirmation already succeeded on the backend. Do not tell the user
-        // that confirmation failed just because the local refresh was transient.
-        console.warn('Profile refresh after CV confirmation failed:', profileErr);
+        // Backend confirmation is authoritative.
+        // A transient profile refresh failure must not turn a
+        // successful confirmation into an Upload Error.
+        console.warn(
+          'Profile refresh after CV confirmation failed:',
+          profileErr
+        );
       }
 
       if (isMountedRef.current) {
         setErrorMessage(null);
         setStatus('completed');
+        setProgressPercent(100);
         haptics.success();
       }
+    };
+
+    try {
+      await confirmCVReplacement(activeJobId);
+      await finishConfirmedReplacement();
     } catch (err) {
-      console.warn('Confirm CV replacement error:', err);
+      console.warn(
+        'Confirm CV replacement request error:',
+        err
+      );
+
+      // The HTTP response may fail after the backend has already
+      // committed the replacement. Reconcile against the durable
+      // server job before telling the user confirmation failed.
+      let confirmedOnServer = false;
+
+      try {
+        const reconciledJob = await getProcessingJob(
+          activeJobId
+        );
+
+        const reconciledResult =
+          reconciledJob &&
+          typeof reconciledJob.result === 'object' &&
+          reconciledJob.result !== null
+            ? reconciledJob.result
+            : null;
+
+        confirmedOnServer =
+          reconciledJob?.status === 'completed' &&
+          reconciledResult?.confirmed === true &&
+          Boolean(reconciledResult?.profile_id);
+      } catch (reconcileErr) {
+        console.warn(
+          'CV confirmation reconciliation failed:',
+          reconcileErr
+        );
+      }
+
+      if (confirmedOnServer) {
+        await finishConfirmedReplacement();
+        return;
+      }
+
       if (isMountedRef.current) {
-        setStatus('failed');
+        // Do NOT force another AI extraction. The already-extracted
+        // pending result remains retryable and its allowance is
+        // released by the backend on confirmation failure.
+        setStatus('pending_confirmation');
         setErrorMessage('CV_CONFIRMATION_FAILED');
         haptics.error();
+
+        Alert.alert(
+          t('cvUpload.errorTitle'),
+          t('cvUpload.errors.confirmationFailed', {
+            defaultValue:
+              'Failed to confirm CV replacement. Please try again.',
+          })
+        );
       }
     } finally {
       confirmInFlightRef.current = false;
+
       if (isMountedRef.current) {
         setIsConfirming(false);
       }
     }
   };
 
-  const resetAfterCancellation = (cancelledJobId) => {
-    cancelledJobIdRef.current = cancelledJobId;
-    clearPolling();
-    clearVisualProgress();
-    setStatus('idle');
-    setProgressPercent(0);
-    setErrorMessage(null);
-    setSelectedFile(null);
-    setJobId(null);
-  };
+  const handleCancelAnalysis = (options = {}) => {
+    const leaveAfterCancellation =
+      options?.leaveAfterCancellation === true;
 
-  const handleCancelAnalysis = () => {
-    if (!jobId || cancelInFlightRef.current || isCancelling) return;
+    if (
+      !jobId ||
+      cancelInFlightRef.current ||
+      isCancelling ||
+      cancelPromptVisibleRef.current
+    ) {
+      return;
+    }
 
     const activeJobId = jobId;
+
+    cancelPromptVisibleRef.current = true;
 
     Alert.alert(
       t('cvUpload.cancelAnalysisTitle'),
@@ -543,25 +603,43 @@ export default function CVUploadScreen({ route, navigation }) {
         {
           text: t('cvUpload.keepAnalyzing'),
           style: 'cancel',
+          onPress: () => {
+            cancelPromptVisibleRef.current = false;
+          },
         },
         {
           text: t('cvUpload.cancelAnalysis'),
           style: 'destructive',
           onPress: async () => {
+            cancelPromptVisibleRef.current = false;
+
             if (cancelInFlightRef.current) return;
 
             cancelInFlightRef.current = true;
             setIsCancelling(true);
 
             try {
+              // Server-side cancellation is authoritative.
+              // It marks the durable job terminal and releases
+              // the reserved AI allowance before returning.
               await cancelCVAnalysis(activeJobId);
 
               if (isMountedRef.current) {
                 resetAfterCancellation(activeJobId);
                 haptics.selection?.();
               }
+
+              if (leaveAfterCancellation) {
+                // Allow exactly the navigation that follows the
+                // confirmed server-side cancellation.
+                allowNavigationRef.current = true;
+                navigation.goBack();
+              }
             } catch (err) {
-              console.warn('Cancel CV analysis error:', err);
+              console.warn(
+                'Cancel CV analysis error:',
+                err
+              );
 
               if (isMountedRef.current) {
                 Alert.alert(
@@ -579,9 +657,69 @@ export default function CVUploadScreen({ route, navigation }) {
             }
           },
         },
-      ]
+      ],
+      {
+        cancelable: true,
+        onDismiss: () => {
+          cancelPromptVisibleRef.current = false;
+        },
+      }
     );
   };
+
+  const handleProtectedBackPress = () => {
+    const analysisMayStillOwnQuota =
+      Boolean(jobId) &&
+      (
+        status === 'queued' ||
+        status === 'processing' ||
+        status === 'timeout'
+      );
+
+    if (analysisMayStillOwnQuota) {
+      handleCancelAnalysis({
+        leaveAfterCancellation: true,
+      });
+      return;
+    }
+
+    navigation.goBack();
+  };
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener(
+      'beforeRemove',
+      (event) => {
+        if (allowNavigationRef.current) {
+          allowNavigationRef.current = false;
+          return;
+        }
+
+        const analysisMayStillOwnQuota =
+          Boolean(jobId) &&
+          (
+            status === 'queued' ||
+            status === 'processing' ||
+            status === 'timeout'
+          );
+
+        if (!analysisMayStillOwnQuota) {
+          return;
+        }
+
+        // Protect Android hardware back, iOS gestures,
+        // and navigator-driven removal while an analysis
+        // can still hold a quota reservation.
+        event.preventDefault();
+
+        handleCancelAnalysis({
+          leaveAfterCancellation: true,
+        });
+      }
+    );
+
+    return unsubscribe;
+  });
 
   const handleStopPolling = () => {
     clearPolling();
@@ -608,6 +746,7 @@ export default function CVUploadScreen({ route, navigation }) {
         title={hasExistingCV ? t('cvUpload.replaceTitle') : t('cvUpload.title')}
         showBack={true}
         navigation={navigation}
+        onBackPress={handleProtectedBackPress}
       />
 
       <ScrollView
@@ -830,11 +969,16 @@ export default function CVUploadScreen({ route, navigation }) {
 
             <TouchableOpacity
               style={styles.secondaryBtn}
-              onPress={pickFileAndUpload}
+              onPress={handleCancelAnalysis}
+              disabled={!jobId || isCancelling}
               accessibilityRole="button"
-              accessibilityLabel={t('cvUpload.uploadAgain')}
+              accessibilityLabel={t('cvUpload.cancelAnalysis')}
             >
-              <Text style={styles.secondaryBtnText}>{t('cvUpload.uploadAgain')}</Text>
+              <Text style={styles.secondaryBtnText}>
+                {isCancelling
+                  ? t('cvUpload.cancellingAnalysis')
+                  : t('cvUpload.cancelAnalysis')}
+              </Text>
             </TouchableOpacity>
           </Card>
         )}
