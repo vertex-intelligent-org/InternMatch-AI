@@ -72,6 +72,16 @@ class InternshipCreateRequest(BaseModel):
         return cleaned
 
 
+class InternshipUpdateRequest(InternshipCreateRequest):
+    """
+    Full employer-owned opportunity update payload.
+
+    Uses the same validated canonical fields as creation. The authenticated
+    employer must own the listing being updated.
+    """
+
+
+
 class InternshipSummaryResponse(BaseModel):
     """Schema for individual internship item in catalog listing endpoint."""
 
@@ -125,6 +135,7 @@ class InternshipDetailResponse(BaseModel):
     preferred_skills: List[str] = Field(default_factory=list)
     languages: List[str] = Field(default_factory=list)
     min_education: Optional[str] = None
+    experience_requirements: Optional[str] = None
     is_active: bool = True
     posted_at: datetime
 
@@ -146,6 +157,7 @@ class InternshipDetailResponse(BaseModel):
             preferred_skills=model.preferred_skills or [],
             languages=languages_list,
             min_education=model.education_requirements,
+            experience_requirements=model.experience_requirements,
             is_active=getattr(model, "is_active", True),
             posted_at=model.created_at,
         )

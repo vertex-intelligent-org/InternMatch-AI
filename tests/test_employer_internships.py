@@ -1328,3 +1328,249 @@ def test_employer_applicants_are_ranked_by_canonical_match_score(
         "FastAPI",
         "Docker",
     ]
+
+def test_employer_can_update_owned_opportunity_without_changing_ownership(client):
+    from app.db.models import InternshipListing
+
+    employer_id = uuid4()
+    _create_profile(
+        employer_id,
+        "Update Employer",
+        account_type="employer",
+    )
+
+    headers = {
+        "Authorization": f"Bearer valid-user-{employer_id}"
+    }
+
+    create_response = client.post(
+        "/api/v1/internships",
+        json={
+            "title": "Backend Intern",
+            "company": "InternMatch Labs",
+            "location": "Istanbul",
+            "work_type": "hybrid",
+            "description": "Build reliable backend services.",
+            "required_skills": ["Python"],
+            "preferred_skills": ["FastAPI"],
+            "language": "English",
+            "education_requirements": "Computer Engineering student",
+            "experience_requirements": "Entry level",
+        },
+        headers=headers,
+    )
+
+    assert create_response.status_code == 201
+
+    created = create_response.json()
+    listing_id = created["id"]
+
+    update_response = client.patch(
+        f"/api/v1/internships/{listing_id}",
+        json={
+            "title": "Platform Engineering Intern",
+            "company": "InternMatch Labs",
+            "location": "Remote",
+            "work_type": "remote",
+            # Keep description unchanged so this ownership-focused test does
+            # not depend on an additional embedding provider call.
+            "description": "Build reliable backend services.",
+            "required_skills": ["Python", "PostgreSQL"],
+            "preferred_skills": ["FastAPI", "Docker"],
+            "language": "English",
+            "education_requirements": "Engineering student",
+            "experience_requirements": "No prior professional experience required",
+        },
+        headers=headers,
+    )
+
+    assert update_response.status_code == 200
+
+    updated = update_response.json()
+
+    assert updated["id"] == listing_id
+    assert updated["title"] == "Platform Engineering Intern"
+    assert updated["company"] == "InternMatch Labs"
+    assert updated["location"] == "Remote"
+    assert updated["work_type"] == "remote"
+    assert updated["description"] == "Build reliable backend services."
+    assert updated["required_skills"] == ["Python", "PostgreSQL"]
+    assert updated["preferred_skills"] == ["FastAPI", "Docker"]
+    assert updated["languages"] == ["English"]
+    assert updated["min_education"] == "Engineering student"
+    assert (
+        updated["experience_requirements"]
+        == "No prior professional experience required"
+    )
+    assert updated["is_active"] is True
+
+    with TestingSessionLocal() as db:
+        listing = db.get(InternshipListing, UUID(listing_id))
+
+        assert listing is not None
+        assert listing.employer_user_id == employer_id
+        assert listing.is_active is True
+
+
+def test_employer_cannot_update_another_employers_opportunity(client):
+    from app.db.models import InternshipListing
+
+    owner_id = uuid4()
+    attacker_id = uuid4()
+
+    _create_profile(
+        owner_id,
+        "Owner Employer",
+        account_type="employer",
+    )
+    _create_profile(
+        attacker_id,
+        "Other Employer",
+        account_type="employer",
+    )
+
+    owner_headers = {
+        "Authorization": f"Bearer valid-user-{owner_id}"
+    }
+    attacker_headers = {
+        "Authorization": f"Bearer valid-user-{attacker_id}"
+    }
+
+    create_response = client.post(
+        "/api/v1/internships",
+        json={
+            "title": "Protected Internship",
+            "company": "Owner Company",
+            "location": "Istanbul",
+            "work_type": "hybrid",
+            "description": "Ownership isolation test opportunity.",
+            "required_skills": ["Python"],
+            "preferred_skills": [],
+            "language": "English",
+            "education_requirements": None,
+            "experience_requirements": None,
+        },
+        headers=owner_headers,
+    )
+
+    assert create_response.status_code == 201
+
+    listing_id = create_response.json()["id"]
+
+    forbidden_update = client.patch(
+        f"/api/v1/internships/{listing_id}",
+        json={
+            "title": "Hijacked Internship",
+            "company": "Other Company",
+            "location": "Remote",
+            "work_type": "remote",
+            "description": "Ownership isolation test opportunity.",
+            "required_skills": ["Go"],
+            "preferred_skills": [],
+            "language": "English",
+            "education_requirements": None,
+            "experience_requirements": None,
+        },
+        headers=attacker_headers,
+    )
+
+    # Deliberately return not-found semantics so listing ownership is not
+    # disclosed to another employer.
+    assert forbidden_update.status_code == 404
+
+    with TestingSessionLocal() as db:
+        listing = db.get(InternshipListing, UUID(listing_id))
+
+        assert listing is not None
+        assert listing.employer_user_id == owner_id
+        assert listing.title == "Protected Internship"
+        assert listing.company == "Owner Company"
+        assert listing.location == "Istanbul"
+        assert listing.work_type == "hybrid"
+        assert listing.required_skills == ["Python"]
+        assert listing.is_active is True
+
+def test_update_opportunity_requires_authentication_and_employer_role(client):
+    owner_id = uuid4()
+    candidate_id = uuid4()
+
+    _create_profile(
+        owner_id,
+        "Security Owner",
+        account_type="employer",
+    )
+    _create_profile(
+        candidate_id,
+        "Security Candidate",
+        account_type="intern",
+    )
+
+    owner_headers = {
+        "Authorization": f"Bearer valid-user-{owner_id}"
+    }
+    candidate_headers = {
+        "Authorization": f"Bearer valid-user-{candidate_id}"
+    }
+
+    create_response = client.post(
+        "/api/v1/internships",
+        json={
+            "title": "Security Internship",
+            "company": "Secure Company",
+            "location": "Istanbul",
+            "work_type": "hybrid",
+            "description": "Security authorization test opportunity.",
+            "required_skills": ["Python"],
+            "preferred_skills": [],
+            "language": "English",
+            "education_requirements": None,
+            "experience_requirements": None,
+        },
+        headers=owner_headers,
+    )
+
+    assert create_response.status_code == 201
+
+    listing_id = create_response.json()["id"]
+
+    update_payload = {
+        "title": "Unauthorized Mutation Attempt",
+        "company": "Secure Company",
+        "location": "Remote",
+        "work_type": "remote",
+        "description": "Security authorization test opportunity.",
+        "required_skills": ["Python"],
+        "preferred_skills": [],
+        "language": "English",
+        "education_requirements": None,
+        "experience_requirements": None,
+    }
+
+    unauthenticated = client.patch(
+        f"/api/v1/internships/{listing_id}",
+        json=update_payload,
+    )
+
+    assert unauthenticated.status_code == 401
+
+    candidate_attempt = client.patch(
+        f"/api/v1/internships/{listing_id}",
+        json=update_payload,
+        headers=candidate_headers,
+    )
+
+    assert candidate_attempt.status_code == 403
+
+    db = TestingSessionLocal()
+    try:
+        listing = db.get(InternshipListing, UUID(listing_id))
+
+        assert listing is not None
+        assert listing.employer_user_id == owner_id
+        assert listing.title == "Security Internship"
+        assert listing.company == "Secure Company"
+        assert listing.location == "Istanbul"
+        assert listing.work_type == "hybrid"
+        assert listing.is_active is True
+    finally:
+        db.close()

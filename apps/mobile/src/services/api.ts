@@ -738,6 +738,19 @@ export async function createEmployerInternship(
   });
 }
 
+export async function updateEmployerInternship(
+  id: string,
+  payload: EmployerCreateInternshipPayload
+): Promise<InternshipDetail> {
+  return apiRequest<InternshipDetail>(
+    `/internships/${encodeURIComponent(id)}`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    }
+  );
+}
+
 export async function getEmployerInternships(
   params: {
     limit?: number;

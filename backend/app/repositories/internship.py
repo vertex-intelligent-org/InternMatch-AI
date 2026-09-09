@@ -156,6 +156,48 @@ class InternshipRepository:
         return db.scalar(stmt)
 
     @staticmethod
+    def update_employer_listing(
+        db: Session,
+        listing: InternshipListing,
+        *,
+        title: str,
+        company: str,
+        location: str,
+        work_type: str,
+        description: str,
+        required_skills: List[str],
+        preferred_skills: List[str],
+        language: Optional[str] = "English",
+        education_requirements: Optional[str] = None,
+        experience_requirements: Optional[str] = None,
+        description_embedding: Optional[List[float]] = None,
+    ) -> InternshipListing:
+        """
+        Update an already ownership-verified employer listing in place.
+
+        Does not alter employer ownership, publication state, primary key,
+        creation timestamp, applications, or historical relationships.
+        Flushes session state; does not commit the transaction.
+        """
+
+        listing.title = title
+        listing.company = company
+        listing.location = location
+        listing.work_type = work_type
+        listing.description = description
+        listing.required_skills = required_skills or []
+        listing.preferred_skills = preferred_skills or []
+        listing.language = language or "English"
+        listing.education_requirements = education_requirements
+        listing.experience_requirements = experience_requirements
+
+        if description_embedding is not None:
+            listing.description_embedding = description_embedding
+
+        db.flush()
+        return listing
+
+    @staticmethod
     def close_listing(
         db: Session,
         listing: InternshipListing,

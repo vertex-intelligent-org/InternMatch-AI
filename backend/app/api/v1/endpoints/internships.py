@@ -26,6 +26,7 @@ from app.schemas.internship import (
     InternshipDetailResponse,
     InternshipListResponse,
     InternshipSummaryResponse,
+    InternshipUpdateRequest,
 )
 from app.services.content_translation import translate_internship_content
 from app.services.embeddings import generate_embedding
@@ -171,6 +172,77 @@ def list_my_internships(
         limit=limit,
         offset=offset,
     )
+
+
+@router.patch("/{id}", response_model=InternshipDetailResponse)
+def update_internship_opportunity(
+    id: UUID,
+    payload: InternshipUpdateRequest,
+    current_user: AuthenticatedUser = Depends(require_employer_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Update an employer-owned internship opportunity.
+
+    Requires verified employer ownership. Ownership and publication state are
+    immutable through this endpoint. Description embeddings are regenerated
+    only when the canonical description changes.
+    """
+
+    listing = InternshipRepository.get_by_id_and_owner(
+        db=db,
+        internship_id=id,
+        employer_user_id=current_user.user_id,
+    )
+
+    if not listing:
+        return JSONResponse(
+            status_code=status.HTTP_404_NOT_FOUND,
+            content=format_not_found_error(
+                "Internship opportunity not found or not owned by current user."
+            ),
+        )
+
+    description_embedding = None
+
+    if payload.description != listing.description:
+        try:
+            description_embedding = list(
+                generate_embedding(payload.description)
+            )
+        except Exception as exc:
+            logger.warning(
+                "Embedding generation failed for employer opportunity update: %s",
+                type(exc).__name__,
+            )
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Opportunity updating is temporarily unavailable.",
+            ) from exc
+
+    try:
+        updated_listing = InternshipRepository.update_employer_listing(
+            db=db,
+            listing=listing,
+            title=payload.title,
+            company=payload.company,
+            location=payload.location,
+            work_type=payload.work_type,
+            description=payload.description,
+            required_skills=payload.required_skills,
+            preferred_skills=payload.preferred_skills,
+            language=payload.language,
+            education_requirements=payload.education_requirements,
+            experience_requirements=payload.experience_requirements,
+            description_embedding=description_embedding,
+        )
+        db.commit()
+        db.refresh(updated_listing)
+    except Exception:
+        db.rollback()
+        raise
+
+    return InternshipDetailResponse.from_orm_model(updated_listing)
 
 
 @router.get("/{id}/applicants", response_model=EmployerApplicantListResponse)

@@ -312,6 +312,37 @@ export default function EmployerOpportunitiesScreen({ navigation }) {
                       <View style={[styles.cardActionGroup, isRTL && styles.rowRTL]}>
                         {item.is_active !== false && (
                           <TouchableOpacity
+                            style={[styles.editOpportunityBtn, isRTL && styles.rowRTL]}
+                            onPress={() =>
+                              navigation.navigate('CreateOpportunity', {
+                                internshipId: item.id,
+                                opportunity: item,
+                              })
+                            }
+                            accessibilityRole="button"
+                            accessibilityLabel={`${t(
+                              'employerOpportunities.editBtn',
+                              'Edit'
+                            )} ${item.title}`}
+                          >
+                            <Ionicons
+                              name="create-outline"
+                              size={15}
+                              color={colors.accentStrong || colors.tealDark}
+                            />
+                            <Text
+                              style={[
+                                styles.editOpportunityBtnText,
+                                isRTL && styles.rtlText,
+                              ]}
+                            >
+                              {t('employerOpportunities.editBtn', 'Edit')}
+                            </Text>
+                          </TouchableOpacity>
+                        )}
+
+                        {item.is_active !== false && (
+                          <TouchableOpacity
                             style={[styles.closeOpportunityBtn, isRTL && styles.rowRTL]}
                             onPress={() => handleCloseOpportunity(item)}
                             disabled={closingId === item.id}
@@ -510,6 +541,18 @@ const styles = StyleSheet.create({
     height: 5,
     borderRadius: 2.5,
     marginEnd: 4,
+  },
+  editOpportunityBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    minHeight: spacing.minimumTouchTarget,
+    paddingHorizontal: spacing.sm,
+  },
+  editOpportunityBtnText: {
+    ...typography.button,
+    fontSize: 12,
+    color: colors.accentStrong || colors.tealDark,
   },
   publishedBadge: {
     backgroundColor: '#ECFDF5',

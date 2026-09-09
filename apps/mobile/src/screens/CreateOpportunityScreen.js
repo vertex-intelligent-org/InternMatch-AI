@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -21,7 +21,12 @@ import Chip from '../components/Chip';
 import Card from '../components/Card';
 import GradientButton from '../components/GradientButton';
 import haptics from '../services/haptics';
-import { createEmployerInternship, ApiError } from '../services/api';
+import {
+  createEmployerInternship,
+  getInternshipDetail,
+  updateEmployerInternship,
+  ApiError,
+} from '../services/api';
 
 const WORK_TYPES = [
   { id: 'remote' },
@@ -48,24 +53,81 @@ function normalizeSkillsInput(rawText) {
   return result;
 }
 
-export default function CreateOpportunityScreen({ navigation }) {
+export default function CreateOpportunityScreen({ navigation, route }) {
   const { t } = useTranslation();
   const { isRTL } = useLocalization();
   const insets = useSafeAreaInsets();
+  const editingOpportunity = route?.params?.opportunity || null;
+  const editingId =
+    route?.params?.internshipId || editingOpportunity?.id || null;
+  const isEditing = Boolean(editingId);
 
-  const [title, setTitle] = useState('');
-  const [company, setCompany] = useState('');
-  const [location, setLocation] = useState('');
-  const [workType, setWorkType] = useState('hybrid');
+  const [title, setTitle] = useState(editingOpportunity?.title || '');
+  const [company, setCompany] = useState(editingOpportunity?.company || '');
+  const [location, setLocation] = useState(editingOpportunity?.location || '');
+  const [workType, setWorkType] = useState(editingOpportunity?.work_type || 'hybrid');
   const [description, setDescription] = useState('');
-  const [requiredSkills, setRequiredSkills] = useState('');
-  const [preferredSkills, setPreferredSkills] = useState('');
+  const [requiredSkills, setRequiredSkills] = useState((editingOpportunity?.required_skills || []).join(', '));
+  const [preferredSkills, setPreferredSkills] = useState((editingOpportunity?.preferred_skills || []).join(', '));
   const [language, setLanguage] = useState('English');
   const [educationRequirements, setEducationRequirements] = useState('');
   const [experienceRequirements, setExperienceRequirements] = useState('');
 
+  const [loadingExisting, setLoadingExisting] = useState(Boolean(editingId));
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState(null);
+
+  useEffect(() => {
+    if (!editingId) {
+      setLoadingExisting(false);
+      return undefined;
+    }
+
+    let active = true;
+
+    const loadExistingOpportunity = async () => {
+      setLoadingExisting(true);
+      setErrorMessage(null);
+
+      try {
+        const detail = await getInternshipDetail(editingId);
+
+        if (!active) return;
+
+        setTitle(detail.title || '');
+        setCompany(detail.company || '');
+        setLocation(detail.location || '');
+        setWorkType(detail.work_type || 'hybrid');
+        setDescription(detail.description || '');
+        setRequiredSkills((detail.required_skills || []).join(', '));
+        setPreferredSkills((detail.preferred_skills || []).join(', '));
+        setLanguage(detail.languages?.[0] || 'English');
+        setEducationRequirements(detail.min_education || '');
+        setExperienceRequirements(detail.experience_requirements || '');
+      } catch (err) {
+        console.warn('Failed to load employer opportunity for editing:', err);
+
+        if (active) {
+          setErrorMessage(
+            t(
+              'createOpportunity.editLoadError',
+              'Failed to load this opportunity for editing. Please try again.'
+            )
+          );
+        }
+      } finally {
+        if (active) {
+          setLoadingExisting(false);
+        }
+      }
+    };
+
+    loadExistingOpportunity();
+
+    return () => {
+      active = false;
+    };
+  }, [editingId, t]);
 
   const handleSubmit = async () => {
     setErrorMessage(null);
@@ -97,12 +159,23 @@ export default function CreateOpportunityScreen({ navigation }) {
     setSubmitting(true);
 
     try {
-      await createEmployerInternship(payload);
+      if (isEditing) {
+        await updateEmployerInternship(editingId, payload);
+      } else {
+        await createEmployerInternship(payload);
+      }
       haptics.success();
 
       Alert.alert(
-        t('createOpportunity.successTitle'),
-        t('createOpportunity.successMessage'),
+        isEditing
+          ? t('createOpportunity.editSuccessTitle', 'Opportunity Updated')
+          : t('createOpportunity.successTitle'),
+        isEditing
+          ? t(
+              'createOpportunity.editSuccessMessage',
+              'Your opportunity has been updated successfully.'
+            )
+          : t('createOpportunity.successMessage'),
         [
           {
             text: 'OK',
@@ -117,7 +190,12 @@ export default function CreateOpportunityScreen({ navigation }) {
         ]
       );
     } catch (err) {
-      console.warn('Failed to publish employer opportunity:', err);
+      console.warn(
+        isEditing
+          ? 'Failed to update employer opportunity:'
+          : 'Failed to publish employer opportunity:',
+        err
+      );
       if (err instanceof ApiError && err.status === 503) {
         setErrorMessage(t('createOpportunity.error503'));
       } else {
@@ -131,8 +209,19 @@ export default function CreateOpportunityScreen({ navigation }) {
   return (
     <ScreenContainer edges={['top', 'bottom']}>
       <ScreenHeader
-        title={t('createOpportunity.title')}
-        subtitle={t('createOpportunity.subtitle')}
+        title={
+          isEditing
+            ? t('createOpportunity.editTitle', 'Edit Opportunity')
+            : t('createOpportunity.title')
+        }
+        subtitle={
+          isEditing
+            ? t(
+                'createOpportunity.editSubtitle',
+                'Update the opportunity details candidates will see.'
+              )
+            : t('createOpportunity.subtitle')
+        }
         showBack
         navigation={navigation}
         alignment="center"
@@ -173,7 +262,7 @@ export default function CreateOpportunityScreen({ navigation }) {
             value={title}
             onChangeText={setTitle}
             maxLength={200}
-            editable={!submitting}
+            editable={!submitting && !loadingExisting}
           />
 
           <Text style={[styles.label, isRTL && styles.rtlText]}>
@@ -186,7 +275,7 @@ export default function CreateOpportunityScreen({ navigation }) {
             value={company}
             onChangeText={setCompany}
             maxLength={200}
-            editable={!submitting}
+            editable={!submitting && !loadingExisting}
           />
 
           <Text style={[styles.label, isRTL && styles.rtlText]}>
@@ -199,7 +288,7 @@ export default function CreateOpportunityScreen({ navigation }) {
             value={location}
             onChangeText={setLocation}
             maxLength={200}
-            editable={!submitting}
+            editable={!submitting && !loadingExisting}
           />
 
           <Text style={[styles.label, isRTL && styles.rtlText]}>
@@ -215,7 +304,7 @@ export default function CreateOpportunityScreen({ navigation }) {
                   label={label}
                   variant={isSelected ? 'skill' : 'neutral'}
                   selected={isSelected}
-                  onPress={() => !submitting && setWorkType(typeObj.id)}
+                  onPress={() => !submitting && !loadingExisting && setWorkType(typeObj.id)}
                 />
               );
             })}
@@ -233,7 +322,7 @@ export default function CreateOpportunityScreen({ navigation }) {
             multiline
             numberOfLines={5}
             textAlignVertical="top"
-            editable={!submitting}
+            editable={!submitting && !loadingExisting}
           />
 
           {/* Section 2: Skills & Requirements (Optional) */}
@@ -250,7 +339,7 @@ export default function CreateOpportunityScreen({ navigation }) {
             placeholderTextColor={colors.textTertiary || colors.textMuted}
             value={requiredSkills}
             onChangeText={setRequiredSkills}
-            editable={!submitting}
+            editable={!submitting && !loadingExisting}
           />
 
           <Text style={[styles.label, isRTL && styles.rtlText]}>
@@ -262,7 +351,7 @@ export default function CreateOpportunityScreen({ navigation }) {
             placeholderTextColor={colors.textTertiary || colors.textMuted}
             value={preferredSkills}
             onChangeText={setPreferredSkills}
-            editable={!submitting}
+            editable={!submitting && !loadingExisting}
           />
 
           <Text style={[styles.label, isRTL && styles.rtlText]}>
@@ -274,7 +363,7 @@ export default function CreateOpportunityScreen({ navigation }) {
             placeholderTextColor={colors.textTertiary || colors.textMuted}
             value={language}
             onChangeText={setLanguage}
-            editable={!submitting}
+            editable={!submitting && !loadingExisting}
           />
 
           <Text style={[styles.label, isRTL && styles.rtlText]}>
@@ -286,7 +375,7 @@ export default function CreateOpportunityScreen({ navigation }) {
             placeholderTextColor={colors.textTertiary || colors.textMuted}
             value={educationRequirements}
             onChangeText={setEducationRequirements}
-            editable={!submitting}
+            editable={!submitting && !loadingExisting}
           />
 
           <Text style={[styles.label, isRTL && styles.rtlText]}>
@@ -298,15 +387,25 @@ export default function CreateOpportunityScreen({ navigation }) {
             placeholderTextColor={colors.textTertiary || colors.textMuted}
             value={experienceRequirements}
             onChangeText={setExperienceRequirements}
-            editable={!submitting}
+            editable={!submitting && !loadingExisting}
           />
 
           <GradientButton
-            title={submitting ? t('createOpportunity.publishing') : t('createOpportunity.publishBtn')}
+            title={
+              loadingExisting
+                ? t('common.loading', 'Loading...')
+                : submitting
+                  ? isEditing
+                    ? t('createOpportunity.updating', 'Updating...')
+                    : t('createOpportunity.publishing')
+                  : isEditing
+                    ? t('createOpportunity.updateBtn', 'Update Opportunity')
+                    : t('createOpportunity.publishBtn')
+            }
             color={colors.accent || colors.teal}
             onPress={handleSubmit}
-            disabled={submitting}
-            loading={submitting}
+            disabled={submitting || loadingExisting}
+            loading={submitting || loadingExisting}
             style={styles.publishBtn}
           />
         </ScrollView>
