@@ -454,12 +454,26 @@ export async function purchaseProStudentMonthly(): Promise<PurchaseActionResult>
       candidateState,
       reason: 'entitlement_not_active',
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errorCode =
+      typeof error === 'object' &&
+      error !== null &&
+      'code' in error
+        ? error.code
+        : undefined;
+
+    const userCancelled =
+      typeof error === 'object' &&
+      error !== null &&
+      'userCancelled' in error
+        ? error.userCancelled
+        : undefined;
+
     const isCancelled = Boolean(
-      error?.code === PURCHASES_ERROR_CODE.PURCHASE_CANCELLED_ERROR ||
-        error?.code === '1' ||
-        error?.code === 1 ||
-        error?.userCancelled === true
+      errorCode === PURCHASES_ERROR_CODE.PURCHASE_CANCELLED_ERROR ||
+        errorCode === '1' ||
+        errorCode === 1 ||
+        userCancelled === true
     );
 
     const fallbackState = await getCandidateRevenueCatState();
