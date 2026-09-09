@@ -391,6 +391,155 @@ export default function EmployerApplicantDetailScreen({ route, navigation }) {
               </Card>
             </Reveal>
 
+            {/* Grounded deterministic match explanation.
+                These values are persisted canonical Match components from the backend.
+                No LLM-generated recruiter explanation is used here. */}
+            {typeof applicant.match_score === 'number' && (
+              <Reveal delay={20}>
+                <Card style={styles.employerMatchExplanationCard} padding="md">
+                  <View style={[styles.explanationHeader, isRTL && styles.rowRTL]}>
+                    <View style={styles.explanationTitleBlock}>
+                      <Text style={[styles.sectionTitle, isRTL && styles.rtlText]}>
+                        {t(
+                          'employerCandidateRanking.explanationTitle',
+                          'Why this candidate ranks here'
+                        )}
+                      </Text>
+                      <Text style={[styles.explanationSubtitle, isRTL && styles.rtlText]}>
+                        {t(
+                          'employerCandidateRanking.explanationSubtitle',
+                          'Based on the same persisted match factors used to rank applicants.'
+                        )}
+                      </Text>
+                    </View>
+                    <MatchBadge score={applicant.match_score} />
+                  </View>
+
+                  <View style={styles.scoreBreakdown}>
+                    <View style={[styles.scoreBreakdownRow, isRTL && styles.rowRTL]}>
+                      <View style={styles.scoreBreakdownLabelBlock}>
+                        <Text style={[styles.scoreBreakdownLabel, isRTL && styles.rtlText]}>
+                          {t('employerCandidateRanking.skillsFit', 'Skills fit')}
+                        </Text>
+                        <Text style={[styles.scoreBreakdownWeight, isRTL && styles.rtlText]}>
+                          {t('employerCandidateRanking.weight50', '50% of overall score')}
+                        </Text>
+                      </View>
+                      <Text style={styles.scoreBreakdownValue}>
+                        {typeof applicant.skill_score === 'number'
+                          ? `${applicant.skill_score}/100`
+                          : '—'}
+                      </Text>
+                    </View>
+
+                    <View style={[styles.scoreBreakdownRow, isRTL && styles.rowRTL]}>
+                      <View style={styles.scoreBreakdownLabelBlock}>
+                        <Text style={[styles.scoreBreakdownLabel, isRTL && styles.rtlText]}>
+                          {t('employerCandidateRanking.semanticFit', 'Semantic fit')}
+                        </Text>
+                        <Text style={[styles.scoreBreakdownWeight, isRTL && styles.rtlText]}>
+                          {t('employerCandidateRanking.weight30', '30% of overall score')}
+                        </Text>
+                      </View>
+                      <Text style={styles.scoreBreakdownValue}>
+                        {typeof applicant.vector_score === 'number'
+                          ? `${applicant.vector_score}/100`
+                          : '—'}
+                      </Text>
+                    </View>
+
+                    <View style={[styles.scoreBreakdownRow, isRTL && styles.rowRTL]}>
+                      <View style={styles.scoreBreakdownLabelBlock}>
+                        <Text style={[styles.scoreBreakdownLabel, isRTL && styles.rtlText]}>
+                          {t('employerCandidateRanking.profileFit', 'Profile fit')}
+                        </Text>
+                        <Text style={[styles.scoreBreakdownWeight, isRTL && styles.rtlText]}>
+                          {t('employerCandidateRanking.weight20', '20% of overall score')}
+                        </Text>
+                      </View>
+                      <Text style={styles.scoreBreakdownValue}>
+                        {typeof applicant.attribute_score === 'number'
+                          ? `${applicant.attribute_score}/100`
+                          : '—'}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {(applicant.matching_skills?.length > 0 ||
+                    applicant.missing_skills?.length > 0) && (
+                    <View style={styles.skillsEvidenceBlock}>
+                      {applicant.matching_skills?.length > 0 && (
+                        <View style={styles.skillEvidenceSection}>
+                          <Text style={[styles.skillEvidenceTitle, isRTL && styles.rtlText]}>
+                            {t(
+                              'employerCandidateRanking.matchingSkillsTitle',
+                              'Matching skills'
+                            )}
+                          </Text>
+                          <View style={[styles.skillChipWrap, isRTL && styles.rowRTL]}>
+                            {applicant.matching_skills.map((skill) => (
+                              <View key={`match-${skill}`} style={styles.matchingSkillChip}>
+                                <Ionicons
+                                  name="checkmark-circle-outline"
+                                  size={14}
+                                  color={colors.success || '#10B981'}
+                                />
+                                <Text
+                                  style={[
+                                    styles.matchingSkillText,
+                                    isRTL && styles.rtlText,
+                                  ]}
+                                >
+                                  {skill}
+                                </Text>
+                              </View>
+                            ))}
+                          </View>
+                        </View>
+                      )}
+
+                      {applicant.missing_skills?.length > 0 && (
+                        <View style={styles.skillEvidenceSection}>
+                          <Text style={[styles.skillEvidenceTitle, isRTL && styles.rtlText]}>
+                            {t(
+                              'employerCandidateRanking.missingSkillsTitle',
+                              'Missing role skills'
+                            )}
+                          </Text>
+                          <View style={[styles.skillChipWrap, isRTL && styles.rowRTL]}>
+                            {applicant.missing_skills.map((skill) => (
+                              <View key={`missing-${skill}`} style={styles.missingSkillChip}>
+                                <Ionicons
+                                  name="remove-circle-outline"
+                                  size={14}
+                                  color={colors.warning || '#D97706'}
+                                />
+                                <Text
+                                  style={[
+                                    styles.missingSkillText,
+                                    isRTL && styles.rtlText,
+                                  ]}
+                                >
+                                  {skill}
+                                </Text>
+                              </View>
+                            ))}
+                          </View>
+                        </View>
+                      )}
+                    </View>
+                  )}
+
+                  <Text style={[styles.explanationFootnote, isRTL && styles.rtlText]}>
+                    {t(
+                      'employerCandidateRanking.explanationFootnote',
+                      'Ranking is decision support only. Review the full application before making a hiring decision.'
+                    )}
+                  </Text>
+                </Card>
+              </Reveal>
+            )}
+
             {/* Sequence 2: Application Details & Recruiter Action Controls */}
             <Reveal delay={30}>
               <Card style={styles.metaCard} padding="md">
@@ -1210,6 +1359,108 @@ const styles = StyleSheet.create({
   },
   iconRTL: {
     marginStart: spacing.xs,
+  },
+  employerMatchExplanationCard: {
+    marginBottom: spacing.md,
+  },
+  explanationHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+  },
+  explanationTitleBlock: {
+    flex: 1,
+  },
+  explanationSubtitle: {
+    ...typography.caption,
+    color: colors.textSecondary || colors.textMuted,
+    marginTop: spacing.xxs,
+    lineHeight: 18,
+  },
+  scoreBreakdown: {
+    marginTop: spacing.md,
+    gap: spacing.xs,
+  },
+  scoreBreakdownRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.borderSubtle || colors.border,
+    paddingTop: spacing.xs,
+  },
+  scoreBreakdownLabelBlock: {
+    flex: 1,
+    marginEnd: spacing.sm,
+  },
+  scoreBreakdownLabel: {
+    ...typography.label,
+    color: colors.textPrimary || colors.textDark,
+    fontSize: 13,
+  },
+  scoreBreakdownWeight: {
+    ...typography.caption,
+    color: colors.textTertiary || colors.textMuted,
+    fontSize: 11,
+    marginTop: 1,
+  },
+  scoreBreakdownValue: {
+    ...typography.cardTitle,
+    color: colors.accentStrong || colors.tealDark,
+    fontSize: 15,
+  },
+  skillsEvidenceBlock: {
+    marginTop: spacing.md,
+    gap: spacing.sm,
+  },
+  skillEvidenceSection: {
+    gap: spacing.xs,
+  },
+  skillEvidenceTitle: {
+    ...typography.label,
+    color: colors.textSecondary || colors.textMuted,
+    fontSize: 12,
+  },
+  skillChipWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
+  },
+  matchingSkillChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 5,
+    borderRadius: spacing.radii.pill,
+    backgroundColor: colors.successSoft || '#ECFDF5',
+  },
+  matchingSkillText: {
+    ...typography.caption,
+    color: colors.textPrimary || colors.textDark,
+    fontSize: 12,
+  },
+  missingSkillChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 5,
+    borderRadius: spacing.radii.pill,
+    backgroundColor: colors.warningSoft || '#FEF3C7',
+  },
+  missingSkillText: {
+    ...typography.caption,
+    color: colors.textPrimary || colors.textDark,
+    fontSize: 12,
+  },
+  explanationFootnote: {
+    ...typography.caption,
+    color: colors.textTertiary || colors.textMuted,
+    fontSize: 11,
+    lineHeight: 16,
+    marginTop: spacing.md,
   },
   rowRTL: {
     flexDirection: 'row-reverse',

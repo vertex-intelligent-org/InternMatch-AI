@@ -1313,6 +1313,25 @@ def test_employer_applicants_are_ranked_by_canonical_match_score(
     ]
     assert items[0]["missing_skills"] == []
 
+    # The employer explanation must expose the exact persisted Match
+    # components used by the canonical ranking. No mobile-side recomputation
+    # and no LLM-generated values are allowed here.
+    assert items[0]["match_score"] == 91
+    assert items[0]["skill_score"] == 91
+    assert items[0]["vector_score"] == 91
+    assert items[0]["attribute_score"] == 91
+
+    assert items[1]["match_score"] == 74
+    assert items[1]["skill_score"] == 74
+    assert items[1]["vector_score"] == 74
+    assert items[1]["attribute_score"] == 74
+
+    assert items[2]["match_score"] == 48
+    assert items[2]["skill_score"] == 48
+    assert items[2]["vector_score"] == 48
+    assert items[2]["attribute_score"] == 48
+
+
     assert items[1]["matching_skills"] == [
         "Python",
         "FastAPI",
@@ -1574,3 +1593,196 @@ def test_update_opportunity_requires_authentication_and_employer_role(client):
         assert listing.is_active is True
     finally:
         db.close()
+
+def test_employer_applicant_detail_uses_same_canonical_match_components(client):
+    employer_id = uuid4()
+    candidate_id = uuid4()
+
+    _create_profile(
+        employer_id,
+        "Detail Explainability Employer",
+        account_type="employer",
+    )
+
+    candidate_profile = _create_profile(
+        candidate_id,
+        "Grounded Detail Candidate",
+        account_type="intern",
+        preferences={"department": "Computer Engineering"},
+    )
+
+    headers = {
+        "Authorization": f"Bearer valid-user-{employer_id}"
+    }
+
+    create_response = client.post(
+        "/api/v1/internships",
+        json={
+            "title": "Grounded Ranking Intern",
+            "company": "Grounded Labs",
+            "location": "Remote",
+            "work_type": "remote",
+            "description": "Grounded employer explanation detail test.",
+            "required_skills": ["Python", "FastAPI"],
+            "preferred_skills": ["Docker"],
+        },
+        headers=headers,
+    )
+
+    assert create_response.status_code == 201
+    listing_id = UUID(create_response.json()["id"])
+
+    db = TestingSessionLocal()
+    try:
+        application = Application(
+            id=uuid4(),
+            student_id=candidate_profile.id,
+            internship_id=listing_id,
+            status="applied",
+            applied_date=datetime.now(timezone.utc).date(),
+            created_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc),
+        )
+        db.add(application)
+        db.flush()
+
+        match = Match(
+            id=uuid4(),
+            student_id=candidate_profile.id,
+            internship_id=listing_id,
+            overall_score=82,
+            skill_score=90,
+            vector_score=76,
+            attribute_score=70,
+            skill_gap_analysis={
+                "matching_skills": ["Python", "FastAPI"],
+                "missing_skills": ["Docker"],
+                "summary": "",
+                "recommendations": [],
+            },
+            created_at=datetime.now(timezone.utc),
+        )
+        db.add(match)
+        db.commit()
+
+        application_id = application.id
+    finally:
+        db.close()
+
+    detail_response = client.get(
+        f"/api/v1/internships/{listing_id}/applicants/{application_id}",
+        headers=headers,
+    )
+
+    assert detail_response.status_code == 200
+
+    detail = detail_response.json()
+
+    assert detail["match_score"] == 82
+    assert detail["skill_score"] == 90
+    assert detail["vector_score"] == 76
+    assert detail["attribute_score"] == 70
+
+    assert detail["matching_skills"] == [
+        "Python",
+        "FastAPI",
+    ]
+    assert detail["missing_skills"] == [
+        "Docker",
+    ]
+
+    # Employer-facing explanation must not expose internal ownership identifiers
+    # outside the intentional candidate summary contract.
+    assert "employer_user_id" not in detail
+
+
+def test_employer_unscored_applicant_has_no_fabricated_score_breakdown(client):
+    employer_id = uuid4()
+    candidate_id = uuid4()
+
+    _create_profile(
+        employer_id,
+        "Unscored Explainability Employer",
+        account_type="employer",
+    )
+
+    candidate_profile = _create_profile(
+        candidate_id,
+        "Unscored Candidate",
+        account_type="intern",
+    )
+
+    headers = {
+        "Authorization": f"Bearer valid-user-{employer_id}"
+    }
+
+    create_response = client.post(
+        "/api/v1/internships",
+        json={
+            "title": "Unscored Candidate Intern",
+            "company": "Explainability Labs",
+            "location": "Remote",
+            "work_type": "remote",
+            "description": "Verify that employer explanations never fabricate scores.",
+            "required_skills": ["Python"],
+            "preferred_skills": ["Docker"],
+        },
+        headers=headers,
+    )
+
+    assert create_response.status_code == 201
+    listing_id = UUID(create_response.json()["id"])
+
+    db = TestingSessionLocal()
+    try:
+        application = Application(
+            id=uuid4(),
+            student_id=candidate_profile.id,
+            internship_id=listing_id,
+            status="applied",
+            applied_date=datetime.now(timezone.utc).date(),
+            created_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc),
+        )
+        db.add(application)
+        db.commit()
+
+        application_id = application.id
+    finally:
+        db.close()
+
+    list_response = client.get(
+        f"/api/v1/internships/{listing_id}/applicants",
+        headers=headers,
+    )
+
+    assert list_response.status_code == 200
+
+    items = list_response.json()["items"]
+    assert len(items) == 1
+
+    applicant = items[0]
+
+    assert applicant["match_score"] is None
+    assert applicant["skill_score"] is None
+    assert applicant["vector_score"] is None
+    assert applicant["attribute_score"] is None
+    assert applicant["ai_rank"] is None
+    assert applicant["matching_skills"] == []
+    assert applicant["missing_skills"] == []
+
+    detail_response = client.get(
+        f"/api/v1/internships/{listing_id}/applicants/{application_id}",
+        headers=headers,
+    )
+
+    assert detail_response.status_code == 200
+
+    detail = detail_response.json()
+
+    assert detail["match_score"] is None
+    assert detail["skill_score"] is None
+    assert detail["vector_score"] is None
+    assert detail["attribute_score"] is None
+    assert detail["matching_skills"] == []
+    assert detail["missing_skills"] == []

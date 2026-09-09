@@ -227,6 +227,9 @@ class EmployerApplicantResponse(BaseModel):
     applied_date: Optional[date] = None
     generated_cover_letter: Optional[str] = None
     match_score: Optional[int] = None
+    skill_score: Optional[int] = None
+    vector_score: Optional[int] = None
+    attribute_score: Optional[int] = None
     ai_rank: Optional[int] = None
     matching_skills: List[str] = Field(default_factory=list)
     missing_skills: List[str] = Field(default_factory=list)
@@ -273,6 +276,9 @@ class EmployerApplicantResponse(BaseModel):
             applied_date=application.applied_date,
             generated_cover_letter=application.generated_cover_letter,
             match_score=match.overall_score if match is not None else None,
+            skill_score=match.skill_score if match is not None else None,
+            vector_score=match.vector_score if match is not None else None,
+            attribute_score=match.attribute_score if match is not None else None,
             ai_rank=ai_rank,
             matching_skills=matching_skills,
             missing_skills=missing_skills,

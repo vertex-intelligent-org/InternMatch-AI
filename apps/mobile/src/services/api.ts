@@ -711,6 +711,9 @@ export type EmployerApplicantItem = {
   applied_date: string | null;
   generated_cover_letter: string | null;
   match_score: number | null;
+  skill_score: number | null;
+  vector_score: number | null;
+  attribute_score: number | null;
   ai_rank: number | null;
   matching_skills: string[];
   missing_skills: string[];

@@ -288,15 +288,24 @@ def list_internship_applicants(
     )
 
     items = []
-    for rank, (app, profile, match) in enumerate(ranked_records, start=1):
+    scored_rank = 0
+
+    for app, profile, match in ranked_records:
+        ai_rank = None
+
+        if match is not None:
+            scored_rank += 1
+            ai_rank = scored_rank
+
         skills = MatchingDataRepository.get_skill_names_for_student(db, profile.id)
+
         items.append(
             EmployerApplicantResponse.from_orm_data(
                 application=app,
                 profile=profile,
                 match=match,
                 skills=skills,
-                ai_rank=rank,
+                ai_rank=ai_rank,
             )
         )
 
