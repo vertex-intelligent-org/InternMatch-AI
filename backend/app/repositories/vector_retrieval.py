@@ -8,6 +8,7 @@ from typing import List, Sequence
 
 from app.core.config import settings
 from app.db.models import InternshipListing
+from app.repositories.internship import public_internship_visibility_condition
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import Select
@@ -49,6 +50,7 @@ def build_nearest_internships_statement(
         .where(
             InternshipListing.description_embedding.is_not(None),
             InternshipListing.is_active.is_(True),
+            public_internship_visibility_condition(),
         )
         .order_by(distance_expr.asc())
         .limit(limit)

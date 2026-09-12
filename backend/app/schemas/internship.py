@@ -18,8 +18,14 @@ class InternshipCreateRequest(BaseModel):
     title: str = Field(
         ..., min_length=1, max_length=200, description="Job / internship title"
     )
-    company: str = Field(
-        ..., min_length=1, max_length=200, description="Company name"
+    company: Optional[str] = Field(
+        default=None,
+        min_length=1,
+        max_length=200,
+        description=(
+            "Deprecated compatibility field. Ignored by the server; "
+            "company identity is derived from the verified organization."
+        ),
     )
     location: str = Field(
         ...,
@@ -49,7 +55,7 @@ class InternshipCreateRequest(BaseModel):
         default=None, description="Experience requirements"
     )
 
-    @field_validator("title", "company", "location", "description", mode="before")
+    @field_validator("title", "location", "description", mode="before")
     @classmethod
     def validate_non_empty_trimmed(cls, v: Any) -> str:
         """Validate and trim required string fields."""

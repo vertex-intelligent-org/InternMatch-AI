@@ -104,7 +104,10 @@ def save_internship(
             ),
         )
 
-    internship = InternshipRepository.get_by_id(db=db, internship_id=internship_id)
+    internship = InternshipRepository.get_public_by_id(
+        db=db,
+        internship_id=internship_id,
+    )
     if not internship:
         return JSONResponse(
             status_code=status.HTTP_404_NOT_FOUND,

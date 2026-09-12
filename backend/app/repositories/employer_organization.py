@@ -95,6 +95,7 @@ class EmployerOrganizationRepository:
                 EmployerOrganization.owner_user_id == owner_user_id
             )
             .with_for_update()
+            .execution_options(populate_existing=True)
         )
         return db.scalar(stmt)
 
@@ -109,6 +110,7 @@ class EmployerOrganizationRepository:
                 EmployerOrganization.id == organization_id
             )
             .with_for_update()
+            .execution_options(populate_existing=True)
         )
         return db.scalar(stmt)
 

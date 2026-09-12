@@ -6,18 +6,69 @@ Provides read-only database access for internship listings.
 from typing import List, Optional, Tuple
 from uuid import UUID
 
-from app.db.models import InternshipListing
+from app.db.models import EmployerOrganization, InternshipListing
 from sqlalchemy import String, cast, func, or_, select
 from sqlalchemy.orm import Session
+
+
+
+def public_internship_visibility_condition():
+    """
+    Canonical public/candidate visibility rule.
+
+    Active curated listings without an employer owner remain eligible.
+    Employer-owned listings are public only while the owner's organization
+    is currently verified.
+    """
+    verified_owner_ids = select(
+        EmployerOrganization.owner_user_id
+    ).where(
+        EmployerOrganization.verification_status == "verified"
+    )
+
+    return or_(
+        InternshipListing.employer_user_id.is_(None),
+        InternshipListing.employer_user_id.in_(
+            verified_owner_ids
+        ),
+    )
 
 
 class InternshipRepository:
     """Repository handling database read operations for InternshipListing."""
 
     @staticmethod
-    def get_by_id(db: Session, internship_id: UUID) -> Optional[InternshipListing]:
-        """Fetch single internship listing record by its primary key UUID."""
-        stmt = select(InternshipListing).where(InternshipListing.id == internship_id)
+    def get_by_id(
+        db: Session,
+        internship_id: UUID,
+    ) -> Optional[InternshipListing]:
+        """
+        Fetch a listing by primary key without applying public visibility.
+
+        Internal/server-authoritative use only. Candidate/public HTTP paths
+        must use get_public_by_id().
+        """
+        stmt = select(InternshipListing).where(
+            InternshipListing.id == internship_id
+        )
+        return db.scalar(stmt)
+
+    @staticmethod
+    def get_public_by_id(
+        db: Session,
+        internship_id: UUID,
+    ) -> Optional[InternshipListing]:
+        """
+        Fetch one currently public internship.
+
+        Curated rows remain eligible when active. Employer-owned rows require
+        a currently verified employer organization.
+        """
+        stmt = select(InternshipListing).where(
+            InternshipListing.id == internship_id,
+            InternshipListing.is_active.is_(True),
+            public_internship_visibility_condition(),
+        )
         return db.scalar(stmt)
 
     @staticmethod
@@ -34,7 +85,10 @@ class InternshipRepository:
         Excludes closed listings from public discovery.
         Returns (items, total_count).
         """
-        stmt = select(InternshipListing).where(InternshipListing.is_active.is_(True))
+        stmt = select(InternshipListing).where(
+            InternshipListing.is_active.is_(True),
+            public_internship_visibility_condition(),
+        )
 
         if work_type and work_type.strip():
             stmt = stmt.where(

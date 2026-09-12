@@ -4,12 +4,14 @@ and Applicant Retrieval Endpoints (Gate EMP-MVP1 / EMP-MVP1B).
 """
 
 from datetime import datetime, timezone
+from pathlib import Path
 from uuid import UUID, uuid4
 
 import pytest
 from app.core.config import settings
 from app.db.models import (
     Application,
+    EmployerOrganization,
     InternshipListing,
     Match,
     Skill,
@@ -33,6 +35,7 @@ def clean_database():
         db.query(StudentSkill).delete()
         db.query(Skill).delete()
         db.query(InternshipListing).delete()
+        db.query(EmployerOrganization).delete()
         db.query(StudentProfile).delete()
         db.commit()
     finally:
@@ -45,6 +48,7 @@ def clean_database():
         db.query(StudentSkill).delete()
         db.query(Skill).delete()
         db.query(InternshipListing).delete()
+        db.query(EmployerOrganization).delete()
         db.query(StudentProfile).delete()
         db.commit()
     finally:
@@ -60,7 +64,13 @@ def default_mock_embedding(monkeypatch):
     )
 
 
-def _create_profile(user_id, full_name, account_type="employer", preferences=None):
+def _create_profile(
+    user_id,
+    full_name,
+    account_type="employer",
+    preferences=None,
+    employer_verification_status="verified",
+):
     """Helper to create a StudentProfile in test database."""
     prefs = preferences or {}
     prefs["account_type"] = account_type
@@ -76,6 +86,45 @@ def _create_profile(user_id, full_name, account_type="employer", preferences=Non
             updated_at=datetime.now(timezone.utc),
         )
         db.add(profile)
+
+        if (
+            account_type == "employer"
+            and employer_verification_status is not None
+        ):
+            now = datetime.now(timezone.utc)
+
+            db.add(
+                EmployerOrganization(
+                    id=uuid4(),
+                    owner_user_id=user_id,
+                    legal_name="Acme Corp Legal Entity",
+                    display_name="Acme Corp",
+                    website_url="https://acme.example",
+                    normalized_domain="acme.example",
+                    business_email=(
+                        f"employer-{user_id}@acme.example"
+                    ),
+                    country_code="TR",
+                    registration_number="TEST-REG-001",
+                    tax_number=None,
+                    representative_name=full_name,
+                    representative_role="Recruiter",
+                    verification_status=(
+                        employer_verification_status
+                    ),
+                    submitted_at=now,
+                    reviewed_at=(
+                        now
+                        if employer_verification_status == "verified"
+                        else None
+                    ),
+                    reviewed_by=None,
+                    rejection_reason_code=None,
+                    created_at=now,
+                    updated_at=now,
+                )
+            )
+
         db.commit()
         db.refresh(profile)
         return profile
@@ -1409,7 +1458,7 @@ def test_employer_can_update_owned_opportunity_without_changing_ownership(client
 
     assert updated["id"] == listing_id
     assert updated["title"] == "Platform Engineering Intern"
-    assert updated["company"] == "InternMatch Labs"
+    assert updated["company"] == "Acme Corp"
     assert updated["location"] == "Remote"
     assert updated["work_type"] == "remote"
     assert updated["description"] == "Build reliable backend services."
@@ -1503,7 +1552,7 @@ def test_employer_cannot_update_another_employers_opportunity(client):
         assert listing is not None
         assert listing.employer_user_id == owner_id
         assert listing.title == "Protected Internship"
-        assert listing.company == "Owner Company"
+        assert listing.company == "Acme Corp"
         assert listing.location == "Istanbul"
         assert listing.work_type == "hybrid"
         assert listing.required_skills == ["Python"]
@@ -1587,7 +1636,7 @@ def test_update_opportunity_requires_authentication_and_employer_role(client):
         assert listing is not None
         assert listing.employer_user_id == owner_id
         assert listing.title == "Security Internship"
-        assert listing.company == "Secure Company"
+        assert listing.company == "Acme Corp"
         assert listing.location == "Istanbul"
         assert listing.work_type == "hybrid"
         assert listing.is_active is True
@@ -2205,3 +2254,465 @@ def test_employer_applicant_detail_exposes_server_authoritative_skill_provenance
 
     # Employer detail must not expose private storage implementation details.
     assert "cv_storage_path" not in payload
+
+
+@pytest.mark.parametrize(
+    "verification_status",
+    [
+        None,
+        "unverified",
+        "pending",
+        "rejected",
+        "suspended",
+    ],
+)
+def test_create_internship_requires_verified_organization(
+    client: TestClient,
+    verification_status,
+):
+    employer_user_id = uuid4()
+
+    _create_profile(
+        employer_user_id,
+        "Unverified Employer",
+        account_type="employer",
+        employer_verification_status=verification_status,
+    )
+
+    response = client.post(
+        "/api/v1/internships",
+        json={
+            "title": "Security Engineering Intern",
+            "company": "Impersonated Company",
+            "location": "Remote",
+            "work_type": "remote",
+            "description": "Build secure backend systems.",
+            "required_skills": ["Python"],
+        },
+        headers={
+            "Authorization":
+            f"Bearer valid-user-{employer_user_id}"
+        },
+    )
+
+    assert response.status_code == 403
+    assert "verified company profile" in (
+        response.json()["detail"].lower()
+    )
+
+
+def test_verified_employer_company_is_server_derived_on_create_and_update(
+    client: TestClient,
+):
+    employer_user_id = uuid4()
+
+    _create_profile(
+        employer_user_id,
+        "Verified Employer",
+        account_type="employer",
+    )
+
+    headers = {
+        "Authorization":
+        f"Bearer valid-user-{employer_user_id}"
+    }
+
+    create_response = client.post(
+        "/api/v1/internships",
+        json={
+            "title": "Backend Intern",
+            "company": "Fake Global Corporation",
+            "location": "Istanbul",
+            "work_type": "hybrid",
+            "description": "Build backend APIs.",
+            "required_skills": ["Python"],
+        },
+        headers=headers,
+    )
+
+    assert create_response.status_code == 201
+
+    created = create_response.json()
+
+    # Client company value is compatibility-only.
+    assert created["company"] == "Acme Corp"
+
+    listing_id = UUID(created["id"])
+
+    update_response = client.patch(
+        f"/api/v1/internships/{listing_id}",
+        json={
+            "title": "Backend Engineering Intern",
+            "company": "Another Impersonated Company",
+            "location": "Istanbul",
+            "work_type": "hybrid",
+            "description": "Build secure backend APIs.",
+            "required_skills": ["Python", "FastAPI"],
+        },
+        headers=headers,
+    )
+
+    assert update_response.status_code == 200
+    assert update_response.json()["company"] == "Acme Corp"
+
+    db = TestingSessionLocal()
+    try:
+        listing = db.get(
+            InternshipListing,
+            listing_id,
+        )
+
+        assert listing is not None
+        assert listing.company == "Acme Corp"
+    finally:
+        db.close()
+
+
+def test_public_catalog_and_detail_hide_unverified_employer_listing(
+    client: TestClient,
+):
+    employer_user_id = uuid4()
+
+    _create_profile(
+        employer_user_id,
+        "Pending Employer",
+        account_type="employer",
+        employer_verification_status="pending",
+    )
+
+    hidden_listing_id = uuid4()
+    curated_listing_id = uuid4()
+
+    db = TestingSessionLocal()
+    try:
+        db.add_all(
+            [
+                InternshipListing(
+                    id=hidden_listing_id,
+                    employer_user_id=employer_user_id,
+                    title="Hidden Employer Listing",
+                    company="Pending Company",
+                    location="Remote",
+                    work_type="remote",
+                    description="Must not be public.",
+                    required_skills=[],
+                    preferred_skills=[],
+                    language="English",
+                    is_active=True,
+                ),
+                InternshipListing(
+                    id=curated_listing_id,
+                    employer_user_id=None,
+                    title="Curated Public Listing",
+                    company="Curated Partner",
+                    location="Remote",
+                    work_type="remote",
+                    description="Legacy curated listing.",
+                    required_skills=[],
+                    preferred_skills=[],
+                    language="English",
+                    is_active=True,
+                ),
+            ]
+        )
+        db.commit()
+    finally:
+        db.close()
+
+    catalog_response = client.get(
+        "/api/v1/internships"
+    )
+
+    assert catalog_response.status_code == 200
+
+    catalog_ids = {
+        item["id"]
+        for item in catalog_response.json()["items"]
+    }
+
+    assert str(hidden_listing_id) not in catalog_ids
+    assert str(curated_listing_id) in catalog_ids
+
+    hidden_detail = client.get(
+        f"/api/v1/internships/{hidden_listing_id}"
+    )
+    assert hidden_detail.status_code == 404
+
+    curated_detail = client.get(
+        f"/api/v1/internships/{curated_listing_id}"
+    )
+    assert curated_detail.status_code == 200
+
+
+def test_a3_backfill_migration_canonicalizes_verified_company_names():
+    migration = Path(
+        "database/migrations/"
+        "020_canonicalize_verified_employer_listings.sql"
+    ).read_text(encoding="utf-8")
+
+    assert (
+        "UPDATE public.internship_listings AS listing"
+        in migration
+    )
+    assert (
+        "SET company = organization.display_name"
+        in migration
+    )
+    assert (
+        "organization.verification_status = 'verified'"
+        in migration
+    )
+    assert (
+        "listing.employer_user_id = organization.owner_user_id"
+        in migration
+    )
+
+
+def test_create_rechecks_verification_after_embedding_before_write(
+    client: TestClient,
+    monkeypatch,
+):
+    """
+    A company may be verified at the cheap precheck but suspended while the
+    external embedding call is running. The final locked check must reject
+    publication before any listing write.
+    """
+    from types import SimpleNamespace
+
+    from app.repositories.employer_organization import (
+        EmployerOrganizationRepository,
+    )
+    from app.repositories.internship import InternshipRepository
+
+    employer_user_id = uuid4()
+
+    _create_profile(
+        employer_user_id,
+        "Race Employer",
+        account_type="employer",
+        employer_verification_status=None,
+    )
+
+    call_order = []
+
+    verified_org = SimpleNamespace(
+        verification_status="verified",
+        display_name="Race Corp",
+    )
+    suspended_org = SimpleNamespace(
+        verification_status="suspended",
+        display_name="Race Corp",
+    )
+
+    def precheck(db, owner_user_id):
+        assert owner_user_id == employer_user_id
+        call_order.append("precheck")
+        return verified_org
+
+    def generate_after_precheck(text):
+        assert text == "Race-sensitive opportunity."
+        call_order.append("embedding")
+        return [0.1] * settings.EMBEDDING_DIMENSION
+
+    def locked_recheck(db, owner_user_id):
+        assert owner_user_id == employer_user_id
+        call_order.append("locked_recheck")
+        return suspended_org
+
+    def forbidden_write(*args, **kwargs):
+        call_order.append("write")
+        raise AssertionError(
+            "Listing write must not occur after suspension."
+        )
+
+    monkeypatch.setattr(
+        EmployerOrganizationRepository,
+        "get_by_owner_user_id",
+        staticmethod(precheck),
+    )
+    monkeypatch.setattr(
+        EmployerOrganizationRepository,
+        "get_by_owner_user_id_for_update",
+        staticmethod(locked_recheck),
+    )
+    monkeypatch.setattr(
+        "app.api.v1.endpoints.internships.generate_embedding",
+        generate_after_precheck,
+    )
+    monkeypatch.setattr(
+        InternshipRepository,
+        "create_employer_listing",
+        staticmethod(forbidden_write),
+    )
+
+    response = client.post(
+        "/api/v1/internships",
+        json={
+            "title": "Race Security Intern",
+            "company": "Client Controlled Name",
+            "location": "Remote",
+            "work_type": "remote",
+            "description": "Race-sensitive opportunity.",
+            "required_skills": ["Python"],
+        },
+        headers={
+            "Authorization":
+            f"Bearer valid-user-{employer_user_id}"
+        },
+    )
+
+    assert response.status_code == 403
+    assert call_order == [
+        "precheck",
+        "embedding",
+        "locked_recheck",
+    ]
+
+    with TestingSessionLocal() as db:
+        listing = (
+            db.query(InternshipListing)
+            .filter(
+                InternshipListing.title
+                == "Race Security Intern"
+            )
+            .one_or_none()
+        )
+        assert listing is None
+
+
+def test_update_rechecks_verification_after_embedding_before_write(
+    client: TestClient,
+    monkeypatch,
+):
+    """
+    Updating an existing employer listing follows the same race-safe law:
+    verification must be checked again under row lock after embedding work.
+    """
+    from types import SimpleNamespace
+
+    from app.repositories.employer_organization import (
+        EmployerOrganizationRepository,
+    )
+    from app.repositories.internship import InternshipRepository
+
+    employer_user_id = uuid4()
+    listing_id = uuid4()
+
+    _create_profile(
+        employer_user_id,
+        "Update Race Employer",
+        account_type="employer",
+        employer_verification_status=None,
+    )
+
+    with TestingSessionLocal() as db:
+        db.add(
+            InternshipListing(
+                id=listing_id,
+                employer_user_id=employer_user_id,
+                title="Original Race Listing",
+                company="Race Corp",
+                location="Istanbul",
+                work_type="hybrid",
+                description="Original description.",
+                required_skills=["Python"],
+                preferred_skills=[],
+                language="English",
+                is_active=True,
+            )
+        )
+        db.commit()
+
+    call_order = []
+
+    verified_org = SimpleNamespace(
+        verification_status="verified",
+        display_name="Race Corp",
+    )
+    suspended_org = SimpleNamespace(
+        verification_status="suspended",
+        display_name="Race Corp",
+    )
+
+    def precheck(db, owner_user_id):
+        assert owner_user_id == employer_user_id
+        call_order.append("precheck")
+        return verified_org
+
+    def generate_after_precheck(text):
+        assert text == "Changed description."
+        call_order.append("embedding")
+        return [0.2] * settings.EMBEDDING_DIMENSION
+
+    def locked_recheck(db, owner_user_id):
+        assert owner_user_id == employer_user_id
+        call_order.append("locked_recheck")
+        return suspended_org
+
+    def forbidden_update(*args, **kwargs):
+        call_order.append("write")
+        raise AssertionError(
+            "Listing update must not occur after suspension."
+        )
+
+    monkeypatch.setattr(
+        EmployerOrganizationRepository,
+        "get_by_owner_user_id",
+        staticmethod(precheck),
+    )
+    monkeypatch.setattr(
+        EmployerOrganizationRepository,
+        "get_by_owner_user_id_for_update",
+        staticmethod(locked_recheck),
+    )
+    monkeypatch.setattr(
+        "app.api.v1.endpoints.internships.generate_embedding",
+        generate_after_precheck,
+    )
+    monkeypatch.setattr(
+        InternshipRepository,
+        "update_employer_listing",
+        staticmethod(forbidden_update),
+    )
+
+    response = client.patch(
+        f"/api/v1/internships/{listing_id}",
+        json={
+            "title": "Mutated Race Listing",
+            "company": "Client Controlled Name",
+            "location": "Remote",
+            "work_type": "remote",
+            "description": "Changed description.",
+            "required_skills": ["Go"],
+            "preferred_skills": [],
+            "language": "English",
+            "education_requirements": None,
+            "experience_requirements": None,
+        },
+        headers={
+            "Authorization":
+            f"Bearer valid-user-{employer_user_id}"
+        },
+    )
+
+    assert response.status_code == 403
+    assert call_order == [
+        "precheck",
+        "embedding",
+        "locked_recheck",
+    ]
+
+    with TestingSessionLocal() as db:
+        listing = db.get(
+            InternshipListing,
+            listing_id,
+        )
+
+        assert listing is not None
+        assert listing.title == "Original Race Listing"
+        assert listing.company == "Race Corp"
+        assert listing.description == "Original description."
+        assert listing.location == "Istanbul"
+        assert listing.work_type == "hybrid"
+        assert listing.required_skills == ["Python"]
+        assert listing.is_active is True

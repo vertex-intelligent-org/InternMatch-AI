@@ -13,6 +13,7 @@ from app.core.logging import get_logger
 from app.core.security import AuthenticatedUser, require_employer_user
 from app.db.session import get_db
 from app.repositories.application import ApplicationRepository
+from app.repositories.employer_organization import EmployerOrganizationRepository
 from app.repositories.internship import InternshipRepository
 from app.repositories.matching_data import MatchingDataRepository
 from app.schemas.application import (
@@ -57,6 +58,51 @@ def format_not_found_error(message: str) -> Dict[str, Any]:
     }
 
 
+def require_verified_employer_organization(
+    db: Session,
+    employer_user_id: UUID,
+    *,
+    lock_for_update: bool,
+):
+    """
+    Require a currently verified employer organization.
+
+    The initial non-locking check rejects ineligible employers before any
+    external embedding work. The final FOR UPDATE check runs immediately
+    before mutation and serializes publication against admin suspension.
+    """
+    if lock_for_update:
+        organization = (
+            EmployerOrganizationRepository
+            .get_by_owner_user_id_for_update(
+                db,
+                employer_user_id,
+            )
+        )
+    else:
+        organization = (
+            EmployerOrganizationRepository
+            .get_by_owner_user_id(
+                db,
+                employer_user_id,
+            )
+        )
+
+    if (
+        organization is None
+        or organization.verification_status != "verified"
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=(
+                "A verified company profile is required to "
+                "publish internship opportunities."
+            ),
+        )
+
+    return organization
+
+
 @router.post(
     "",
     response_model=InternshipDetailResponse,
@@ -73,6 +119,12 @@ def create_internship(
     Generates description embedding synchronously and requires valid embedding
     before persisting the opportunity.
     """
+    require_verified_employer_organization(
+        db,
+        current_user.user_id,
+        lock_for_update=False,
+    )
+
     try:
         embedding = generate_embedding(payload.description)
     except Exception as exc:
@@ -97,11 +149,17 @@ def create_internship(
         )
 
     try:
+        organization = require_verified_employer_organization(
+            db,
+            current_user.user_id,
+            lock_for_update=True,
+        )
+
         listing = InternshipRepository.create_employer_listing(
             db=db,
             employer_user_id=current_user.user_id,
             title=payload.title,
-            company=payload.company,
+            company=organization.display_name,
             location=payload.location,
             work_type=payload.work_type,
             description=payload.description,
@@ -210,6 +268,12 @@ def update_internship_opportunity(
             ),
         )
 
+    require_verified_employer_organization(
+        db,
+        current_user.user_id,
+        lock_for_update=False,
+    )
+
     description_embedding = None
 
     if payload.description != listing.description:
@@ -228,11 +292,17 @@ def update_internship_opportunity(
             ) from exc
 
     try:
+        organization = require_verified_employer_organization(
+            db,
+            current_user.user_id,
+            lock_for_update=True,
+        )
+
         updated_listing = InternshipRepository.update_employer_listing(
             db=db,
             listing=listing,
             title=payload.title,
-            company=payload.company,
+            company=organization.display_name,
             location=payload.location,
             work_type=payload.work_type,
             description=payload.description,
@@ -701,7 +771,10 @@ def get_internship_detail(
     Public read-only endpoint.
     When locale is 'tr' or 'ar', free-form explanatory content is localized dynamically.
     """
-    listing = InternshipRepository.get_by_id(db=db, internship_id=id)
+    listing = InternshipRepository.get_public_by_id(
+        db=db,
+        internship_id=id,
+    )
     if not listing:
         return JSONResponse(
             status_code=status.HTTP_404_NOT_FOUND,

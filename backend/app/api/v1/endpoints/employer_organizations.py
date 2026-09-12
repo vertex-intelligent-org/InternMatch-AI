@@ -654,6 +654,21 @@ def approve_organization(
             ),
         )
 
+        (
+            db.query(InternshipListing)
+            .filter(
+                InternshipListing.employer_user_id
+                == organization.owner_user_id
+            )
+            .update(
+                {
+                    InternshipListing.company:
+                    organization.display_name,
+                },
+                synchronize_session=False,
+            )
+        )
+
         db.commit()
         db.refresh(organization)
     except Exception:

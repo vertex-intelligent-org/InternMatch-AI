@@ -8,6 +8,7 @@ from typing import List, Optional, Tuple
 from uuid import UUID
 
 from app.db.models import InternshipListing, SavedInternship, StudentProfile
+from app.repositories.internship import public_internship_visibility_condition
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -111,18 +112,36 @@ class SavedInternshipRepository:
         """
         base_stmt = (
             select(SavedInternship, InternshipListing)
-            .join(StudentProfile, SavedInternship.student_id == StudentProfile.id)
+            .join(
+                StudentProfile,
+                SavedInternship.student_id == StudentProfile.id,
+            )
             .join(
                 InternshipListing,
                 SavedInternship.internship_id == InternshipListing.id,
             )
-            .where(StudentProfile.user_id == user_id)
+            .where(
+                StudentProfile.user_id == user_id,
+                InternshipListing.is_active.is_(True),
+                public_internship_visibility_condition(),
+            )
         )
 
         count_stmt = (
             select(func.count(SavedInternship.id))
-            .join(StudentProfile, SavedInternship.student_id == StudentProfile.id)
-            .where(StudentProfile.user_id == user_id)
+            .join(
+                StudentProfile,
+                SavedInternship.student_id == StudentProfile.id,
+            )
+            .join(
+                InternshipListing,
+                SavedInternship.internship_id == InternshipListing.id,
+            )
+            .where(
+                StudentProfile.user_id == user_id,
+                InternshipListing.is_active.is_(True),
+                public_internship_visibility_condition(),
+            )
         )
         total = db.scalar(count_stmt) or 0
 
