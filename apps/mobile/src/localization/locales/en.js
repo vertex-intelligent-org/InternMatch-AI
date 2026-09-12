@@ -39,6 +39,15 @@ export default {
     viewListingA11y: 'View Internship Listing',
     viewListingBtn: 'View Listing',
   },
+  aiCancellation: {
+    title: 'Cancel AI operation?',
+    message: 'Are you sure you want to cancel this AI process? If you cancel before completion, your AI credit will not be consumed.',
+    continue: 'Continue Processing',
+    cancel: 'Cancel AI Process',
+    cancelling: 'Cancelling...',
+    failedTitle: 'Could Not Cancel',
+    failedMessage: 'The AI operation could not be cancelled. It may still be running, so keep this screen open and try again.',
+  },
   applications: {
     appliedDate: 'Applied on {{date}}',
     appliedOn: 'Applied on {{date}}',

@@ -53,31 +53,130 @@ export default function MatchupsScreen({ navigation }) {
   const [refreshing, setRefreshing] = useState(false);
   const isFocused = useIsFocused();
   const passiveFetchTriggeredRef = useRef(false);
+  const cancelPromptVisibleRef = useRef(false);
+  const allowNavigationRef = useRef(false);
 
   const {
     isCalculating,
+    isCancelling,
     progressPercent,
     calculationError,
     startCalculation,
     cancelCalculation,
   } = useMatchCalculation();
 
-  const handleStopChecking = useCallback(() => {
+  const handleStopChecking = useCallback((options = {}) => {
+    const leaveAfterCancellation =
+      options?.leaveAfterCancellation === true;
+    const navigationAction =
+      options?.navigationAction || null;
+
+    if (
+      !isCalculating ||
+      isCancelling ||
+      cancelPromptVisibleRef.current
+    ) {
+      return;
+    }
+
+    cancelPromptVisibleRef.current = true;
+
     Alert.alert(
-      t('matchups.stopConfirmTitle'),
-      t('matchups.stopConfirmMessage'),
+      t('aiCancellation.title'),
+      t('aiCancellation.message'),
       [
         {
-          text: t('matchups.keepChecking'),
+          text: t('aiCancellation.continue'),
           style: 'cancel',
+          onPress: () => {
+            // Keep the exact server job and polling state alive.
+            cancelPromptVisibleRef.current = false;
+          },
         },
         {
-          text: t('matchups.stopChecking'),
-          onPress: cancelCalculation,
+          text: t('aiCancellation.cancel'),
+          style: 'destructive',
+          onPress: async () => {
+            cancelPromptVisibleRef.current = false;
+
+            try {
+              const cancelled =
+                await cancelCalculation();
+
+              if (!cancelled) {
+                throw new Error(
+                  'SERVER_CANCEL_NOT_YET_AVAILABLE'
+                );
+              }
+
+              if (leaveAfterCancellation) {
+                allowNavigationRef.current = true;
+
+                if (navigationAction) {
+                  navigation.dispatch(
+                    navigationAction
+                  );
+                } else {
+                  navigation.goBack();
+                }
+              }
+            } catch (error) {
+              console.warn(
+                'Match calculation cancellation failed:',
+                error
+              );
+
+              Alert.alert(
+                t('aiCancellation.failedTitle'),
+                t('aiCancellation.failedMessage')
+              );
+            }
+          },
         },
-      ]
+      ],
+      {
+        cancelable: true,
+        onDismiss: () => {
+          cancelPromptVisibleRef.current = false;
+        },
+      }
     );
-  }, [cancelCalculation, t]);
+  }, [
+    cancelCalculation,
+    isCalculating,
+    isCancelling,
+    navigation,
+    t,
+  ]);
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener(
+      'beforeRemove',
+      (event) => {
+        if (allowNavigationRef.current) {
+          allowNavigationRef.current = false;
+          return;
+        }
+
+        if (!isCalculating) {
+          return;
+        }
+
+        event.preventDefault();
+
+        handleStopChecking({
+          leaveAfterCancellation: true,
+          navigationAction: event.data.action,
+        });
+      }
+    );
+
+    return unsubscribe;
+  }, [
+    navigation,
+    isCalculating,
+    handleStopChecking,
+  ]);
 
   const hasAnalyZV = Boolean(
     profile?.cv_url ||

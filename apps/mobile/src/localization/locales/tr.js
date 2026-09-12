@@ -39,6 +39,15 @@ export default {
     viewListingA11y: 'Staj İlanını Gör',
     viewListingBtn: 'İlanı Gör',
   },
+  aiCancellation: {
+    title: 'Yapay zekâ işlemi iptal edilsin mi?',
+    message: 'Bu yapay zekâ işlemini iptal etmek istediğinizden emin misiniz? İşlem tamamlanmadan iptal ederseniz AI kullanım hakkınız tüketilmez.',
+    continue: 'İşleme Devam Et',
+    cancel: 'AI İşlemini İptal Et',
+    cancelling: 'İptal ediliyor...',
+    failedTitle: 'İşlem İptal Edilemedi',
+    failedMessage: 'Yapay zekâ işlemi iptal edilemedi. İşlem hâlâ çalışıyor olabilir; bu ekranı açık tutup tekrar deneyin.',
+  },
   applications: {
     appliedDate: 'Başvuru tarihi: {{date}}',
     appliedOn: '{{date}} tarihinde başvuruldu',

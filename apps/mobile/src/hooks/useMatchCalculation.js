@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { calculateMatches, getProcessingJob, ApiError } from '../services/api';
+import { calculateMatches, getProcessingJob, ApiError,
+  cancelProcessingJob,} from '../services/api';
 
 const POLL_INTERVAL_MS = 1500;
 const TIMEOUT_MS = 210000; // 210 seconds (safe buffer above RQ 180s worker timeout)
@@ -8,12 +9,15 @@ export function useMatchCalculation() {
   const [isCalculating, setIsCalculating] = useState(false);
   const [progressPercent, setProgressPercent] = useState(0);
   const [calculationError, setCalculationError] = useState(null);
+  const [isCancelling, setIsCancelling] = useState(false);
 
   const isMountedRef = useRef(true);
   const pollTimerRef = useRef(null);
   const isPollingRef = useRef(false);
   const startTimeRef = useRef(0);
   const isCalculatingRef = useRef(false);
+  const activeJobIdRef = useRef(null);
+  const cancelInFlightRef = useRef(false);
 
   const clearPolling = useCallback(() => {
     if (pollTimerRef.current) {
@@ -31,13 +35,51 @@ export function useMatchCalculation() {
     };
   }, [clearPolling]);
 
-  const cancelCalculation = useCallback(() => {
-    clearPolling();
-    isCalculatingRef.current = false;
+  const cancelCalculation = useCallback(async () => {
+    if (cancelInFlightRef.current) {
+      return false;
+    }
+
+    const activeJobId = activeJobIdRef.current;
+
+    // Before the enqueue response gives us a durable job id we cannot
+    // truthfully claim server cancellation. The screen remains protected
+    // and the user can retry once the accepted job id is available.
+    if (!activeJobId) {
+      return false;
+    }
+
+    cancelInFlightRef.current = true;
+
     if (isMountedRef.current) {
-      setIsCalculating(false);
-      setProgressPercent(0);
-      setCalculationError(null);
+      setIsCancelling(true);
+    }
+
+    try {
+      // Do not stop local polling first. The server is authoritative:
+      // only a successful cancellation response permits local teardown.
+      await cancelProcessingJob(activeJobId);
+
+      if (activeJobIdRef.current === activeJobId) {
+        activeJobIdRef.current = null;
+      }
+
+      clearPolling();
+      isCalculatingRef.current = false;
+
+      if (isMountedRef.current) {
+        setIsCalculating(false);
+        setProgressPercent(0);
+        setCalculationError(null);
+      }
+
+      return true;
+    } finally {
+      cancelInFlightRef.current = false;
+
+      if (isMountedRef.current) {
+        setIsCancelling(false);
+      }
     }
   }, [clearPolling]);
 
@@ -50,6 +92,7 @@ export function useMatchCalculation() {
 
       clearPolling();
       isCalculatingRef.current = true;
+    activeJobIdRef.current = null;
       setIsCalculating(true);
       setProgressPercent(0);
       setCalculationError(null);
@@ -59,6 +102,7 @@ export function useMatchCalculation() {
         const acceptRes = await calculateMatches();
         const activeJobId = acceptRes.job_id;
 
+        activeJobIdRef.current = activeJobId;
         if (!isMountedRef.current || !isCalculatingRef.current) {
           return;
         }
@@ -163,6 +207,7 @@ export function useMatchCalculation() {
 
   return {
     isCalculating,
+    isCancelling,
     progressPercent,
     calculationError,
     startCalculation,

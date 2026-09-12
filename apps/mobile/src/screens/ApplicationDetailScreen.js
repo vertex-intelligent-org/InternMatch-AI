@@ -31,6 +31,7 @@ import haptics from '../services/haptics';
 import { useLocalization } from '../localization/LocalizationContext';
 import { formatLocalizedDate, formatLocalizedDateTime } from '../localization/formatters';
 import useSmoothAIProgress from '../hooks/useSmoothAIProgress';
+import { useCancellableAIJob } from '../hooks/useCancellableAIJob';
 import { useSubscription } from '../context/SubscriptionProvider';
 
 const CANONICAL_STATUSES = [
@@ -118,6 +119,17 @@ export default function ApplicationDetailScreen({ route, navigation }) {
   const [savingNotes, setSavingNotes] = useState(false);
   const requestGenerationRef = useRef(0);
   const mutationLockRef = useRef(false);
+  const interviewPrepCancelPromptVisibleRef =
+    useRef(false);
+  const interviewPrepAllowNavigationRef =
+    useRef(false);
+
+  const {
+    isProcessing: interviewPrepJobProcessing,
+    isCancelling: interviewPrepCancelling,
+    runAIJob: runInterviewPrepJob,
+    cancelAIJob: cancelInterviewPrepJob,
+  } = useCancellableAIJob();
 
   const fetchDetail = useCallback(async (isRefresh = false) => {
     const generation = ++requestGenerationRef.current;
@@ -215,62 +227,383 @@ export default function ApplicationDetailScreen({ route, navigation }) {
       22000
     );
 
-  const handleGenerateInterviewPrep = async () => {
-    if (!applicationId || interviewPrepLoading) {
-      return;
-    }
-
-    setInterviewPrepLoading(true);
-    setInterviewPrepError(false);
-
-    try {
-      const result = await generateInterviewPrep(
-        applicationId,
-        locale
-      );
-
-      setInterviewPrep(result);
-
-      refreshAIUsage().catch(
-        (usageError) => {
-          console.warn(
-            'AI usage refresh after interview prep failed:',
-            usageError
-          );
+  const applyInterviewPrepResult =
+    useCallback(
+      (result) => {
+        if (
+          !result ||
+          typeof result !== 'object'
+        ) {
+          setInterviewPrepLoading(false);
+          setInterviewPrepError(true);
+          return false;
         }
-      );
 
-      haptics.success();
-    } catch (err) {
-      if (
-        err instanceof ApiError &&
-        err.status === 402 &&
-        err.code === 'AI_QUOTA_EXCEEDED'
-      ) {
+        setInterviewPrep(result);
+        setInterviewPrepLoading(false);
+        setInterviewPrepError(false);
+
         refreshAIUsage().catch(
           (usageError) => {
             console.warn(
-              'AI usage refresh after interview prep quota response failed:',
+              'AI usage refresh after interview prep failed:',
               usageError
             );
           }
         );
 
-        navigation.navigate('Plans');
+        haptics.success();
+        return true;
+      },
+      [refreshAIUsage]
+    );
+
+  const handleGenerateInterviewPrep =
+    async () => {
+      if (
+        !applicationId ||
+        interviewPrepLoading ||
+        interviewPrepJobProcessing
+      ) {
         return;
       }
 
-      console.warn(
-        'Failed to generate interview prep:',
-        err
-      );
-      setInterviewPrepError(true);
-      haptics.error();
-    } finally {
-      setInterviewPrepLoading(false);
-    }
-  };
+      setInterviewPrepLoading(true);
+      setInterviewPrepError(false);
 
+      try {
+        const outcome =
+          await runInterviewPrepJob(
+            () =>
+              generateInterviewPrep(
+                applicationId,
+                locale
+              )
+          );
+
+        if (
+          outcome.status ===
+          'completed'
+        ) {
+          applyInterviewPrepResult(
+            outcome.result
+          );
+          return;
+        }
+
+        if (
+          outcome.status ===
+          'quota_exceeded'
+        ) {
+          setInterviewPrepLoading(false);
+
+          refreshAIUsage().catch(
+            (usageError) => {
+              console.warn(
+                'AI usage refresh after interview prep quota response failed:',
+                usageError
+              );
+            }
+          );
+
+          navigation.navigate(
+            'Plans'
+          );
+          return;
+        }
+
+        if (
+          outcome.status ===
+            'cancelled' ||
+          outcome.status ===
+            'superseded' ||
+          outcome.status === 'busy'
+        ) {
+          return;
+        }
+
+        setInterviewPrepLoading(false);
+        setInterviewPrepError(true);
+        haptics.error();
+      } catch (err) {
+        if (
+          err instanceof ApiError &&
+          err.status === 402 &&
+          err.code ===
+            'AI_QUOTA_EXCEEDED'
+        ) {
+          setInterviewPrepLoading(false);
+
+          refreshAIUsage().catch(
+            (usageError) => {
+              console.warn(
+                'AI usage refresh after interview prep quota response failed:',
+                usageError
+              );
+            }
+          );
+
+          navigation.navigate(
+            'Plans'
+          );
+          return;
+        }
+
+        console.warn(
+          'Failed to generate interview prep:',
+          err
+        );
+
+        setInterviewPrepLoading(false);
+        setInterviewPrepError(true);
+        haptics.error();
+      }
+    };
+
+  const leaveApplicationDetail =
+    useCallback(
+      (navigationAction = null) => {
+        interviewPrepAllowNavigationRef.current =
+          true;
+
+        if (navigationAction) {
+          navigation.dispatch(
+            navigationAction
+          );
+        } else {
+          navigation.goBack();
+        }
+      },
+      [navigation]
+    );
+
+  const requestInterviewPrepCancellation =
+    useCallback(
+      (options = {}) => {
+        const leaveAfterCancellation =
+          options?.leaveAfterCancellation ===
+          true;
+
+        const navigationAction =
+          options?.navigationAction || null;
+
+        if (
+          !interviewPrepLoading ||
+          !interviewPrepJobProcessing ||
+          interviewPrepCancelling ||
+          interviewPrepCancelPromptVisibleRef.current
+        ) {
+          if (
+            leaveAfterCancellation &&
+            !interviewPrepJobProcessing
+          ) {
+            navigation.goBack();
+          }
+
+          return;
+        }
+
+        interviewPrepCancelPromptVisibleRef.current =
+          true;
+
+        Alert.alert(
+          t('aiCancellation.title'),
+          t('aiCancellation.message'),
+          [
+            {
+              text: t(
+                'aiCancellation.continue'
+              ),
+              style: 'cancel',
+              onPress: () => {
+                // Continue keeps the same job.
+                interviewPrepCancelPromptVisibleRef.current =
+                  false;
+              },
+            },
+            {
+              text: t(
+                'aiCancellation.cancel'
+              ),
+              style: 'destructive',
+              onPress: async () => {
+                try {
+                  const outcome =
+                    await cancelInterviewPrepJob();
+
+                  interviewPrepCancelPromptVisibleRef.current =
+                    false;
+
+                  if (
+                    outcome.status ===
+                    'completed'
+                  ) {
+                    // Completion won race.
+                    applyInterviewPrepResult(
+                      outcome.result
+                    );
+                    return;
+                  }
+
+                  if (
+                    outcome.status ===
+                    'quota_exceeded'
+                  ) {
+                    setInterviewPrepLoading(
+                      false
+                    );
+
+                    refreshAIUsage().catch(
+                      () => {}
+                    );
+
+                    navigation.navigate(
+                      'Plans'
+                    );
+                    return;
+                  }
+
+                  if (
+                    outcome.status ===
+                    'cancelled'
+                  ) {
+                    setInterviewPrepLoading(
+                      false
+                    );
+                    setInterviewPrepError(
+                      false
+                    );
+
+                    if (
+                      leaveAfterCancellation
+                    ) {
+                      leaveApplicationDetail(
+                        navigationAction
+                      );
+                    }
+
+                    return;
+                  }
+
+                  if (
+                    outcome.status ===
+                    'failed'
+                  ) {
+                    setInterviewPrepLoading(
+                      false
+                    );
+                    setInterviewPrepError(
+                      true
+                    );
+
+                    if (
+                      leaveAfterCancellation
+                    ) {
+                      leaveApplicationDetail(
+                        navigationAction
+                      );
+                    }
+                  }
+                } catch (error) {
+                  console.warn(
+                    'Interview prep cancellation failed:',
+                    error
+                  );
+
+                  interviewPrepCancelPromptVisibleRef.current =
+                    false;
+
+                  Alert.alert(
+                    t(
+                      'aiCancellation.failedTitle'
+                    ),
+                    t(
+                      'aiCancellation.failedMessage'
+                    )
+                  );
+                }
+              },
+            },
+          ],
+          {
+            cancelable: true,
+            onDismiss: () => {
+              interviewPrepCancelPromptVisibleRef.current =
+                false;
+            },
+          }
+        );
+      },
+      [
+        applyInterviewPrepResult,
+        cancelInterviewPrepJob,
+        interviewPrepCancelling,
+        interviewPrepJobProcessing,
+        interviewPrepLoading,
+        leaveApplicationDetail,
+        navigation,
+        refreshAIUsage,
+        t,
+      ]
+    );
+
+  const handleProtectedApplicationBack =
+    useCallback(() => {
+      if (
+        interviewPrepLoading &&
+        interviewPrepJobProcessing
+      ) {
+        requestInterviewPrepCancellation({
+          leaveAfterCancellation: true,
+        });
+        return;
+      }
+
+      navigation.goBack();
+    }, [
+      interviewPrepJobProcessing,
+      interviewPrepLoading,
+      navigation,
+      requestInterviewPrepCancellation,
+    ]);
+
+  useEffect(() => {
+    const unsubscribe =
+      navigation.addListener(
+        'beforeRemove',
+        (event) => {
+          if (
+            interviewPrepAllowNavigationRef.current
+          ) {
+            interviewPrepAllowNavigationRef.current =
+              false;
+            return;
+          }
+
+          if (
+            !interviewPrepLoading ||
+            !interviewPrepJobProcessing
+          ) {
+            return;
+          }
+
+          event.preventDefault();
+
+          requestInterviewPrepCancellation({
+            leaveAfterCancellation: true,
+            navigationAction:
+              event.data.action,
+          });
+        }
+      );
+
+    return unsubscribe;
+  }, [
+    interviewPrepJobProcessing,
+    interviewPrepLoading,
+    navigation,
+    requestInterviewPrepCancellation,
+  ]);
 
   return (
     <ScreenContainer edges={['top', 'bottom']}>
@@ -278,7 +611,30 @@ export default function ApplicationDetailScreen({ route, navigation }) {
         title={t('applicationDetail.title')}
         showBack={true}
         navigation={navigation}
+        onBackPress={handleProtectedApplicationBack}
       />
+
+      {interviewPrepLoading ? (
+        <View style={styles.interviewPrepCancelTopWrap}>
+          <TouchableOpacity
+            style={styles.interviewPrepCancelBtn}
+            onPress={() =>
+              requestInterviewPrepCancellation()
+            }
+            disabled={interviewPrepCancelling}
+            accessibilityRole="button"
+            accessibilityLabel={t(
+              'aiCancellation.cancel'
+            )}
+          >
+            <Text style={styles.interviewPrepCancelText}>
+              {interviewPrepCancelling
+                ? t('aiCancellation.cancelling')
+                : t('aiCancellation.cancel')}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
 
       <KeyboardAvoidingView
         style={styles.container}
@@ -1602,6 +1958,26 @@ const styles = StyleSheet.create({
     color: colors.textPrimary || colors.textDark,
     marginTop: spacing.xs,
     lineHeight: 21,
+  },
+
+  interviewPrepCancelTopWrap: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
+  },
+  interviewPrepCancelBtn: {
+    minHeight: 42,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: colors.danger || '#EF4444',
+    borderRadius: spacing.radii?.md || 10,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  interviewPrepCancelText: {
+    color: colors.danger || '#EF4444',
+    fontSize: 13,
+    fontWeight: '700',
   },
 
   interviewPrepLoadingRow: {

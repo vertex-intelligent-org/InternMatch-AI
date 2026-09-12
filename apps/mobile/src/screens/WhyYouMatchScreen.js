@@ -23,6 +23,7 @@ import { getMatchExplanation, ApiError } from '../services/api';
 import { useLocalization } from '../localization/LocalizationContext';
 import { useSubscription } from '../context/SubscriptionProvider';
 import useSmoothAIProgress from '../hooks/useSmoothAIProgress';
+import { useCancellableAIJob } from '../hooks/useCancellableAIJob';
 
 export default function WhyYouMatchScreen({ route, navigation }) {
   const { t } = useTranslation();
@@ -45,72 +46,432 @@ export default function WhyYouMatchScreen({ route, navigation }) {
   const [error, setError] = useState(null);
   const [isNotFound, setIsNotFound] = useState(false);
   const requestGenerationRef = useRef(0);
+  const cancelPromptVisibleRef =
+    useRef(false);
+  const allowNavigationRef =
+    useRef(false);
 
-  const fetchExplanationData = useCallback(async () => {
-    const generation = ++requestGenerationRef.current;
+  const {
+    isProcessing: explanationJobProcessing,
+    isCancelling: explanationCancelling,
+    runAIJob: runExplanationJob,
+    cancelAIJob: cancelExplanationJob,
+  } = useCancellableAIJob();
 
-    if (!matchId) {
-      if (generation !== requestGenerationRef.current) return;
-      setIsNotFound(true);
-      setLoading(false);
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-    setIsNotFound(false);
-
-    try {
-      const data = await getMatchExplanation(matchId, locale);
-      if (generation !== requestGenerationRef.current) return;
-      setExplanation(data);
-
-      refreshAIUsage().catch(
-        (usageError) => {
-          console.warn(
-            'AI usage refresh after match explanation failed:',
-            usageError
+  const applyExplanationResult =
+    useCallback(
+      (result) => {
+        if (
+          !result ||
+          typeof result !== 'object'
+        ) {
+          setLoading(false);
+          setError(
+            'MATCH_EXPLANATION_FAILED'
           );
+          return false;
         }
-      );
-    } catch (err) {
-      if (generation !== requestGenerationRef.current) return;
-      if (
-        err instanceof ApiError &&
-        err.status === 402 &&
-        err.code === 'AI_QUOTA_EXCEEDED'
-      ) {
+
+        setExplanation(result);
+        setError(null);
+        setIsNotFound(false);
+        setLoading(false);
+
         refreshAIUsage().catch(
           (usageError) => {
             console.warn(
-              'AI usage refresh after match quota response failed:',
+              'AI usage refresh after match explanation failed:',
               usageError
             );
           }
         );
 
-        navigation.navigate('Plans');
-      } else if (
-        err instanceof ApiError &&
-        err.status === 404
-      ) {
+        return true;
+      },
+      [refreshAIUsage]
+    );
+
+  const fetchExplanationData =
+    useCallback(async () => {
+      const generation =
+        ++requestGenerationRef.current;
+
+      if (!matchId) {
+        if (
+          generation !==
+          requestGenerationRef.current
+        ) {
+          return;
+        }
+
         setIsNotFound(true);
-      } else if (err instanceof ApiError && err.status === 429) {
-        setError('SERVICE_BUSY');
-      } else {
-        console.warn('Failed to load match explanation:', err);
-        setError('MATCH_EXPLANATION_FAILED');
-      }
-    } finally {
-      if (generation === requestGenerationRef.current) {
         setLoading(false);
+        return;
       }
-    }
+
+      setLoading(true);
+      setError(null);
+      setIsNotFound(false);
+
+      try {
+        const outcome =
+          await runExplanationJob(
+            () =>
+              getMatchExplanation(
+                matchId,
+                locale
+              )
+          );
+
+        if (
+          generation !==
+          requestGenerationRef.current
+        ) {
+          return;
+        }
+
+        if (
+          outcome.status ===
+          'completed'
+        ) {
+          applyExplanationResult(
+            outcome.result
+          );
+          return;
+        }
+
+        if (
+          outcome.status ===
+          'quota_exceeded'
+        ) {
+          setLoading(false);
+
+          refreshAIUsage().catch(
+            (usageError) => {
+              console.warn(
+                'AI usage refresh after match quota response failed:',
+                usageError
+              );
+            }
+          );
+
+          navigation.navigate(
+            'Plans'
+          );
+          return;
+        }
+
+        if (
+          outcome.status ===
+            'cancelled' ||
+          outcome.status ===
+            'superseded' ||
+          outcome.status === 'busy'
+        ) {
+          return;
+        }
+
+        setLoading(false);
+        setError(
+          'MATCH_EXPLANATION_FAILED'
+        );
+      } catch (err) {
+        if (
+          generation !==
+          requestGenerationRef.current
+        ) {
+          return;
+        }
+
+        if (
+          err instanceof ApiError &&
+          err.status === 402 &&
+          err.code ===
+            'AI_QUOTA_EXCEEDED'
+        ) {
+          setLoading(false);
+
+          refreshAIUsage().catch(
+            (usageError) => {
+              console.warn(
+                'AI usage refresh after match quota response failed:',
+                usageError
+              );
+            }
+          );
+
+          navigation.navigate(
+            'Plans'
+          );
+        } else if (
+          err instanceof ApiError &&
+          err.status === 404
+        ) {
+          setLoading(false);
+          setIsNotFound(true);
+        } else if (
+          err instanceof ApiError &&
+          err.status === 429
+        ) {
+          setLoading(false);
+          setError('SERVICE_BUSY');
+        } else {
+          console.warn(
+            'Failed to load match explanation:',
+            err
+          );
+
+          setLoading(false);
+          setError(
+            'MATCH_EXPLANATION_FAILED'
+          );
+        }
+      }
+    }, [
+      applyExplanationResult,
+      locale,
+      matchId,
+      navigation,
+      refreshAIUsage,
+      runExplanationJob,
+    ]);
+
+  const leaveWhyYouMatch =
+    useCallback(
+      (navigationAction = null) => {
+        allowNavigationRef.current =
+          true;
+
+        if (navigationAction) {
+          navigation.dispatch(
+            navigationAction
+          );
+        } else {
+          navigation.goBack();
+        }
+      },
+      [navigation]
+    );
+
+  const requestExplanationCancellation =
+    useCallback(
+      (options = {}) => {
+        const leaveAfterCancellation =
+          options?.leaveAfterCancellation ===
+          true;
+
+        const navigationAction =
+          options?.navigationAction || null;
+
+        if (
+          !loading ||
+          !explanationJobProcessing ||
+          explanationCancelling ||
+          cancelPromptVisibleRef.current
+        ) {
+          if (
+            leaveAfterCancellation &&
+            !explanationJobProcessing
+          ) {
+            navigation.goBack();
+          }
+
+          return;
+        }
+
+        cancelPromptVisibleRef.current =
+          true;
+
+        Alert.alert(
+          t('aiCancellation.title'),
+          t('aiCancellation.message'),
+          [
+            {
+              text: t(
+                'aiCancellation.continue'
+              ),
+              style: 'cancel',
+              onPress: () => {
+                // Same server job continues.
+                cancelPromptVisibleRef.current =
+                  false;
+              },
+            },
+            {
+              text: t(
+                'aiCancellation.cancel'
+              ),
+              style: 'destructive',
+              onPress: async () => {
+                try {
+                  const outcome =
+                    await cancelExplanationJob();
+
+                  cancelPromptVisibleRef.current =
+                    false;
+
+                  if (
+                    outcome.status ===
+                    'completed'
+                  ) {
+                    // Completion won the race.
+                    // Keep benefit; no refund claim.
+                    applyExplanationResult(
+                      outcome.result
+                    );
+                    return;
+                  }
+
+                  if (
+                    outcome.status ===
+                    'quota_exceeded'
+                  ) {
+                    setLoading(false);
+
+                    refreshAIUsage().catch(
+                      () => {}
+                    );
+
+                    navigation.navigate(
+                      'Plans'
+                    );
+                    return;
+                  }
+
+                  if (
+                    outcome.status ===
+                    'cancelled'
+                  ) {
+                    setLoading(false);
+                    setError(null);
+
+                    if (
+                      leaveAfterCancellation
+                    ) {
+                      leaveWhyYouMatch(
+                        navigationAction
+                      );
+                    }
+
+                    return;
+                  }
+
+                  if (
+                    outcome.status ===
+                    'failed'
+                  ) {
+                    setLoading(false);
+                    setError(
+                      'MATCH_EXPLANATION_FAILED'
+                    );
+
+                    if (
+                      leaveAfterCancellation
+                    ) {
+                      leaveWhyYouMatch(
+                        navigationAction
+                      );
+                    }
+                  }
+                } catch (error) {
+                  console.warn(
+                    'Match explanation cancellation failed:',
+                    error
+                  );
+
+                  cancelPromptVisibleRef.current =
+                    false;
+
+                  Alert.alert(
+                    t(
+                      'aiCancellation.failedTitle'
+                    ),
+                    t(
+                      'aiCancellation.failedMessage'
+                    )
+                  );
+                }
+              },
+            },
+          ],
+          {
+            cancelable: true,
+            onDismiss: () => {
+              cancelPromptVisibleRef.current =
+                false;
+            },
+          }
+        );
+      },
+      [
+        applyExplanationResult,
+        cancelExplanationJob,
+        explanationCancelling,
+        explanationJobProcessing,
+        leaveWhyYouMatch,
+        loading,
+        navigation,
+        refreshAIUsage,
+        t,
+      ]
+    );
+
+  const handleProtectedBackPress =
+    useCallback(() => {
+      if (
+        loading &&
+        explanationJobProcessing
+      ) {
+        requestExplanationCancellation({
+          leaveAfterCancellation: true,
+        });
+        return;
+      }
+
+      navigation.goBack();
+    }, [
+      explanationJobProcessing,
+      loading,
+      navigation,
+      requestExplanationCancellation,
+    ]);
+
+  useEffect(() => {
+    const unsubscribe =
+      navigation.addListener(
+        'beforeRemove',
+        (event) => {
+          if (
+            allowNavigationRef.current
+          ) {
+            allowNavigationRef.current =
+              false;
+            return;
+          }
+
+          if (
+            !loading ||
+            !explanationJobProcessing
+          ) {
+            return;
+          }
+
+          event.preventDefault();
+
+          requestExplanationCancellation({
+            leaveAfterCancellation: true,
+            navigationAction:
+              event.data.action,
+          });
+        }
+      );
+
+    return unsubscribe;
   }, [
-    matchId,
-    locale,
+    explanationJobProcessing,
+    loading,
     navigation,
-    refreshAIUsage,
+    requestExplanationCancellation,
   ]);
 
   useEffect(() => {
@@ -123,6 +484,7 @@ export default function WhyYouMatchScreen({ route, navigation }) {
         title={t('whyYouMatch.title')}
         showBack={true}
         navigation={navigation}
+        onBackPress={handleProtectedBackPress}
       />
 
       <ScrollView
@@ -143,6 +505,23 @@ export default function WhyYouMatchScreen({ route, navigation }) {
             <Text style={styles.loadingSubtext}>
               {t('whyYouMatch.analyzingRequirements')}
             </Text>
+            <TouchableOpacity
+              style={styles.primaryButton}
+              onPress={() =>
+                requestExplanationCancellation()
+              }
+              disabled={explanationCancelling}
+              accessibilityRole="button"
+              accessibilityLabel={t(
+                'aiCancellation.cancel'
+              )}
+            >
+              <Text style={styles.primaryButtonText}>
+                {explanationCancelling
+                  ? t('aiCancellation.cancelling')
+                  : t('aiCancellation.cancel')}
+              </Text>
+            </TouchableOpacity>
             <View style={styles.aiProgressTrack}>
               <View
                 style={[

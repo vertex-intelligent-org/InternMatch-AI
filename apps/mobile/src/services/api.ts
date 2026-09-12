@@ -568,6 +568,12 @@ export type SkillGapAnalysis = {
   recommendations: string[];
 };
 
+export type AIJobAcceptedResponse = {
+  job_id: string;
+  status: 'queued';
+  message: string;
+};
+
 export type MatchExplanationResponse = {
   match_id: string;
   overall_score: number;
@@ -592,12 +598,11 @@ export async function calculateMatches(): Promise<MatchCalculationAcceptedRespon
 export async function getMatchExplanation(
   matchId: string,
   contentLocale?: string
-): Promise<MatchExplanationResponse> {
+): Promise<AIJobAcceptedResponse> {
   const normalizedLocale = normalizeLocale(contentLocale) || DEFAULT_LOCALE;
-  return apiRequest<MatchExplanationResponse>(
-    `/matches/${encodeURIComponent(matchId)}/explanation?content_locale=${encodeURIComponent(normalizedLocale)}`,
-    {
-      method: 'GET',
+  return apiRequest<AIJobAcceptedResponse>(
+    `/matches/${encodeURIComponent(matchId)}/explanation?content_locale=${encodeURIComponent(normalizedLocale)}`, {
+    method: 'POST',
     }
   );
 }
@@ -695,11 +700,11 @@ export async function getApplicationDetail(
 export async function generateInterviewPrep(
   applicationId: string,
   contentLocale?: string
-): Promise<InterviewPrepResponse> {
+): Promise<AIJobAcceptedResponse> {
   const normalizedLocale =
     normalizeLocale(contentLocale) || DEFAULT_LOCALE;
 
-  return apiRequest<InterviewPrepResponse>(
+  return apiRequest<AIJobAcceptedResponse>(
     `/applications/${encodeURIComponent(applicationId)}/interview-prep?content_locale=${encodeURIComponent(normalizedLocale)}`,
     {
       method: 'POST',
@@ -1023,4 +1028,21 @@ export async function deleteAccount(): Promise<AccountDeletionResponse> {
   return apiRequest<AccountDeletionResponse>('/auth/account', {
     method: 'DELETE',
   });
+}
+
+export type CancelProcessingJobResponse = {
+  job_id: string;
+  status: 'cancelled';
+  message: string;
+};
+
+export async function cancelProcessingJob(
+  jobId: string
+): Promise<CancelProcessingJobResponse> {
+  return apiRequest<CancelProcessingJobResponse>(
+    `/jobs/${encodeURIComponent(jobId)}/cancel`,
+    {
+      method: 'POST',
+    }
+  );
 }

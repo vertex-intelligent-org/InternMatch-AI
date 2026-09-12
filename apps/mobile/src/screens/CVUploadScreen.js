@@ -340,6 +340,23 @@ export default function CVUploadScreen({ route, navigation }) {
     }
   };
 
+  const refreshAIUsageInBackground = () => {
+    const usageRefreshStartedAt = Date.now();
+
+    refreshAIUsage()
+      .then(() => {
+        console.info(
+          `[CV_TIMING] usage-refresh-background duration=${Date.now() - usageRefreshStartedAt}ms`
+        );
+      })
+      .catch((usageError) => {
+        console.warn(
+          'AI usage background refresh after CV state change failed:',
+          usageError
+        );
+      });
+  };
+
   const scheduleNextPoll = (activeJobId) => {
     clearPolling();
     if (!isMountedRef.current) return;
@@ -409,19 +426,6 @@ export default function CVUploadScreen({ route, navigation }) {
           `[CV_TIMING] job-completed elapsed=${Date.now() - startTimeRef.current}ms`
         );
 
-        const usageRefreshStartedAt = Date.now();
-        try {
-          await refreshAIUsage();
-          console.info(
-            `[CV_TIMING] usage-refresh duration=${Date.now() - usageRefreshStartedAt}ms`
-          );
-        } catch (usageError) {
-          console.warn(
-            'AI usage refresh after CV completion failed:',
-            usageError
-          );
-        }
-
         // Check requires_confirmation BEFORE normal completed success handling
         if (job.result && job.result.requires_confirmation === true) {
           console.info(
@@ -431,11 +435,18 @@ export default function CVUploadScreen({ route, navigation }) {
           setStatus('pending_confirmation');
           setProgressPercent(100);
           haptics.warning?.() || haptics.selection?.();
+
+          // The mismatch decision must be visible immediately.
+          // Quota refresh is informative and must never block this UI.
+          refreshAIUsageInBackground();
           return;
         }
 
         setProgressPercent(100);
         clearPolling();
+
+        // Usage metadata is not part of the canonical CV success boundary.
+        refreshAIUsageInBackground();
 
         const profileRefreshStartedAt = Date.now();
         try {
@@ -514,6 +525,11 @@ export default function CVUploadScreen({ route, navigation }) {
 
     try {
       await confirmCVReplacement(activeJobId);
+
+      // Confirmation already committed the authoritative quota state.
+      // Refresh its display without extending the Replace button wait.
+      refreshAIUsageInBackground();
+
       await finishConfirmedReplacement();
     } catch (err) {
       console.warn(
@@ -550,6 +566,7 @@ export default function CVUploadScreen({ route, navigation }) {
       }
 
       if (confirmedOnServer) {
+        refreshAIUsageInBackground();
         await finishConfirmedReplacement();
         return;
       }
@@ -865,6 +882,7 @@ export default function CVUploadScreen({ route, navigation }) {
               color={colors.warning || '#F59E0B'}
               onPress={handleConfirmReplacement}
               disabled={isConfirming}
+              loading={isConfirming}
               style={{ marginTop: spacing.xl, width: '100%' }}
             />
 

@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { generateApplication, getProcessingJob, ApiError } from '../services/api';
+import { generateApplication, getProcessingJob, ApiError,
+  cancelProcessingJob,} from '../services/api';
 
 const POLL_INTERVAL_MS = 1500;
 const TIMEOUT_MS = 210000; // 210 seconds (safely exceeds RQ 180s worker timeout)
@@ -12,6 +13,7 @@ export function useApplicationGeneration() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [progressPercent, setProgressPercent] = useState(0);
   const [generationError, setGenerationError] = useState(null);
+  const [isCancelling, setIsCancelling] = useState(false);
 
   const isMountedRef = useRef(true);
   const pollTimerRef = useRef(null);
@@ -19,6 +21,8 @@ export function useApplicationGeneration() {
   const isPollingRef = useRef(false);
   const startTimeRef = useRef(0);
   const isGeneratingRef = useRef(false);
+  const activeJobIdRef = useRef(null);
+  const cancelInFlightRef = useRef(false);
 
   const clearPolling = useCallback(() => {
     if (pollTimerRef.current) {
@@ -46,14 +50,52 @@ export function useApplicationGeneration() {
     };
   }, [clearPolling, clearVisualProgress]);
 
-  const cancelGeneration = useCallback(() => {
-    clearPolling();
-    clearVisualProgress();
-    isGeneratingRef.current = false;
+  const cancelGeneration = useCallback(async () => {
+    if (cancelInFlightRef.current) {
+      return false;
+    }
+
+    const activeJobId = activeJobIdRef.current;
+
+    // Before the enqueue response gives us a durable job id we cannot
+    // truthfully claim server cancellation. The screen remains protected
+    // and the user can retry once the accepted job id is available.
+    if (!activeJobId) {
+      return false;
+    }
+
+    cancelInFlightRef.current = true;
+
     if (isMountedRef.current) {
-      setIsGenerating(false);
-      setProgressPercent(0);
-      setGenerationError(null);
+      setIsCancelling(true);
+    }
+
+    try {
+      // Do not stop local polling first. The server is authoritative:
+      // only a successful cancellation response permits local teardown.
+      await cancelProcessingJob(activeJobId);
+
+      if (activeJobIdRef.current === activeJobId) {
+        activeJobIdRef.current = null;
+      }
+
+      clearPolling();
+    clearVisualProgress();
+      isGeneratingRef.current = false;
+
+      if (isMountedRef.current) {
+        setIsGenerating(false);
+        setProgressPercent(0);
+        setGenerationError(null);
+      }
+
+      return true;
+    } finally {
+      cancelInFlightRef.current = false;
+
+      if (isMountedRef.current) {
+        setIsCancelling(false);
+      }
     }
   }, [clearPolling, clearVisualProgress]);
 
@@ -67,6 +109,7 @@ export function useApplicationGeneration() {
       clearPolling();
       clearVisualProgress();
       isGeneratingRef.current = true;
+    activeJobIdRef.current = null;
       setIsGenerating(true);
       setProgressPercent(
         VISUAL_PROGRESS_START
@@ -124,6 +167,7 @@ export function useApplicationGeneration() {
         });
         const activeJobId = acceptRes.job_id;
 
+        activeJobIdRef.current = activeJobId;
         if (!isMountedRef.current || !isGeneratingRef.current) {
           return;
         }
@@ -270,6 +314,7 @@ export function useApplicationGeneration() {
 
   return {
     isGenerating,
+    isCancelling,
     progressPercent,
     generationError,
     startGeneration,

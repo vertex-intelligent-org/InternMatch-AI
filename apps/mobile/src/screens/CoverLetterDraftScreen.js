@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef} from 'react';
 import {
   View,
   Text,
@@ -59,14 +59,138 @@ export default function CoverLetterDraftScreen({ route, navigation }) {
   const [loadingExisting, setLoadingExisting] = useState(true);
   const [resolveError, setResolveError] = useState(null);
   const [isDiscarding, setIsDiscarding] = useState(false);
+  const cancelPromptVisibleRef = useRef(false);
+  const allowNavigationRef = useRef(false);
 
   const {
     isGenerating,
+    isCancelling,
     progressPercent,
     generationError,
     startGeneration,
     cancelGeneration,
   } = useApplicationGeneration();
+
+  const requestGenerationCancellation = (options = {}) => {
+    const leaveAfterCancellation =
+      options?.leaveAfterCancellation === true;
+    const navigationAction =
+      options?.navigationAction || null;
+
+    if (
+      !isGenerating ||
+      isCancelling ||
+      cancelPromptVisibleRef.current
+    ) {
+      return;
+    }
+
+    cancelPromptVisibleRef.current = true;
+
+    Alert.alert(
+      t('aiCancellation.title'),
+      t('aiCancellation.message'),
+      [
+        {
+          text: t('aiCancellation.continue'),
+          style: 'cancel',
+          onPress: () => {
+            // Continue means exactly that: no API call, no restart,
+            // no polling reset, and no progress reset.
+            cancelPromptVisibleRef.current = false;
+          },
+        },
+        {
+          text: t('aiCancellation.cancel'),
+          style: 'destructive',
+          onPress: async () => {
+            cancelPromptVisibleRef.current = false;
+
+            try {
+              const cancelled =
+                await cancelGeneration();
+
+              if (!cancelled) {
+                throw new Error(
+                  'SERVER_CANCEL_NOT_YET_AVAILABLE'
+                );
+              }
+
+              if (leaveAfterCancellation) {
+                allowNavigationRef.current = true;
+
+                if (navigationAction) {
+                  navigation.dispatch(
+                    navigationAction
+                  );
+                } else {
+                  navigation.goBack();
+                }
+              }
+            } catch (error) {
+              console.warn(
+                'Application generation cancellation failed:',
+                error
+              );
+
+              Alert.alert(
+                t('aiCancellation.failedTitle'),
+                t('aiCancellation.failedMessage')
+              );
+            }
+          },
+        },
+      ],
+      {
+        cancelable: true,
+        onDismiss: () => {
+          cancelPromptVisibleRef.current = false;
+        },
+      }
+    );
+  };
+
+  const handleProtectedBackPress = () => {
+    if (isGenerating) {
+      requestGenerationCancellation({
+        leaveAfterCancellation: true,
+      });
+      return;
+    }
+
+    navigation.goBack();
+  };
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener(
+      'beforeRemove',
+      (event) => {
+        if (allowNavigationRef.current) {
+          allowNavigationRef.current = false;
+          return;
+        }
+
+        if (!isGenerating) {
+          return;
+        }
+
+        // Protect Android hardware back, iOS back gestures,
+        // and navigator-driven screen removal.
+        event.preventDefault();
+
+        requestGenerationCancellation({
+          leaveAfterCancellation: true,
+          navigationAction: event.data.action,
+        });
+      }
+    );
+
+    return unsubscribe;
+  }, [
+    navigation,
+    isGenerating,
+    isCancelling,
+  ]);
 
   // Check if an application with generated cover letter already exists for this internship
   const checkExistingApplication = useCallback(async () => {
@@ -282,6 +406,7 @@ export default function CoverLetterDraftScreen({ route, navigation }) {
         title={t('coverLetterDraft.title')}
         showBack={true}
         navigation={navigation}
+        onBackPress={handleProtectedBackPress}
       />
 
       <ScrollView
@@ -398,7 +523,8 @@ export default function CoverLetterDraftScreen({ route, navigation }) {
 
               <TouchableOpacity
                 style={styles.cancelBtn}
-                onPress={cancelGeneration}
+                onPress={() => requestGenerationCancellation()}
+                disabled={isCancelling}
                 accessibilityRole="button"
                 accessibilityLabel={t('coverLetterDraft.stopChecking')}
               >
