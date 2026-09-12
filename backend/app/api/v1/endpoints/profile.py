@@ -263,13 +263,40 @@ def upsert_my_profile(
     Ownership is strictly governed by the authenticated JWT subject UUID.
     Transaction commit boundary is owned by this endpoint handler.
     """
+    existing_profile = StudentProfileRepository.get_by_user_id(
+        db,
+        user_id=current_user.user_id,
+    )
+
+    if existing_profile is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Canonical profile must be created through the "
+                "authenticated sign-up flow."
+            ),
+        )
+
+    profile_preferences = payload.preferences
+    if profile_preferences is not None:
+        profile_preferences = dict(profile_preferences)
+        existing_preferences = dict(existing_profile.preferences or {})
+        existing_account_type = existing_preferences.get("account_type")
+
+        # Account role is immutable after canonical profile creation.
+        # Ordinary profile edits must never promote/demote an account.
+        if existing_account_type in {"intern", "employer"}:
+            profile_preferences["account_type"] = existing_account_type
+        else:
+            profile_preferences.pop("account_type", None)
+
     profile = StudentProfileRepository.upsert_by_user_id(
         db=db,
         user_id=current_user.user_id,
         full_name=payload.full_name,
         headline=payload.headline,
         cv_storage_path=payload.cv_storage_path,
-        preferences=payload.preferences,
+        preferences=profile_preferences,
     )
 
     if payload.skills is not None:

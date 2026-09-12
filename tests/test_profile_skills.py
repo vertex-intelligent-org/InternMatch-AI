@@ -23,10 +23,39 @@ from tests.db import TestingSessionLocal
 pytestmark = pytest.mark.usefixtures("mock_supabase_auth")
 
 
+def _create_canonical_profile(
+    user_id,
+    *,
+    full_name: str,
+    headline: str | None = None,
+    cv_storage_path: str | None = None,
+):
+    """Create enrolled-account state for focused profile/skills tests."""
+    db = TestingSessionLocal()
+    try:
+        profile = StudentProfile(
+            user_id=user_id,
+            full_name=full_name,
+            headline=headline,
+            cv_storage_path=cv_storage_path,
+            preferences={"account_type": "intern"},
+        )
+        db.add(profile)
+        db.commit()
+        db.refresh(profile)
+    finally:
+        db.close()
+
+
 def test_1_authenticated_candidate_can_set_skills_manually(client: TestClient):
     """Test 1: Authenticated candidate can manually set and update their skills."""
     user_id = uuid4()
     token = f"valid-user-{user_id}"
+    _create_canonical_profile(
+        user_id,
+        full_name="Skill Tester",
+        headline="Full-Stack Dev",
+    )
 
     payload = {
         "full_name": "Skill Tester",
@@ -61,6 +90,9 @@ def test_3_user_isolation_is_preserved(client: TestClient):
     token_a = f"valid-user-{user_a}"
     token_b = f"valid-user-{user_b}"
 
+    _create_canonical_profile(user_a, full_name="User A")
+    _create_canonical_profile(user_b, full_name="User B")
+
     # Set User A skills
     client.put(
         "/api/v1/profile",
@@ -88,6 +120,7 @@ def test_4_duplicate_case_insensitive_skills_normalize_correctly(client: TestCli
     """Test 4: Duplicates with different casing or leading/trailing whitespace collapse."""
     user_id = uuid4()
     token = f"valid-user-{user_id}"
+    _create_canonical_profile(user_id, full_name="Case Tester")
 
     payload = {
         "full_name": "Case Tester",
@@ -160,8 +193,9 @@ def test_8_manual_skill_add_invalidates_embedding(client: TestClient):
     """Test 8: Adding a new manual skill clears existing summary_embedding."""
     user_id = uuid4()
     token = f"valid-user-{user_id}"
+    _create_canonical_profile(user_id, full_name="Embed Tester")
 
-    # Create profile with initial skills
+    # Establish initial skills on the enrolled profile.
     client.put(
         "/api/v1/profile",
         json={"full_name": "Embed Tester", "skills": ["Python"]},
@@ -192,8 +226,9 @@ def test_9_manual_skill_removal_invalidates_embedding(client: TestClient):
     """Test 9: Removing a manual skill clears existing summary_embedding."""
     user_id = uuid4()
     token = f"valid-user-{user_id}"
+    _create_canonical_profile(user_id, full_name="Removal Tester")
 
-    # Create profile with 2 skills
+    # Establish initial skills on the enrolled profile.
     client.put(
         "/api/v1/profile",
         json={"full_name": "Removal Tester", "skills": ["Python", "FastAPI"]},
@@ -224,6 +259,7 @@ def test_10_semantically_identical_normalized_skills_preserve_embedding(client: 
     """Test 10: Submitting effectively identical skills preserves embedding."""
     user_id = uuid4()
     token = f"valid-user-{user_id}"
+    _create_canonical_profile(user_id, full_name="Identical Tester")
 
     client.put(
         "/api/v1/profile",
@@ -255,6 +291,7 @@ def test_11_social_link_only_profile_update_preserves_embedding(client: TestClie
     """Test 11: Updating only social links preserves summary_embedding."""
     user_id = uuid4()
     token = f"valid-user-{user_id}"
+    _create_canonical_profile(user_id, full_name="Social Tester")
 
     client.put(
         "/api/v1/profile",
@@ -297,6 +334,7 @@ def test_12_semantic_preference_update_invalidates_embedding(client: TestClient)
     """Test 12: Updating semantic preferences clears summary_embedding."""
     user_id = uuid4()
     token = f"valid-user-{user_id}"
+    _create_canonical_profile(user_id, full_name="Pref Tester")
 
     client.put(
         "/api/v1/profile",
@@ -452,6 +490,7 @@ def test_16_get_profile_returns_resulting_skills_correctly(client: TestClient):
     """Test 16: GET /api/v1/profile returns skills accurately in deterministic format."""
     user_id = uuid4()
     token = f"valid-user-{user_id}"
+    _create_canonical_profile(user_id, full_name="Get Profile Tester")
 
     client.put(
         "/api/v1/profile",
@@ -469,8 +508,13 @@ def test_17_cv_path_semantics_remain_preserved(client: TestClient):
     """Test 17: CV storage path is preserved when updating manual skills."""
     user_id = uuid4()
     token = f"valid-user-{user_id}"
+    _create_canonical_profile(
+        user_id,
+        full_name="CV Path Tester",
+        cv_storage_path="cvs/my_persisted_cv.pdf",
+    )
 
-    # Initial profile with cv_storage_path
+    # Establish initial skills while preserving the existing CV path.
     client.put(
         "/api/v1/profile",
         json={
@@ -499,8 +543,9 @@ def test_18_avatar_semantics_remain_preserved(client: TestClient):
     """Test 18: Avatar storage path is preserved when updating manual skills."""
     user_id = uuid4()
     token = f"valid-user-{user_id}"
+    _create_canonical_profile(user_id, full_name="Avatar Tester")
 
-    # Create profile and assign avatar
+    # Establish skills, then assign avatar.
     client.put(
         "/api/v1/profile",
         json={"full_name": "Avatar Tester", "skills": ["Python"]},

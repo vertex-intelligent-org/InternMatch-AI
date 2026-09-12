@@ -118,6 +118,11 @@ export default {
   },
   auth: {
     accountType: 'Account Type',
+    accountAlreadyExistsTitle: 'Account already exists',
+    accountAlreadyExistsMessage: 'This identity already belongs to an InternMatch account. Please use Sign In instead.',
+    noAccountTitle: 'No InternMatch account found',
+    noAccountMessage: 'We could not find an InternMatch account for this sign-in. Please create an account first.',
+    selectAccountType: 'Please choose Student or Employer before creating your account.',
     appleNotAvailable: 'Apple Sign-In is not available in this build yet.',
     appleSignIn: 'Apple Sign-In',
     checkEmailMessage: 'Your account was created. Please confirm your email address, then sign in.',

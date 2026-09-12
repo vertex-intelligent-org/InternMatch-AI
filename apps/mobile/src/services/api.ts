@@ -238,6 +238,27 @@ export async function getProfile(): Promise<StudentProfileResponse> {
   });
 }
 
+export type CompleteSignupPayload = {
+  full_name: string;
+  department?: string | null;
+  account_type: 'intern' | 'employer';
+};
+
+export type CompleteSignupResponse = {
+  created: boolean;
+  user_id: string;
+  account_type: 'intern' | 'employer';
+};
+
+export async function completeSignup(
+  payload: CompleteSignupPayload
+): Promise<CompleteSignupResponse> {
+  return apiRequest<CompleteSignupResponse>('/auth/complete-signup', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
 export async function upsertProfile(
   payload: UpsertProfilePayload
 ): Promise<StudentProfileResponse> {

@@ -487,3 +487,132 @@ def test_verify_jwt_reuses_supabase_client_for_same_configuration(monkeypatch):
         ]
     finally:
         security_module._get_supabase_auth_client.cache_clear()
+
+
+# --- Gate 1: canonical role-aware signup provisioning ---
+
+
+def test_complete_signup_creates_canonical_employer_profile(
+    client: TestClient,
+    mock_supabase_auth,
+):
+    user_id = uuid4()
+    token = f"valid-user-{user_id}"
+
+    response = client.post(
+        "/api/v1/auth/complete-signup",
+        json={
+            "full_name": "Acme Recruiter",
+            "department": "Talent",
+            "account_type": "employer",
+        },
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 201
+    data = response.json()
+    assert data["created"] is True
+    assert data["user_id"] == str(user_id)
+    assert data["account_type"] == "employer"
+
+    db = TestingSessionLocal()
+    try:
+        profile = (
+            db.query(StudentProfile)
+            .filter(StudentProfile.user_id == user_id)
+            .one()
+        )
+        assert profile.full_name == "Acme Recruiter"
+        assert profile.preferences["account_type"] == "employer"
+        assert profile.preferences["department"] == "Talent"
+    finally:
+        db.close()
+
+
+def test_complete_signup_rejects_duplicate_profile_without_role_mutation(
+    client: TestClient,
+    mock_supabase_auth,
+):
+    user_id = uuid4()
+
+    db = TestingSessionLocal()
+    try:
+        db.add(
+            StudentProfile(
+                user_id=user_id,
+                full_name="Existing Student",
+                preferences={"account_type": "intern"},
+            )
+        )
+        db.commit()
+    finally:
+        db.close()
+
+    token = f"valid-user-{user_id}"
+    response = client.post(
+        "/api/v1/auth/complete-signup",
+        json={
+            "full_name": "Attempted Employer",
+            "department": "HR",
+            "account_type": "employer",
+        },
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 409
+
+    db = TestingSessionLocal()
+    try:
+        profile = (
+            db.query(StudentProfile)
+            .filter(StudentProfile.user_id == user_id)
+            .one()
+        )
+        assert profile.full_name == "Existing Student"
+        assert profile.preferences["account_type"] == "intern"
+    finally:
+        db.close()
+
+
+def test_complete_signup_rejects_unsupported_role(
+    client: TestClient,
+    mock_supabase_auth,
+):
+    user_id = uuid4()
+    token = f"valid-user-{user_id}"
+
+    response = client.post(
+        "/api/v1/auth/complete-signup",
+        json={
+            "full_name": "Role Injection",
+            "department": "Security",
+            "account_type": "admin",
+        },
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 422
+
+    db = TestingSessionLocal()
+    try:
+        profile = (
+            db.query(StudentProfile)
+            .filter(StudentProfile.user_id == user_id)
+            .one_or_none()
+        )
+        assert profile is None
+    finally:
+        db.close()
+
+
+def test_complete_signup_requires_authentication(client: TestClient):
+    response = client.post(
+        "/api/v1/auth/complete-signup",
+        json={
+            "full_name": "Anonymous User",
+            "department": None,
+            "account_type": "intern",
+        },
+    )
+
+    assert response.status_code == 401

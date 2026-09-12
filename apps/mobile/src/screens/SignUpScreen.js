@@ -30,8 +30,12 @@ import PressableScale from '../components/PressableScale';
 import motionTokens from '../motion/motionTokens';
 import { signInWithGoogle } from '../services/googleAuth';
 import { signInWithApple } from '../services/appleAuth';
-import { signUpWithEmail, isAuthRateLimitError } from '../services/auth';
-import { ApiError, syncAuthenticatedUser, upsertProfile } from '../services/api';
+import { signUpWithEmail, signOut, isAuthRateLimitError } from '../services/auth';
+import {
+  ApiError,
+  completeSignup,
+  syncAuthenticatedUser,
+} from '../services/api';
 import { useProfile } from '../context/ProfileContext';
 import haptics from '../services/haptics';
 
@@ -39,7 +43,7 @@ export default function SignUpScreen({ navigation }) {
   const { t } = useTranslation();
   const { isRTL } = useLocalization();
   const insets = useSafeAreaInsets();
-  const [accountType, setAccountType] = useState('intern'); // 'intern' | 'employer'
+  const [accountType, setAccountType] = useState(null); // null | 'intern' | 'employer'
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -50,10 +54,89 @@ export default function SignUpScreen({ navigation }) {
   const [loadingSource, setLoadingSource] = useState(null);
   const { refreshProfile, setProfile } = useProfile();
 
+  const ensureAccountTypeSelected = () => {
+    if (accountType === 'intern' || accountType === 'employer') {
+      return true;
+    }
+
+    haptics.error();
+    Alert.alert(
+      t('common.error'),
+      t('auth.selectAccountType')
+    );
+    return false;
+  };
+
+  const ensureSocialSignupReady = () => {
+    if (!ensureAccountTypeSelected()) {
+      return false;
+    }
+
+    if (!fullName.trim()) {
+      haptics.error();
+      Alert.alert(
+        t('common.error'),
+        t('onboarding.enterFullName')
+      );
+      return false;
+    }
+
+    return true;
+  };
+
+  const rejectExistingSignupAccount = async () => {
+    const { error: signOutError } = await signOut();
+    if (signOutError) {
+      throw signOutError;
+    }
+
+    setProfile(null);
+    haptics.error();
+    Alert.alert(
+      t('auth.accountAlreadyExistsTitle'),
+      t('auth.accountAlreadyExistsMessage')
+    );
+  };
+
+  const completeSocialSignup = async () => {
+    const syncResult = await syncAuthenticatedUser();
+
+    if (syncResult.has_profile) {
+      await rejectExistingSignupAccount();
+      return;
+    }
+
+    try {
+      await completeSignup({
+        full_name: fullName.trim(),
+        department: department.trim() || null,
+        account_type: accountType,
+      });
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 409) {
+        await rejectExistingSignupAccount();
+        return;
+      }
+      throw error;
+    }
+
+    const createdProfile = await refreshProfile();
+    if (!createdProfile) {
+      throw new Error(t('errors.profileSaveFailed'));
+    }
+
+    setProfile(createdProfile);
+    navigation.replace('MainTabs');
+  };
+
   const handleCreateAccount = async () => {
     const normalizedEmail = email.trim().toLowerCase();
     const normalizedName = fullName.trim();
     const normalizedDepartment = department.trim();
+
+    if (!ensureAccountTypeSelected()) {
+      return;
+    }
 
     if (!normalizedName || !normalizedEmail || !password) {
       haptics.error();
@@ -96,21 +179,25 @@ export default function SignUpScreen({ navigation }) {
         return;
       }
 
-      await syncAuthenticatedUser();
-
-      const createdProfile = await upsertProfile({
+      await completeSignup({
         full_name: normalizedName,
-        headline: null,
-        preferences: {
-          account_type: accountType,
-          department: normalizedDepartment || null,
-        },
+        department: normalizedDepartment || null,
+        account_type: accountType,
       });
 
-      setProfile(createdProfile);
+      const createdProfile = await refreshProfile();
+      if (!createdProfile) {
+        throw new Error(t('errors.profileSaveFailed'));
+      }
 
+      setProfile(createdProfile);
       navigation.replace('MainTabs');
     } catch (error) {
+      if (error instanceof ApiError && error.status === 409) {
+        await rejectExistingSignupAccount();
+        return;
+      }
+
       if (isAuthRateLimitError(error)) {
         Alert.alert(t('common.error'), t('auth.emailConfirmation.rateLimit'));
         return;
@@ -132,7 +219,7 @@ export default function SignUpScreen({ navigation }) {
   };
 
   const handleGoogle = async () => {
-    if (loading) return;
+    if (loading || !ensureSocialSignupReady()) return;
 
     setLoading(true);
     setLoadingSource('google');
@@ -148,13 +235,7 @@ export default function SignUpScreen({ navigation }) {
         throw new Error(t('errors.unauthorized'));
       }
 
-      navigation.replace('Splash', {
-        onboardingHints: {
-          fullName: fullName.trim(),
-          department: department.trim(),
-          accountType,
-        },
-      });
+      await completeSocialSignup();
     } catch (error) {
       console.warn('Google sign-up failed:', error);
       haptics.error();
@@ -169,17 +250,15 @@ export default function SignUpScreen({ navigation }) {
     }
   };
   const handleApple = async () => {
-    if (loading) return;
+    if (loading || !ensureSocialSignupReady()) return;
 
     setLoading(true);
     setLoadingSource('apple');
 
     try {
-      const result = await signInWithApple({
-        full_name: fullName.trim(),
-        department: department.trim(),
-        account_type: accountType,
-      });
+      // Canonical account role is created by the InternMatch backend below.
+      // Do not write role metadata into an existing Apple Auth identity.
+      const result = await signInWithApple();
 
       if (result.cancelled) {
         return;
@@ -197,7 +276,7 @@ export default function SignUpScreen({ navigation }) {
         throw new Error(t('errors.unauthorized'));
       }
 
-      navigation.replace('Splash');
+      await completeSocialSignup();
     } catch (error) {
       console.warn('Apple sign-up failed:', error);
       haptics.error();

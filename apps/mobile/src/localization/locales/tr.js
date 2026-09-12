@@ -118,6 +118,11 @@ export default {
   },
   auth: {
     accountType: 'Hesap Türü',
+    accountAlreadyExistsTitle: 'Hesap zaten mevcut',
+    accountAlreadyExistsMessage: 'Bu kimlik zaten bir InternMatch hesab\u0131na ba\u011fl\u0131. L\u00fctfen bunun yerine Giri\u015f Yap se\u00e7ene\u011fini kullan\u0131n.',
+    noAccountTitle: 'InternMatch hesab\u0131 bulunamad\u0131',
+    noAccountMessage: 'Bu giri\u015f i\u00e7in bir InternMatch hesab\u0131 bulamad\u0131k. L\u00fctfen \u00f6nce bir hesap olu\u015fturun.',
+    selectAccountType: 'Hesab\u0131n\u0131z\u0131 olu\u015fturmadan \u00f6nce \u00d6\u011frenci veya \u0130\u015fveren se\u00e7ene\u011fini belirleyin.',
     appleNotAvailable: 'Apple ile Giriş bu sürümde henüz kullanılamıyor.',
     appleSignIn: 'Apple ile Giriş',
     checkEmailMessage: 'Hesabınız oluşturuldu. Lütfen e-posta adresinizi onaylayıp ardından giriş yapın.',

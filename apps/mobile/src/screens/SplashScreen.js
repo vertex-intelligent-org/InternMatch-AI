@@ -13,13 +13,17 @@ import Animated, {
   Easing,
 } from 'react-native-reanimated';
 import { gradientColors, colors } from '../theme/colors';
-import { getCurrentSession, signOut } from '../services/auth';
-import { ApiError } from '../services/api';
+import {
+  clearLocalSessionAfterAccountDeletion,
+  getCurrentSession,
+  signOut,
+} from '../services/auth';
+import { ApiError, deleteAccount } from '../services/api';
 import { useProfile } from '../context/ProfileContext';
 import useReducedMotion from '../hooks/useReducedMotion';
 import SplashBowArrowAnimation from '../components/motion/SplashBowArrowAnimation';
 
-export default function SplashScreen({ navigation, route }) {
+export default function SplashScreen({ navigation }) {
   const { t } = useTranslation();
   const { refreshProfile, clearProfile } = useProfile();
   const isReducedMotion = useReducedMotion();
@@ -160,56 +164,15 @@ export default function SplashScreen({ navigation, route }) {
           return;
         }
 
-        // Missing backend profile: onboarding is authoritative.
-        // Provider metadata only prefills the form.
-        const user = data.session.user;
-        const meta = user?.user_metadata || {};
-        const hints = route?.params?.onboardingHints || {};
-
-        const metaName =
-          typeof meta.full_name === 'string'
-            ? meta.full_name.trim()
-            : typeof meta.name === 'string'
-              ? meta.name.trim()
-              : '';
-
-        const initialName =
-          typeof hints.fullName === 'string' && hints.fullName.trim()
-            ? hints.fullName.trim()
-            : metaName;
-
-        const initialDepartment =
-          typeof hints.department === 'string' && hints.department.trim()
-            ? hints.department.trim()
-            : typeof meta.department === 'string'
-              ? meta.department.trim()
-              : '';
-
-        const hintedAccountType =
-          hints.accountType === 'intern' || hints.accountType === 'employer'
-            ? hints.accountType
-            : null;
-
-        const metadataAccountType =
-          meta.account_type === 'intern' || meta.account_type === 'employer'
-            ? meta.account_type
-            : null;
+        // A Supabase identity without a canonical InternMatch profile is not
+        // an authenticated InternMatch account. Remove an orphan Auth identity
+        // rather than turning restored login state into implicit sign-up.
+        await deleteAccount();
+        await clearLocalSessionAfterAccountDeletion();
+        clearProfile();
 
         if (isMounted) {
-          pendingDestinationRef.current = {
-            name: 'OnboardingProfile',
-            params: {
-              initialName,
-              initialDepartment,
-              ...(hintedAccountType || metadataAccountType
-                ? {
-                    initialAccountType:
-                      hintedAccountType || metadataAccountType,
-                  }
-                : {}),
-            },
-          };
-
+          pendingDestinationRef.current = 'SignIn';
           performNavigationIfReady();
         }
       } catch (err) {
@@ -241,7 +204,7 @@ export default function SplashScreen({ navigation, route }) {
     return () => {
       isMounted = false;
     };
-  }, [navigation, route?.params?.onboardingHints, refreshProfile, clearProfile, retryNonce, performNavigationIfReady, stopTargetRotation]);
+  }, [navigation, refreshProfile, clearProfile, retryNonce, performNavigationIfReady, stopTargetRotation]);
 
   return (
     <LinearGradient colors={gradientColors} style={styles.container}>

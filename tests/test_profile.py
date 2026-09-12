@@ -162,28 +162,34 @@ def test_unauthenticated_put_profile_returns_401(client: TestClient):
     assert data["detail"]["error"]["code"] == "UNAUTHORIZED"
 
 
-def test_authenticated_user_can_create_profile(client: TestClient):
-    """Test 7: Authenticated user can create their own profile via PUT when none exists."""
+def test_put_profile_cannot_create_canonical_account(client: TestClient):
+    """PUT /profile is update-only; canonical creation belongs to auth signup."""
     user_id = uuid4()
     token = f"valid-user-{user_id}"
 
-    payload = {
-        "full_name": "Alex Student",
-        "headline": "Junior Data Scientist",
-        "preferences": {"work_types": ["hybrid"]},
-    }
     response = client.put(
         "/api/v1/profile",
-        json=payload,
+        json={
+            "full_name": "Unauthorized Bootstrap",
+            "preferences": {
+                "account_type": "employer",
+                "work_types": ["remote"],
+            },
+        },
         headers={"Authorization": f"Bearer {token}"},
     )
 
-    assert response.status_code == 200
-    data = response.json()
-    assert data["user_id"] == str(user_id)
-    assert data["full_name"] == "Alex Student"
-    assert data["headline"] == "Junior Data Scientist"
-    assert data["preferences"] == {"work_types": ["hybrid"]}
+    assert response.status_code == 409
+
+    db = TestingSessionLocal()
+    try:
+        profile = StudentProfileRepository.get_by_user_id(
+            db,
+            user_id=user_id,
+        )
+        assert profile is None
+    finally:
+        db.close()
 
 
 def test_authenticated_user_can_update_existing_profile(client: TestClient):
@@ -220,26 +226,38 @@ def test_authenticated_user_can_update_existing_profile(client: TestClient):
     assert data["headline"] == "New Lead Engineer"
 
 
-def test_client_supplied_user_id_in_body_cannot_override_jwt(client: TestClient):
-    """Test 9: Attacker user_id in PUT request body cannot hijack another user's profile."""
+def test_client_supplied_user_id_in_body_cannot_override_jwt(
+    client: TestClient,
+):
+    """Client user_id cannot redirect an update to another user's profile."""
     authenticated_user_id = uuid4()
     victim_user_id = uuid4()
 
     db = TestingSessionLocal()
-    victim_profile = StudentProfile(
-        user_id=victim_user_id,
-        full_name="Victim Full Name",
-        headline="Victim Headline",
-    )
-    db.add(victim_profile)
-    db.commit()
-    db.close()
+    try:
+        authenticated_profile = StudentProfile(
+            user_id=authenticated_user_id,
+            full_name="Authenticated User",
+            headline="Original Headline",
+            preferences={"account_type": "intern"},
+        )
+        victim_profile = StudentProfile(
+            user_id=victim_user_id,
+            full_name="Victim Full Name",
+            headline="Victim Headline",
+            preferences={"account_type": "intern"},
+        )
+        db.add_all([authenticated_profile, victim_profile])
+        db.commit()
+    finally:
+        db.close()
 
     token = f"valid-user-{authenticated_user_id}"
+
     malicious_payload = {
         "user_id": str(victim_user_id),
-        "full_name": "Attacker Hijack Attempt",
-        "headline": "Hacked",
+        "full_name": "Authenticated User Updated",
+        "headline": "Updated Headline",
     }
 
     response = client.put(
@@ -250,18 +268,32 @@ def test_client_supplied_user_id_in_body_cannot_override_jwt(client: TestClient)
 
     assert response.status_code == 200
     data = response.json()
-    # Profile created/updated belongs strictly to authenticated_user_id, NOT victim_user_id
+
     assert data["user_id"] == str(authenticated_user_id)
-    assert data["full_name"] == "Attacker Hijack Attempt"
+    assert data["user_id"] != str(victim_user_id)
+    assert data["full_name"] == "Authenticated User Updated"
+    assert data["headline"] == "Updated Headline"
 
-    # Verify victim's profile remains completely unchanged in database
     db_verify = TestingSessionLocal()
-    victim_db_record = StudentProfileRepository.get_by_user_id(db_verify, victim_user_id)
-    assert victim_db_record is not None
-    assert victim_db_record.full_name == "Victim Full Name"
-    assert victim_db_record.headline == "Victim Headline"
-    db_verify.close()
+    try:
+        authenticated = StudentProfileRepository.get_by_user_id(
+            db_verify,
+            authenticated_user_id,
+        )
+        victim = StudentProfileRepository.get_by_user_id(
+            db_verify,
+            victim_user_id,
+        )
 
+        assert authenticated is not None
+        assert authenticated.full_name == "Authenticated User Updated"
+        assert authenticated.headline == "Updated Headline"
+
+        assert victim is not None
+        assert victim.full_name == "Victim Full Name"
+        assert victim.headline == "Victim Headline"
+    finally:
+        db_verify.close()
 
 def test_second_user_profile_remains_unchanged_on_update(client: TestClient):
     """Test 10: Updating user A's profile leaves user B's profile completely untouched."""
@@ -306,30 +338,52 @@ def test_invalid_profile_input_rejected(client: TestClient):
     assert response.status_code == 422
 
 
-def test_put_profile_persists_in_fresh_database_session(client: TestClient):
-    """Test 12: Verify that PUT /api/v1/profile commits transaction and persists to session."""
+def test_put_profile_persists_in_fresh_database_session(
+    client: TestClient,
+):
+    """PUT /profile updates an existing canonical profile and commits it."""
     user_id = uuid4()
+
+    db = TestingSessionLocal()
+    try:
+        db.add(
+            StudentProfile(
+                user_id=user_id,
+                full_name="Original Student",
+                headline="Original Headline",
+                preferences={"account_type": "intern"},
+            )
+        )
+        db.commit()
+    finally:
+        db.close()
+
     token = f"valid-user-{user_id}"
 
-    payload = {"full_name": "Persisted Student", "headline": "Persisted Headline"}
     response = client.put(
         "/api/v1/profile",
-        json=payload,
+        json={
+            "full_name": "Persisted Student",
+            "headline": "Persisted Headline",
+        },
         headers={"Authorization": f"Bearer {token}"},
     )
+
     assert response.status_code == 200
 
-    # Query directly in a separate database session after request completion
     db_fresh = TestingSessionLocal()
-    persisted = StudentProfileRepository.get_by_user_id(db_fresh, user_id=user_id)
-    assert persisted is not None
-    assert persisted.full_name == "Persisted Student"
-    assert persisted.headline == "Persisted Headline"
-    db_fresh.close()
+    try:
+        persisted = StudentProfileRepository.get_by_user_id(
+            db_fresh,
+            user_id=user_id,
+        )
 
-
-# EMBEDDING INVALIDATION TESTS (13 - 19)
-
+        assert persisted is not None
+        assert persisted.full_name == "Persisted Student"
+        assert persisted.headline == "Persisted Headline"
+        assert persisted.preferences["account_type"] == "intern"
+    finally:
+        db_fresh.close()
 
 def test_upsert_changing_headline_clears_summary_embedding():
     """Test 13: Changing headline clears existing summary_embedding."""
@@ -1014,3 +1068,129 @@ def test_post_profile_cv_rate_limited_returns_429(client: TestClient, monkeypatc
         assert len(jobs) == 0
     finally:
         db.close()
+
+
+def test_profile_update_cannot_change_existing_account_type(client: TestClient):
+    """Existing canonical account role cannot be changed through PUT /profile."""
+    user_id = uuid4()
+
+    db = TestingSessionLocal()
+    try:
+        profile = StudentProfile(
+            user_id=user_id,
+            full_name="Existing Student",
+            preferences={
+                "account_type": "intern",
+                "work_types": ["remote"],
+            },
+        )
+        db.add(profile)
+        db.commit()
+    finally:
+        db.close()
+
+    token = f"valid-user-{user_id}"
+    response = client.put(
+        "/api/v1/profile",
+        json={
+            "full_name": "Existing Student",
+            "preferences": {
+                "account_type": "employer",
+                "work_types": ["onsite"],
+            },
+        },
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["preferences"]["account_type"] == "intern"
+    assert data["preferences"]["work_types"] == ["onsite"]
+
+    db_verify = TestingSessionLocal()
+    try:
+        persisted = StudentProfileRepository.get_by_user_id(
+            db_verify,
+            user_id=user_id,
+        )
+        assert persisted is not None
+        assert persisted.preferences["account_type"] == "intern"
+        assert persisted.preferences["work_types"] == ["onsite"]
+    finally:
+        db_verify.close()
+
+
+def test_profile_update_preserves_existing_account_type_when_preferences_omit_it(
+    client: TestClient,
+):
+    """Updating unrelated preferences cannot erase the canonical account role."""
+    user_id = uuid4()
+
+    db = TestingSessionLocal()
+    try:
+        profile = StudentProfile(
+            user_id=user_id,
+            full_name="Existing Employer",
+            preferences={
+                "account_type": "employer",
+                "work_types": ["hybrid"],
+            },
+        )
+        db.add(profile)
+        db.commit()
+    finally:
+        db.close()
+
+    token = f"valid-user-{user_id}"
+    response = client.put(
+        "/api/v1/profile",
+        json={
+            "full_name": "Existing Employer",
+            "preferences": {
+                "work_types": ["remote"],
+            },
+        },
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["preferences"]["account_type"] == "employer"
+    assert data["preferences"]["work_types"] == ["remote"]
+
+
+def test_profile_update_cannot_assign_role_to_legacy_roleless_profile(
+    client: TestClient,
+):
+    """A legacy roleless profile cannot self-promote through profile editing."""
+    user_id = uuid4()
+
+    db = TestingSessionLocal()
+    try:
+        profile = StudentProfile(
+            user_id=user_id,
+            full_name="Legacy User",
+            preferences={"work_types": ["remote"]},
+        )
+        db.add(profile)
+        db.commit()
+    finally:
+        db.close()
+
+    token = f"valid-user-{user_id}"
+    response = client.put(
+        "/api/v1/profile",
+        json={
+            "full_name": "Legacy User",
+            "preferences": {
+                "account_type": "employer",
+                "work_types": ["hybrid"],
+            },
+        },
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert "account_type" not in data["preferences"]
+    assert data["preferences"]["work_types"] == ["hybrid"]

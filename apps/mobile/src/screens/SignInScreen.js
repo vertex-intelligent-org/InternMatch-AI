@@ -32,11 +32,17 @@ import { signInWithGoogle } from '../services/googleAuth';
 import { signInWithApple } from '../services/appleAuth';
 import {
   signInWithEmail,
+  clearLocalSessionAfterAccountDeletion,
   resendSignupConfirmation,
   isEmailNotConfirmedError,
   isAuthRateLimitError,
 } from '../services/auth';
-import { ApiError, syncAuthenticatedUser, upsertProfile } from '../services/api';
+import {
+  ApiError,
+  completeSignup,
+  deleteAccount,
+  syncAuthenticatedUser,
+} from '../services/api';
 import { useProfile } from '../context/ProfileContext';
 import haptics from '../services/haptics';
 
@@ -59,6 +65,21 @@ export default function SignInScreen({ navigation, route }) {
   const [resendLoading, setResendLoading] = useState(false);
   const [resendCooldownSeconds, setResendCooldownSeconds] = useState(0);
   const { refreshProfile, setProfile } = useProfile();
+
+  const rejectMissingCanonicalAccount = async () => {
+    // Supabase OAuth may transiently create an Auth identity even when the
+    // user entered through Sign In. Remove that identity server-side so
+    // Sign In never leaves behind an implicit InternMatch registration.
+    await deleteAccount();
+    await clearLocalSessionAfterAccountDeletion();
+
+    setProfile(null);
+    haptics.error();
+    Alert.alert(
+      t('auth.noAccountTitle'),
+      t('auth.noAccountMessage')
+    );
+  };
 
   useEffect(() => {
     const paramEmail = typeof route?.params?.confirmationEmail === 'string'
@@ -155,28 +176,33 @@ export default function SignInScreen({ navigation, route }) {
         navigation.replace('MainTabs');
       } else {
         const meta = data.session?.user?.user_metadata || {};
-        const metaName = typeof meta.full_name === 'string' ? meta.full_name.trim() : '';
-        const metaDept = typeof meta.department === 'string' ? meta.department.trim() : '';
-        const metaAccountType = meta.account_type === 'employer' ? 'employer' : 'intern';
+        const metaName =
+          typeof meta.full_name === 'string'
+            ? meta.full_name.trim()
+            : '';
+        const metaDept =
+          typeof meta.department === 'string'
+            ? meta.department.trim()
+            : '';
+        const metaAccountType =
+          meta.account_type === 'intern' || meta.account_type === 'employer'
+            ? meta.account_type
+            : null;
 
-        if (metaName) {
-          try {
-            const created = await upsertProfile({
-              full_name: metaName,
-              headline: null,
-              preferences: {
-                account_type: metaAccountType,
-                department: metaDept || null,
-              },
-            });
-            setProfile(created);
-            navigation.replace('MainTabs');
-          } catch (createErr) {
-            throw createErr;
-          }
-        } else {
-          navigation.replace('OnboardingProfile');
+        // Email confirmation may complete after the original sign-up session
+        // has ended. Only explicit sign-up metadata may finish that account.
+        if (!metaName || !metaAccountType) {
+          await rejectMissingCanonicalAccount();
+          return;
         }
+
+        await completeSignup({
+          full_name: metaName,
+          department: metaDept || null,
+          account_type: metaAccountType,
+        });
+        await refreshProfile();
+        navigation.replace('MainTabs');
       }
     } catch (error) {
       if (isEmailNotConfirmedError(error)) {
@@ -222,8 +248,15 @@ export default function SignInScreen({ navigation, route }) {
         throw new Error(t('errors.unauthorized'));
       }
 
+      const syncResult = await syncAuthenticatedUser();
+      if (!syncResult.has_profile) {
+        await rejectMissingCanonicalAccount();
+        return;
+      }
+
       setPendingConfirmationEmail('');
-      navigation.replace('Splash');
+      await refreshProfile();
+      navigation.replace('MainTabs');
     } catch (error) {
       console.warn('Google sign-in failed:', error);
       haptics.error();
@@ -262,8 +295,15 @@ export default function SignInScreen({ navigation, route }) {
         throw new Error(t('errors.unauthorized'));
       }
 
+      const syncResult = await syncAuthenticatedUser();
+      if (!syncResult.has_profile) {
+        await rejectMissingCanonicalAccount();
+        return;
+      }
+
       setPendingConfirmationEmail('');
-      navigation.replace('Splash');
+      await refreshProfile();
+      navigation.replace('MainTabs');
     } catch (error) {
       console.warn('Apple sign-in failed:', error);
       haptics.error();

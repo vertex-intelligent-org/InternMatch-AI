@@ -3,7 +3,7 @@ Backend Authentication Endpoints
 Provides authenticated user account sync and identity verification.
 """
 
-from typing import Optional
+from typing import Literal, Optional
 from uuid import UUID
 
 from app.core.security import AuthenticatedUser, get_current_user
@@ -15,6 +15,7 @@ from app.services.account_deletion import (
 )
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 router = APIRouter()
@@ -26,6 +27,22 @@ class AuthSyncResponse(BaseModel):
     user_id: UUID
     email: Optional[str] = None
     has_profile: bool
+
+
+class CompleteSignupRequest(BaseModel):
+    """One-time canonical InternMatch account provisioning payload."""
+
+    full_name: str
+    department: Optional[str] = None
+    account_type: Literal["intern", "employer"]
+
+
+class CompleteSignupResponse(BaseModel):
+    """Response after canonical account provisioning."""
+
+    created: bool
+    user_id: UUID
+    account_type: Literal["intern", "employer"]
 
 
 class AccountDeletionResponse(BaseModel):
@@ -51,6 +68,76 @@ def sync_authenticated_user(
         email=current_user.email,
         has_profile=profile is not None,
     )
+
+@router.post(
+    "/complete-signup",
+    response_model=CompleteSignupResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def complete_signup(
+    payload: CompleteSignupRequest,
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Provision the canonical InternMatch account exactly once.
+
+    Supabase authentication proves identity only. The application account role
+    is validated and persisted here, never inferred from provider metadata.
+    """
+    existing_profile = StudentProfileRepository.get_by_user_id(
+        db,
+        user_id=current_user.user_id,
+    )
+    if existing_profile is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="InternMatch account already exists.",
+        )
+
+    full_name = payload.full_name.strip()
+    if not full_name:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Full name is required.",
+        )
+
+    department = (
+        payload.department.strip()
+        if isinstance(payload.department, str) and payload.department.strip()
+        else None
+    )
+
+    preferences = {
+        "account_type": payload.account_type,
+        "department": department,
+    }
+
+    try:
+        StudentProfileRepository.upsert_by_user_id(
+            db=db,
+            user_id=current_user.user_id,
+            full_name=full_name,
+            headline=None,
+            preferences=preferences,
+        )
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="InternMatch account already exists.",
+        ) from exc
+    except Exception:
+        db.rollback()
+        raise
+
+    return CompleteSignupResponse(
+        created=True,
+        user_id=current_user.user_id,
+        account_type=payload.account_type,
+    )
+
 
 @router.delete("/account", response_model=AccountDeletionResponse)
 def delete_account(
