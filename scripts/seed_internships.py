@@ -201,6 +201,11 @@ def seed_demo_internships(
 
     invalidated_count = 0
     for demo_id, listing in post_seed_listings.items():
+        # These 35 deterministic IDs are the only authoritative curated
+        # demo listings. Never infer curated provenance from a NULL owner.
+        listing.listing_source = "curated"
+        listing.employer_organization_id = None
+
         if refresh_embeddings:
             if listing.description_embedding is not None:
                 listing.description_embedding = None

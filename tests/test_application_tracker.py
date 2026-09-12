@@ -679,6 +679,7 @@ def test_successful_patch_returns_full_updated_contract_schema(
 
         listing = InternshipListing(
             id=uuid4(),
+            listing_source="curated",
             title="Frontend Intern",
             company="BetaTech",
             location="Remote",
@@ -1278,3 +1279,166 @@ def test_candidate_submit_sets_applied_date_and_notes_update_preserves_it(
     ]
 
     assert len(applied_events) == 1
+
+def test_candidate_submit_rejects_active_legacy_unknown_listing(
+    client: TestClient,
+):
+    """
+    A4 security regression:
+    active alone is not sufficient authority for Candidate submission.
+    legacy_unknown listings must remain non-public and non-submittable.
+    """
+    user_id = uuid4()
+    token = f"valid-user-{user_id}"
+
+    db = TestingSessionLocal()
+    try:
+        profile = StudentProfile(
+            id=uuid4(),
+            user_id=user_id,
+            full_name="Boundary Candidate",
+        )
+        db.add(profile)
+        db.flush()
+
+        listing = InternshipListing(
+            id=uuid4(),
+            listing_source="legacy_unknown",
+            title="Hidden Legacy Internship",
+            company="Unknown Source",
+            location="Remote",
+            work_type="remote",
+            description="Must not accept new candidate submissions.",
+            required_skills=[],
+            preferred_skills=[],
+            language="English",
+            is_active=True,
+        )
+        db.add(listing)
+        db.flush()
+
+        application = Application(
+            id=uuid4(),
+            student_id=profile.id,
+            internship_id=listing.id,
+            status="saved",
+            notes=None,
+        )
+        db.add(application)
+        db.commit()
+
+        application_id = application.id
+    finally:
+        db.close()
+
+    response = client.post(
+        f"/api/v1/applications/{application_id}/submit",
+        headers={"Authorization": f"Bearer {token}"},
+        json={},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == (
+        "This internship opportunity is not currently "
+        "available for new submissions."
+    )
+
+    db = TestingSessionLocal()
+    try:
+        application = db.get(Application, application_id)
+        assert application is not None
+        assert application.status == "saved"
+
+        events = (
+            db.query(ApplicationStatusEvent)
+            .filter(
+                ApplicationStatusEvent.application_id
+                == application_id
+            )
+            .all()
+        )
+        assert events == []
+    finally:
+        db.close()
+
+
+def test_candidate_status_patch_rejects_active_legacy_unknown_listing(
+    client: TestClient,
+):
+    """
+    A4 security regression:
+    PATCH saved -> applied must enforce the same canonical public boundary
+    as explicit POST submit.
+    """
+    user_id = uuid4()
+    token = f"valid-user-{user_id}"
+
+    db = TestingSessionLocal()
+    try:
+        profile = StudentProfile(
+            id=uuid4(),
+            user_id=user_id,
+            full_name="Patch Boundary Candidate",
+        )
+        db.add(profile)
+        db.flush()
+
+        listing = InternshipListing(
+            id=uuid4(),
+            listing_source="legacy_unknown",
+            title="Hidden Patch Internship",
+            company="Unknown Source",
+            location="Remote",
+            work_type="remote",
+            description="Must remain unavailable for submission.",
+            required_skills=[],
+            preferred_skills=[],
+            language="English",
+            is_active=True,
+        )
+        db.add(listing)
+        db.flush()
+
+        application = Application(
+            id=uuid4(),
+            student_id=profile.id,
+            internship_id=listing.id,
+            status="saved",
+            notes=None,
+        )
+        db.add(application)
+        db.commit()
+
+        application_id = application.id
+    finally:
+        db.close()
+
+    response = client.patch(
+        f"/api/v1/applications/{application_id}/status",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"status": "applied"},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == (
+        "This internship opportunity is not currently "
+        "available for new submissions."
+    )
+
+    db = TestingSessionLocal()
+    try:
+        application = db.get(Application, application_id)
+        assert application is not None
+        assert application.status == "saved"
+
+        events = (
+            db.query(ApplicationStatusEvent)
+            .filter(
+                ApplicationStatusEvent.application_id
+                == application_id
+            )
+            .all()
+        )
+        assert events == []
+    finally:
+        db.close()

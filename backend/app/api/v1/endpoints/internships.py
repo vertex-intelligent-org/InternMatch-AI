@@ -158,6 +158,7 @@ def create_internship(
         listing = InternshipRepository.create_employer_listing(
             db=db,
             employer_user_id=current_user.user_id,
+            employer_organization_id=organization.id,
             title=payload.title,
             company=organization.display_name,
             location=payload.location,

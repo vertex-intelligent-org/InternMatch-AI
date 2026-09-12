@@ -127,6 +127,7 @@ def test_delete_account_purges_owned_rows_and_detaches_employer_listing(
 
         listing = InternshipListing(
             employer_user_id=user_id,
+            listing_source="employer",
             title="Deletion Test Internship",
             company="Deletion Test Company",
             location="Remote",
@@ -180,6 +181,7 @@ def test_delete_account_purges_owned_rows_and_detaches_employer_listing(
         assert detached_listing is not None
         assert detached_listing.employer_user_id is None
         assert detached_listing.is_active is False
+        assert detached_listing.listing_source == "employer"
 
         tombstone = db.get(
             RevenueCatWebhookEvent,

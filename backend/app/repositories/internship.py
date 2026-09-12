@@ -7,7 +7,7 @@ from typing import List, Optional, Tuple
 from uuid import UUID
 
 from app.db.models import EmployerOrganization, InternshipListing
-from sqlalchemy import String, cast, func, or_, select
+from sqlalchemy import String, and_, cast, func, or_, select
 from sqlalchemy.orm import Session
 
 
@@ -16,20 +16,23 @@ def public_internship_visibility_condition():
     """
     Canonical public/candidate visibility rule.
 
-    Active curated listings without an employer owner remain eligible.
-    Employer-owned listings are public only while the owner's organization
-    is currently verified.
+    Curated visibility is explicit and never inferred from a NULL owner.
+    Employer listings are public only while their bound organization is
+    currently verified. Legacy/unknown rows are never public.
     """
-    verified_owner_ids = select(
-        EmployerOrganization.owner_user_id
+    verified_organization_ids = select(
+        EmployerOrganization.id
     ).where(
         EmployerOrganization.verification_status == "verified"
     )
 
     return or_(
-        InternshipListing.employer_user_id.is_(None),
-        InternshipListing.employer_user_id.in_(
-            verified_owner_ids
+        InternshipListing.listing_source == "curated",
+        and_(
+            InternshipListing.listing_source == "employer",
+            InternshipListing.employer_organization_id.in_(
+                verified_organization_ids
+            ),
         ),
     )
 
@@ -68,6 +71,30 @@ class InternshipRepository:
             InternshipListing.id == internship_id,
             InternshipListing.is_active.is_(True),
             public_internship_visibility_condition(),
+        )
+        return db.scalar(stmt)
+
+    @staticmethod
+    def get_public_by_id_for_update(
+        db: Session,
+        internship_id: UUID,
+    ) -> Optional[InternshipListing]:
+        """
+        Fetch and lock one currently public internship for a candidate write.
+
+        populate_existing prevents an already-loaded identity-map instance
+        from bypassing a fresh visibility decision immediately before the
+        saved -> applied mutation.
+        """
+        stmt = (
+            select(InternshipListing)
+            .where(
+                InternshipListing.id == internship_id,
+                InternshipListing.is_active.is_(True),
+                public_internship_visibility_condition(),
+            )
+            .with_for_update()
+            .execution_options(populate_existing=True)
         )
         return db.scalar(stmt)
 
@@ -132,6 +159,7 @@ class InternshipRepository:
     def create_employer_listing(
         db: Session,
         employer_user_id: UUID,
+        employer_organization_id: UUID,
         title: str,
         company: str,
         location: str,
@@ -150,6 +178,8 @@ class InternshipRepository:
         """
         listing = InternshipListing(
             employer_user_id=employer_user_id,
+            employer_organization_id=employer_organization_id,
+            listing_source="employer",
             title=title,
             company=company,
             location=location,

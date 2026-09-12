@@ -54,6 +54,7 @@ def create_test_internship(
     db = TestingSessionLocal()
     try:
         listing = InternshipListing(
+            listing_source="curated",
             id=uuid4(),
             title=title,
             company=company,
@@ -250,6 +251,7 @@ def test_list_saved_internships_ordering(client: TestClient):
         listings = []
         for i in range(3):
             listing = InternshipListing(
+                listing_source="curated",
                 id=uuid4(),
                 title=f"Role {i}",
                 company="TechCorp",
@@ -299,6 +301,7 @@ def test_list_saved_internships_pagination(client: TestClient):
     try:
         for i in range(5):
             listing = InternshipListing(
+                listing_source="curated",
                 id=uuid4(),
                 title=f"Internship {i}",
                 company="Company",

@@ -664,6 +664,10 @@ def approve_organization(
                 {
                     InternshipListing.company:
                     organization.display_name,
+                    InternshipListing.employer_organization_id:
+                    organization.id,
+                    InternshipListing.listing_source:
+                    "employer",
                 },
                 synchronize_session=False,
             )
@@ -808,8 +812,19 @@ def suspend_organization(
         (
             db.query(InternshipListing)
             .filter(
-                InternshipListing.employer_user_id
-                == organization.owner_user_id
+                (
+                    InternshipListing.employer_organization_id
+                    == organization.id
+                )
+                |
+                (
+                    InternshipListing.employer_organization_id.is_(None)
+                    &
+                    (
+                        InternshipListing.employer_user_id
+                        == organization.owner_user_id
+                    )
+                )
             )
             .update(
                 {

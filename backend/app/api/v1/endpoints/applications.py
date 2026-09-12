@@ -11,6 +11,7 @@ from app.core.rate_limit import enforce_rate_limit
 from app.core.security import AuthenticatedUser, get_current_user
 from app.db.session import get_db
 from app.repositories.application import ApplicationRepository
+from app.repositories.internship import InternshipRepository
 from app.repositories.match import MatchRepository
 from app.repositories.processing_job import ProcessingJobRepository
 from app.schemas.application import (
@@ -356,14 +357,30 @@ def submit_application(
             ),
         )
 
-    if application.internship_id and not application.internship.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=(
-                "This internship opportunity has been closed "
-                "and is no longer accepting new submissions."
-            ),
+    if application.internship_id is not None:
+        public_internship = InternshipRepository.get_public_by_id_for_update(
+            db=db,
+            internship_id=application.internship_id,
         )
+
+        if public_internship is None:
+            if internship is not None and not internship.is_active:
+                detail = (
+                    "This internship opportunity has been closed "
+                    "and is no longer accepting new submissions."
+                )
+            else:
+                detail = (
+                    "This internship opportunity is not currently "
+                    "available for new submissions."
+                )
+
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=detail,
+            )
+
+        internship = public_internship
 
     cover_letter = payload.cover_letter if payload else None
     notes = payload.notes if payload else None
@@ -434,14 +451,32 @@ def update_application_status(
         )
 
     if target_status == "applied" and application.status == "saved":
-        if internship and not getattr(internship, "is_active", True):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=(
-                    "This internship opportunity has been closed "
-                    "and is no longer accepting submissions."
-                ),
+        if application.internship_id is not None:
+            public_internship = (
+                InternshipRepository.get_public_by_id_for_update(
+                    db=db,
+                    internship_id=application.internship_id,
+                )
             )
+
+            if public_internship is None:
+                if internship is not None and not internship.is_active:
+                    detail = (
+                        "This internship opportunity has been closed "
+                        "and is no longer accepting submissions."
+                    )
+                else:
+                    detail = (
+                        "This internship opportunity is not currently "
+                        "available for new submissions."
+                    )
+
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=detail,
+                )
+
+            internship = public_internship
 
     try:
         updated_app = ApplicationRepository.update_status(

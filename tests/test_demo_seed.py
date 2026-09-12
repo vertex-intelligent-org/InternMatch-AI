@@ -451,6 +451,10 @@ def test_non_demo_listings_are_never_queried_or_modified(tmp_path: Path):
         refresh_embeddings=False,
     )
 
+    for listing in demo_listings.values():
+        assert listing.listing_source == "curated"
+        assert listing.employer_organization_id is None
+
     # Non demo listing was never retrieved or modified
     assert non_demo_listing.description_embedding == _make_fake_vector()
 

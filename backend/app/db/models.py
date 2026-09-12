@@ -317,11 +317,30 @@ class InternshipListing(Base):
 
     __tablename__ = "internship_listings"
 
+    __table_args__ = (
+        CheckConstraint(
+            "listing_source IN "
+            "('curated', 'employer', 'legacy_unknown')",
+            name="ck_internship_listings_listing_source",
+        ),
+    )
+
     id: Mapped[UUID] = mapped_column(
         PG_UUID(as_uuid=True), primary_key=True, default=uuid4
     )
     employer_user_id: Mapped[Optional[UUID]] = mapped_column(
         PG_UUID(as_uuid=True), nullable=True
+    )
+    employer_organization_id: Mapped[Optional[UUID]] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("employer_organizations.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    listing_source: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+        default="legacy_unknown",
     )
     title: Mapped[str] = mapped_column(String, nullable=False)
     company: Mapped[str] = mapped_column(String, nullable=False)

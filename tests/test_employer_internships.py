@@ -2390,6 +2390,7 @@ def test_public_catalog_and_detail_hide_unverified_employer_listing(
                 InternshipListing(
                     id=hidden_listing_id,
                     employer_user_id=employer_user_id,
+                    listing_source="employer",
                     title="Hidden Employer Listing",
                     company="Pending Company",
                     location="Remote",
@@ -2403,6 +2404,7 @@ def test_public_catalog_and_detail_hide_unverified_employer_listing(
                 InternshipListing(
                     id=curated_listing_id,
                     employer_user_id=None,
+                    listing_source="curated",
                     title="Curated Public Listing",
                     company="Curated Partner",
                     location="Remote",
@@ -2716,3 +2718,121 @@ def test_update_rechecks_verification_after_embedding_before_write(
         assert listing.work_type == "hybrid"
         assert listing.required_skills == ["Python"]
         assert listing.is_active is True
+def test_a4_null_owner_legacy_unknown_listing_is_not_public(
+    client: TestClient,
+):
+    listing_id = uuid4()
+
+    db = TestingSessionLocal()
+    try:
+        db.add(
+            InternshipListing(
+                id=listing_id,
+                employer_user_id=None,
+                listing_source="legacy_unknown",
+                title="Unknown Legacy Listing",
+                company="Unknown Source",
+                location="Remote",
+                work_type="remote",
+                description="Must remain hidden.",
+                required_skills=[],
+                preferred_skills=[],
+                language="English",
+                is_active=True,
+            )
+        )
+        db.commit()
+    finally:
+        db.close()
+
+    catalog_response = client.get("/api/v1/internships")
+    assert catalog_response.status_code == 200
+
+    catalog_ids = {
+        item["id"]
+        for item in catalog_response.json()["items"]
+    }
+
+    assert str(listing_id) not in catalog_ids
+
+    detail_response = client.get(
+        f"/api/v1/internships/{listing_id}"
+    )
+    assert detail_response.status_code == 404
+
+
+def test_a4_employer_create_persists_organization_binding(
+    client: TestClient,
+):
+    employer_user_id = uuid4()
+
+    _create_profile(
+        employer_user_id,
+        "Bound Employer",
+        account_type="employer",
+        employer_verification_status="verified",
+    )
+
+    db = TestingSessionLocal()
+    try:
+        organization = (
+            db.query(EmployerOrganization)
+            .filter(
+                EmployerOrganization.owner_user_id
+                == employer_user_id
+            )
+            .one()
+        )
+        organization_id = organization.id
+    finally:
+        db.close()
+
+    response = client.post(
+        "/api/v1/internships",
+        json={
+            "title": "Organization Bound Internship",
+            "location": "Remote",
+            "work_type": "remote",
+            "description": "Organization-bound listing regression.",
+            "required_skills": ["Python"],
+            "preferred_skills": [],
+            "language": "English",
+        },
+        headers={
+            "Authorization": (
+                f"Bearer valid-user-{employer_user_id}"
+            )
+        },
+    )
+
+    assert response.status_code == 201
+    listing_id = UUID(response.json()["id"])
+
+    db = TestingSessionLocal()
+    try:
+        listing = db.get(InternshipListing, listing_id)
+        assert listing is not None
+        assert listing.listing_source == "employer"
+        assert listing.employer_user_id == employer_user_id
+        assert (
+            listing.employer_organization_id
+            == organization_id
+        )
+    finally:
+        db.close()
+
+
+def test_a4_migration_defines_safe_listing_provenance():
+    migration = Path(
+        "database/migrations/"
+        "021_add_internship_listing_provenance.sql"
+    ).read_text(encoding="utf-8")
+
+    assert "listing_source" in migration
+    assert "legacy_unknown" in migration
+    assert "employer_organization_id" in migration
+    assert "ON DELETE SET NULL" in migration
+    assert "listing_source = 'employer'" in migration
+    assert "listing_source = 'curated'" in migration
+    assert "20000000-0000-0000-0000-000000000001" in migration
+    assert "20000000-0000-0000-0000-000000000035" in migration
