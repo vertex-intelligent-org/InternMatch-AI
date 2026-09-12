@@ -73,3 +73,18 @@ api_v1_router.include_router(
     prefix="/applications",
     tags=["Application Operations"],
 )
+
+# Gate 2 employer organization verification routes
+from app.api.v1.endpoints import employer_organizations as employer_organizations_endpoints
+
+api_v1_router.include_router(
+    employer_organizations_endpoints.employer_router,
+    prefix="/employer-organization",
+    tags=["Employer Organization"],
+)
+
+api_v1_router.include_router(
+    employer_organizations_endpoints.admin_router,
+    prefix="/admin/employer-organizations",
+    tags=["Admin Employer Verification"],
+)

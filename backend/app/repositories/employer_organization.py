@@ -85,6 +85,122 @@ class EmployerOrganizationRepository:
         return organization
 
     @staticmethod
+    def get_by_owner_user_id_for_update(
+        db: Session,
+        owner_user_id: UUID,
+    ) -> Optional[EmployerOrganization]:
+        stmt = (
+            select(EmployerOrganization)
+            .where(
+                EmployerOrganization.owner_user_id == owner_user_id
+            )
+            .with_for_update()
+        )
+        return db.scalar(stmt)
+
+    @staticmethod
+    def get_by_id_for_update(
+        db: Session,
+        organization_id: UUID,
+    ) -> Optional[EmployerOrganization]:
+        stmt = (
+            select(EmployerOrganization)
+            .where(
+                EmployerOrganization.id == organization_id
+            )
+            .with_for_update()
+        )
+        return db.scalar(stmt)
+
+    @staticmethod
+    def list_by_status(
+        db: Session,
+        verification_status: str,
+    ) -> list[EmployerOrganization]:
+        stmt = (
+            select(EmployerOrganization)
+            .where(
+                EmployerOrganization.verification_status
+                == verification_status
+            )
+            .order_by(
+                EmployerOrganization.submitted_at.asc(),
+                EmployerOrganization.created_at.asc(),
+            )
+        )
+        return list(db.scalars(stmt).all())
+
+    @staticmethod
+    def update_details(
+        db: Session,
+        organization: EmployerOrganization,
+        *,
+        legal_name: str,
+        display_name: str,
+        website_url: str,
+        normalized_domain: str,
+        business_email: str,
+        country_code: str,
+        registration_number: Optional[str],
+        tax_number: Optional[str],
+        representative_name: str,
+        representative_role: str,
+    ) -> EmployerOrganization:
+        """
+        Update employer-controlled organization identity fields.
+
+        This method deliberately accepts no verification/reviewer fields.
+        Lifecycle authorization is enforced by the caller.
+        """
+        organization.legal_name = legal_name
+        organization.display_name = display_name
+        organization.website_url = website_url
+        organization.normalized_domain = normalized_domain
+        organization.business_email = business_email
+        organization.country_code = country_code
+        organization.registration_number = registration_number
+        organization.tax_number = tax_number
+        organization.representative_name = representative_name
+        organization.representative_role = representative_role
+        organization.updated_at = datetime.now(timezone.utc)
+
+        db.flush()
+        return organization
+
+    @staticmethod
+    def transition_status(
+        db: Session,
+        organization: EmployerOrganization,
+        *,
+        new_status: str,
+        reviewer_user_id: Optional[UUID] = None,
+        rejection_reason_code: Optional[str] = None,
+        submitted_at: Optional[datetime] = None,
+        reviewed_at: Optional[datetime] = None,
+        clear_reviewed_at: bool = False,
+    ) -> EmployerOrganization:
+        """
+        Persist one server-authoritative verification status transition.
+
+        Public employer payloads never call this method directly.
+        """
+        organization.verification_status = new_status
+        organization.reviewed_by = reviewer_user_id
+        organization.rejection_reason_code = rejection_reason_code
+
+        if submitted_at is not None:
+            organization.submitted_at = submitted_at
+
+        if clear_reviewed_at:
+            organization.reviewed_at = None
+        elif reviewed_at is not None:
+            organization.reviewed_at = reviewed_at
+
+        organization.updated_at = datetime.now(timezone.utc)
+        db.flush()
+        return organization
+
+    @staticmethod
     def record_event(
         db: Session,
         *,
