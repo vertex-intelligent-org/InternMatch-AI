@@ -680,6 +680,7 @@ def test_successful_patch_returns_full_updated_contract_schema(
         listing = InternshipListing(
             id=uuid4(),
             listing_source="curated",
+            publication_status="published",
             title="Frontend Intern",
             company="BetaTech",
             location="Remote",
@@ -1312,6 +1313,7 @@ def test_candidate_submit_rejects_active_legacy_unknown_listing(
             required_skills=[],
             preferred_skills=[],
             language="English",
+            publication_status="published",
             is_active=True,
         )
         db.add(listing)
@@ -1394,6 +1396,7 @@ def test_candidate_status_patch_rejects_active_legacy_unknown_listing(
             required_skills=[],
             preferred_skills=[],
             language="English",
+            publication_status="published",
             is_active=True,
         )
         db.add(listing)

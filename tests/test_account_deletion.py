@@ -135,6 +135,7 @@ def test_delete_account_purges_owned_rows_and_detaches_employer_listing(
             description="Test listing retained for candidate history.",
             required_skills=["Python"],
             preferred_skills=[],
+            publication_status="published",
             is_active=True,
         )
         db.add(listing)
@@ -180,6 +181,7 @@ def test_delete_account_purges_owned_rows_and_detaches_employer_listing(
         )
         assert detached_listing is not None
         assert detached_listing.employer_user_id is None
+        assert detached_listing.publication_status == "closed"
         assert detached_listing.is_active is False
         assert detached_listing.listing_source == "employer"
 

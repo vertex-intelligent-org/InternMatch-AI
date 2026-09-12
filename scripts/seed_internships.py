@@ -205,6 +205,8 @@ def seed_demo_internships(
         # demo listings. Never infer curated provenance from a NULL owner.
         listing.listing_source = "curated"
         listing.employer_organization_id = None
+        listing.publication_status = "published"
+        listing.is_active = True
 
         if refresh_embeddings:
             if listing.description_embedding is not None:

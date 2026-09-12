@@ -323,6 +323,11 @@ class InternshipListing(Base):
             "('curated', 'employer', 'legacy_unknown')",
             name="ck_internship_listings_listing_source",
         ),
+        CheckConstraint(
+            "publication_status IN "
+            "('draft', 'under_review', 'published', 'closed')",
+            name="ck_internship_listings_publication_status",
+        ),
     )
 
     id: Mapped[UUID] = mapped_column(
@@ -341,6 +346,12 @@ class InternshipListing(Base):
         String,
         nullable=False,
         default="legacy_unknown",
+    )
+    publication_status: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+        default="draft",
+        index=True,
     )
     title: Mapped[str] = mapped_column(String, nullable=False)
     company: Mapped[str] = mapped_column(String, nullable=False)
@@ -369,8 +380,9 @@ class InternshipListing(Base):
         VECTOR(settings.EMBEDDING_DIMENSION).with_variant(JSON(), "sqlite"),
         nullable=True,
     )
+    # Compatibility mirror only. publication_status is authoritative.
     is_active: Mapped[bool] = mapped_column(
-        Boolean, default=True, nullable=False
+        Boolean, default=False, nullable=False
     )
     created_at: Mapped[datetime] = mapped_column(
         default=lambda: datetime.now(timezone.utc), nullable=False

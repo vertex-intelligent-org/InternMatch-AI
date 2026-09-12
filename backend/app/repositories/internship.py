@@ -26,12 +26,15 @@ def public_internship_visibility_condition():
         EmployerOrganization.verification_status == "verified"
     )
 
-    return or_(
-        InternshipListing.listing_source == "curated",
-        and_(
-            InternshipListing.listing_source == "employer",
-            InternshipListing.employer_organization_id.in_(
-                verified_organization_ids
+    return and_(
+        InternshipListing.publication_status == "published",
+        or_(
+            InternshipListing.listing_source == "curated",
+            and_(
+                InternshipListing.listing_source == "employer",
+                InternshipListing.employer_organization_id.in_(
+                    verified_organization_ids
+                ),
             ),
         ),
     )
@@ -69,7 +72,6 @@ class InternshipRepository:
         """
         stmt = select(InternshipListing).where(
             InternshipListing.id == internship_id,
-            InternshipListing.is_active.is_(True),
             public_internship_visibility_condition(),
         )
         return db.scalar(stmt)
@@ -90,7 +92,6 @@ class InternshipRepository:
             select(InternshipListing)
             .where(
                 InternshipListing.id == internship_id,
-                InternshipListing.is_active.is_(True),
                 public_internship_visibility_condition(),
             )
             .with_for_update()
@@ -113,7 +114,6 @@ class InternshipRepository:
         Returns (items, total_count).
         """
         stmt = select(InternshipListing).where(
-            InternshipListing.is_active.is_(True),
             public_internship_visibility_condition(),
         )
 
@@ -180,6 +180,8 @@ class InternshipRepository:
             employer_user_id=employer_user_id,
             employer_organization_id=employer_organization_id,
             listing_source="employer",
+            publication_status="published",
+            is_active=True,
             title=title,
             company=company,
             location=location,
@@ -287,9 +289,12 @@ class InternshipRepository:
         listing: InternshipListing,
     ) -> InternshipListing:
         """
-        Mark an internship listing as closed (is_active = False).
-        Flushes session state; does not commit transaction.
+        Mark an internship listing as closed.
+
+        publication_status is authoritative. is_active is maintained only as
+        the legacy compatibility mirror.
         """
+        listing.publication_status = "closed"
         listing.is_active = False
         db.flush()
         return listing

@@ -122,7 +122,6 @@ class SavedInternshipRepository:
             )
             .where(
                 StudentProfile.user_id == user_id,
-                InternshipListing.is_active.is_(True),
                 public_internship_visibility_condition(),
             )
         )
@@ -139,7 +138,6 @@ class SavedInternshipRepository:
             )
             .where(
                 StudentProfile.user_id == user_id,
-                InternshipListing.is_active.is_(True),
                 public_internship_visibility_condition(),
             )
         )

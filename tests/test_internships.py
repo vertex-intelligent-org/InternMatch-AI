@@ -49,6 +49,8 @@ def test_list_internships_pagination_and_sorting(client: TestClient):
     try:
         for i in range(5):
             listing = InternshipListing(
+                publication_status="published",
+                is_active=True,
                 listing_source="curated",
                 id=uuid4(),
                 title=f"Engineer Intern {i}",
@@ -90,6 +92,8 @@ def test_list_internships_filters(client: TestClient):
     db = TestingSessionLocal()
     try:
         listing1 = InternshipListing(
+            publication_status="published",
+            is_active=True,
             listing_source="curated",
             id=uuid4(),
             title="Backend Intern",
@@ -101,6 +105,8 @@ def test_list_internships_filters(client: TestClient):
             preferred_skills=["Redis"],
         )
         listing2 = InternshipListing(
+            publication_status="published",
+            is_active=True,
             listing_source="curated",
             id=uuid4(),
             title="Frontend Intern",
@@ -112,6 +118,8 @@ def test_list_internships_filters(client: TestClient):
             preferred_skills=["CSS"],
         )
         listing3 = InternshipListing(
+            publication_status="published",
+            is_active=True,
             listing_source="curated",
             id=uuid4(),
             title="DevOps Intern",
@@ -163,6 +171,8 @@ def test_get_internship_by_id_success_and_boundary_mapping(client: TestClient):
     db = TestingSessionLocal()
     try:
         listing = InternshipListing(
+            publication_status="published",
+            is_active=True,
             listing_source="curated",
             id=listing_id,
             title="AI Engineer Intern",
@@ -226,6 +236,8 @@ def test_get_internship_by_id_locale_defaults_and_en(client: TestClient):
     db = TestingSessionLocal()
     try:
         listing = InternshipListing(
+            publication_status="published",
+            is_active=True,
             listing_source="curated",
             id=listing_id,
             title="Backend Engineering Intern",
@@ -270,6 +282,8 @@ def test_get_internship_by_id_locale_tr_translated_with_canonical_invariants(
     db = TestingSessionLocal()
     try:
         listing = InternshipListing(
+            publication_status="published",
+            is_active=True,
             listing_source="curated",
             id=listing_id,
             title="AI Engineer Intern",
@@ -330,6 +344,8 @@ def test_get_internship_by_id_locale_ar_translated_with_canonical_invariants(
     db = TestingSessionLocal()
     try:
         listing = InternshipListing(
+            publication_status="published",
+            is_active=True,
             listing_source="curated",
             id=listing_id,
             title="Fullstack Developer Intern",
@@ -375,6 +391,8 @@ def test_get_internship_by_id_invalid_locale_rejected(client: TestClient):
     db = TestingSessionLocal()
     try:
         listing = InternshipListing(
+            publication_status="published",
+            is_active=True,
             listing_source="curated",
             id=listing_id,
             title="Intern",
@@ -407,6 +425,8 @@ def test_get_internship_by_id_translation_fallback_on_service_failure(
     db = TestingSessionLocal()
     try:
         listing = InternshipListing(
+            publication_status="published",
+            is_active=True,
             listing_source="curated",
             id=listing_id,
             title="Data Science Intern",

@@ -89,6 +89,7 @@ def _create_interviewing_application(
             preferred_skills=[
                 "Docker",
             ],
+            publication_status="published",
             is_active=True,
         )
 

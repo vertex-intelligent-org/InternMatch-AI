@@ -602,6 +602,7 @@ def test_admin_suspension_deactivates_employer_listings(
                 required_skills=["Python"],
                 preferred_skills=[],
                 language="English",
+                publication_status="published",
                 is_active=True,
             )
         )
@@ -631,6 +632,7 @@ def test_admin_suspension_deactivates_employer_listings(
             listing_id,
         )
         assert listing is not None
+        assert listing.publication_status == "closed"
         assert listing.is_active is False
 
         event = (

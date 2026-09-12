@@ -98,7 +98,10 @@ class InternshipSummaryResponse(BaseModel):
     work_type: str
     required_skills: List[str] = Field(default_factory=list)
     preferred_skills: List[str] = Field(default_factory=list)
-    is_active: bool = True
+    publication_status: Literal[
+        "draft", "under_review", "published", "closed"
+    ]
+    is_active: bool
     posted_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
@@ -114,7 +117,15 @@ class InternshipSummaryResponse(BaseModel):
             work_type=model.work_type,
             required_skills=model.required_skills or [],
             preferred_skills=model.preferred_skills or [],
-            is_active=getattr(model, "is_active", True),
+            publication_status=getattr(
+                model,
+                "publication_status",
+                "draft",
+            ),
+            is_active=(
+                getattr(model, "publication_status", "draft")
+                == "published"
+            ),
             posted_at=model.created_at,
         )
 
@@ -142,7 +153,10 @@ class InternshipDetailResponse(BaseModel):
     languages: List[str] = Field(default_factory=list)
     min_education: Optional[str] = None
     experience_requirements: Optional[str] = None
-    is_active: bool = True
+    publication_status: Literal[
+        "draft", "under_review", "published", "closed"
+    ]
+    is_active: bool
     posted_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
@@ -164,6 +178,14 @@ class InternshipDetailResponse(BaseModel):
             languages=languages_list,
             min_education=model.education_requirements,
             experience_requirements=model.experience_requirements,
-            is_active=getattr(model, "is_active", True),
+            publication_status=getattr(
+                model,
+                "publication_status",
+                "draft",
+            ),
+            is_active=(
+                getattr(model, "publication_status", "draft")
+                == "published"
+            ),
             posted_at=model.created_at,
         )

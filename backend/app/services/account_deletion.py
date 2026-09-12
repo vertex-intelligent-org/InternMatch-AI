@@ -215,6 +215,7 @@ def delete_authenticated_account(
             .update(
                 {
                     InternshipListing.employer_user_id: None,
+                    InternshipListing.publication_status: "closed",
                     InternshipListing.is_active: False,
                 },
                 synchronize_session=False,

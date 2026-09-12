@@ -364,7 +364,7 @@ def submit_application(
         )
 
         if public_internship is None:
-            if internship is not None and not internship.is_active:
+            if internship is not None and internship.publication_status == "closed":
                 detail = (
                     "This internship opportunity has been closed "
                     "and is no longer accepting new submissions."
@@ -460,7 +460,7 @@ def update_application_status(
             )
 
             if public_internship is None:
-                if internship is not None and not internship.is_active:
+                if internship is not None and internship.publication_status == "closed":
                     detail = (
                         "This internship opportunity has been closed "
                         "and is no longer accepting submissions."

@@ -691,6 +691,7 @@ def test_employer_close_opportunity_success_and_catalog_exclusion(client: TestCl
     # 2. Close opportunity
     close_res = client.post(f"/api/v1/internships/{listing_id}/close", headers=headers)
     assert close_res.status_code == 200
+    assert close_res.json()["publication_status"] == "closed"
     assert close_res.json()["is_active"] is False
 
     # 3. Verify excluded from public candidate catalog
@@ -704,6 +705,7 @@ def test_employer_close_opportunity_success_and_catalog_exclusion(client: TestCl
     mine_items = mine_res.json()["items"]
     assert len(mine_items) == 1
     assert mine_items[0]["id"] == listing_id
+    assert mine_items[0]["publication_status"] == "closed"
     assert mine_items[0]["is_active"] is False
 
 
@@ -2399,6 +2401,7 @@ def test_public_catalog_and_detail_hide_unverified_employer_listing(
                     required_skills=[],
                     preferred_skills=[],
                     language="English",
+                    publication_status="published",
                     is_active=True,
                 ),
                 InternshipListing(
@@ -2413,6 +2416,7 @@ def test_public_catalog_and_detail_hide_unverified_employer_listing(
                     required_skills=[],
                     preferred_skills=[],
                     language="English",
+                    publication_status="published",
                     is_active=True,
                 ),
             ]
@@ -2620,6 +2624,7 @@ def test_update_rechecks_verification_after_embedding_before_write(
                 required_skills=["Python"],
                 preferred_skills=[],
                 language="English",
+                publication_status="published",
                 is_active=True,
             )
         )
@@ -2738,6 +2743,7 @@ def test_a4_null_owner_legacy_unknown_listing_is_not_public(
                 required_skills=[],
                 preferred_skills=[],
                 language="English",
+                publication_status="published",
                 is_active=True,
             )
         )
@@ -2836,3 +2842,164 @@ def test_a4_migration_defines_safe_listing_provenance():
     assert "listing_source = 'curated'" in migration
     assert "20000000-0000-0000-0000-000000000001" in migration
     assert "20000000-0000-0000-0000-000000000035" in migration
+
+def test_a4b_publication_status_is_authoritative(
+    client: TestClient,
+):
+    """
+    Candidate visibility is controlled by publication_status, not legacy
+    is_active. New direct rows default fail-closed as draft.
+    """
+    db = TestingSessionLocal()
+    try:
+        draft_default = InternshipListing(
+            id=uuid4(),
+            listing_source="curated",
+            title="Draft Default Intern",
+            company="InternMatch",
+            location="Remote",
+            work_type="remote",
+            description="Fail closed by default.",
+            required_skills=[],
+            preferred_skills=[],
+        )
+        under_review = InternshipListing(
+            id=uuid4(),
+            listing_source="curated",
+            publication_status="under_review",
+            is_active=False,
+            title="Review Intern",
+            company="InternMatch",
+            location="Remote",
+            work_type="remote",
+            description="Not public while under review.",
+            required_skills=[],
+            preferred_skills=[],
+        )
+        published = InternshipListing(
+            id=uuid4(),
+            listing_source="curated",
+            publication_status="published",
+            is_active=True,
+            title="Published Intern",
+            company="InternMatch",
+            location="Remote",
+            work_type="remote",
+            description="Visible public opportunity.",
+            required_skills=[],
+            preferred_skills=[],
+        )
+        closed = InternshipListing(
+            id=uuid4(),
+            listing_source="curated",
+            publication_status="closed",
+            is_active=False,
+            title="Closed Intern",
+            company="InternMatch",
+            location="Remote",
+            work_type="remote",
+            description="Historical closed opportunity.",
+            required_skills=[],
+            preferred_skills=[],
+        )
+
+        db.add_all(
+            [
+                draft_default,
+                under_review,
+                published,
+                closed,
+            ]
+        )
+        db.commit()
+
+        db.refresh(draft_default)
+        db.refresh(published)
+
+        assert draft_default.publication_status == "draft"
+        assert draft_default.is_active is False
+        assert published.publication_status == "published"
+
+        draft_id = draft_default.id
+        review_id = under_review.id
+        published_id = published.id
+        closed_id = closed.id
+    finally:
+        db.close()
+
+    catalog_response = client.get("/api/v1/internships")
+
+    assert catalog_response.status_code == 200
+    catalog = catalog_response.json()
+
+    assert catalog["total"] == 1
+    assert catalog["items"][0]["id"] == str(published_id)
+    assert (
+        catalog["items"][0]["publication_status"]
+        == "published"
+    )
+    assert catalog["items"][0]["is_active"] is True
+
+    published_detail = client.get(
+        f"/api/v1/internships/{published_id}"
+    )
+    assert published_detail.status_code == 200
+    assert (
+        published_detail.json()["publication_status"]
+        == "published"
+    )
+    assert published_detail.json()["is_active"] is True
+
+    for hidden_id in (
+        draft_id,
+        review_id,
+        closed_id,
+    ):
+        hidden_response = client.get(
+            f"/api/v1/internships/{hidden_id}"
+        )
+        assert hidden_response.status_code == 404
+
+
+def test_a4b_publication_state_is_not_client_writable():
+    """
+    Employer create/update request contracts do not expose lifecycle authority.
+    """
+    from app.schemas.internship import (
+        InternshipCreateRequest,
+        InternshipUpdateRequest,
+    )
+
+    assert (
+        "publication_status"
+        not in InternshipCreateRequest.model_fields
+    )
+    assert (
+        "publication_status"
+        not in InternshipUpdateRequest.model_fields
+    )
+    assert "is_active" not in InternshipCreateRequest.model_fields
+    assert "is_active" not in InternshipUpdateRequest.model_fields
+
+
+def test_a4b_migration_defines_authoritative_publication_lifecycle():
+    migration = open(
+        "database/migrations/"
+        "022_add_internship_publication_status.sql",
+        encoding="utf-8",
+    ).read()
+
+    assert "publication_status" in migration
+    assert "'draft'" in migration
+    assert "'under_review'" in migration
+    assert "'published'" in migration
+    assert "'closed'" in migration
+    assert "DEFAULT 'draft'" in migration
+    assert "WHEN is_active THEN 'published'" in migration
+    assert "ELSE 'closed'" in migration
+    assert "ALTER COLUMN is_active SET DEFAULT false" in migration
+    assert (
+        "sync_internship_listing_publication_active"
+        in migration
+    )
+    assert "CREATE TRIGGER" in migration

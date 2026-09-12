@@ -49,7 +49,6 @@ def build_nearest_internships_statement(
         select(InternshipListing, distance_expr)
         .where(
             InternshipListing.description_embedding.is_not(None),
-            InternshipListing.is_active.is_(True),
             public_internship_visibility_condition(),
         )
         .order_by(distance_expr.asc())

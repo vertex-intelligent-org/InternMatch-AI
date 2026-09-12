@@ -828,6 +828,7 @@ def suspend_organization(
             )
             .update(
                 {
+                    InternshipListing.publication_status: "closed",
                     InternshipListing.is_active: False,
                 },
                 synchronize_session=False,
