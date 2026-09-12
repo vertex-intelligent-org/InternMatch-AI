@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Animated,
+  Easing,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -20,20 +22,60 @@ const LANGUAGE_OPTIONS = [
   { code: 'ar', label: 'AR' },
 ];
 
+const CIRCLE_SIZE = 36;
+const COLLAPSED_WIDTH = 40;
+const EXPANDED_WIDTH = 124;
+const ANIMATION_DURATION_MS = 180;
+
 export default function PreAuthLanguageSwitcher({
   disabled = false,
   style,
 }) {
   const { t } = useTranslation();
   const { locale, setLocale } = useLocalization();
+
+  const [expanded, setExpanded] = useState(false);
   const [changingLocale, setChangingLocale] = useState(null);
+
+  const expansion = useRef(
+    new Animated.Value(0)
+  ).current;
+
+  useEffect(() => {
+    Animated.timing(expansion, {
+      toValue: expanded ? 1 : 0,
+      duration: ANIMATION_DURATION_MS,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    }).start();
+  }, [expanded, expansion]);
+
+  useEffect(() => {
+    if (disabled && expanded) {
+      setExpanded(false);
+    }
+  }, [disabled, expanded]);
+
+  const toggleExpanded = () => {
+    if (disabled || changingLocale) {
+      return;
+    }
+
+    haptics.selection();
+    setExpanded((current) => !current);
+  };
 
   const handleChange = async (nextLocale) => {
     if (
       disabled ||
-      changingLocale ||
-      nextLocale === locale
+      changingLocale
     ) {
+      return;
+    }
+
+    if (nextLocale === locale) {
+      haptics.selection();
+      setExpanded(false);
       return;
     }
 
@@ -47,6 +89,7 @@ export default function PreAuthLanguageSwitcher({
       }
 
       haptics.selection();
+      setExpanded(false);
     } catch (error) {
       console.warn(
         'Pre-auth language change failed:',
@@ -64,87 +107,191 @@ export default function PreAuthLanguageSwitcher({
     }
   };
 
-  return (
-    <View
-      style={[styles.wrapper, style]}
-      accessibilityRole="radiogroup"
-    >
-      {LANGUAGE_OPTIONS.map((option) => {
-        const selected = locale === option.code;
-        const changing = changingLocale === option.code;
-        const optionDisabled =
-          disabled || Boolean(changingLocale);
+  const animatedWidth = expansion.interpolate({
+    inputRange: [0, 1],
+    outputRange: [
+      COLLAPSED_WIDTH,
+      EXPANDED_WIDTH,
+    ],
+  });
 
-        return (
-          <TouchableOpacity
-            key={option.code}
+  const optionsOpacity = expansion.interpolate({
+    inputRange: [0, 0.35, 1],
+    outputRange: [0, 0, 1],
+  });
+
+  const collapsedOpacity = expansion.interpolate({
+    inputRange: [0, 0.65, 1],
+    outputRange: [1, 0, 0],
+  });
+
+  const currentOption =
+    LANGUAGE_OPTIONS.find(
+      (option) => option.code === locale
+    ) || LANGUAGE_OPTIONS[0];
+
+  return (
+    <Animated.View
+      style={[
+        styles.wrapper,
+        {
+          width: animatedWidth,
+        },
+        style,
+      ]}
+    >
+      <Animated.View
+        pointerEvents={expanded ? 'none' : 'auto'}
+        style={[
+          styles.collapsedLayer,
+          {
+            opacity: collapsedOpacity,
+          },
+        ]}
+      >
+        <TouchableOpacity
+          style={[
+            styles.option,
+            styles.optionSelected,
+            disabled && styles.optionDisabled,
+          ]}
+          onPress={toggleExpanded}
+          disabled={disabled || Boolean(changingLocale)}
+          activeOpacity={0.72}
+          accessibilityRole="button"
+          accessibilityState={{
+            expanded,
+            disabled:
+              disabled || Boolean(changingLocale),
+          }}
+          accessibilityLabel={`${t(
+            `languages.${currentOption.code}`
+          )}. ${t('settings.languagePicker.title', {
+            defaultValue: 'Change language',
+          })}`}
+        >
+          <Text
             style={[
-              styles.option,
-              selected && styles.optionSelected,
-              optionDisabled && styles.optionDisabled,
+              styles.optionText,
+              styles.optionTextSelected,
             ]}
-            onPress={() => handleChange(option.code)}
-            disabled={optionDisabled}
-            activeOpacity={0.72}
-            accessibilityRole="radio"
-            accessibilityState={{
-              selected,
-              disabled: optionDisabled,
-            }}
-            accessibilityLabel={t(
-              `languages.${option.code}`
-            )}
           >
-            {changing ? (
-              <ActivityIndicator
-                size="small"
-                color={
-                  colors.accentStrong ||
-                  colors.tealDark
-                }
-              />
-            ) : (
-              <Text
-                style={[
-                  styles.optionText,
-                  selected &&
-                    styles.optionTextSelected,
-                ]}
-              >
-                {option.label}
-              </Text>
-            )}
-          </TouchableOpacity>
-        );
-      })}
-    </View>
+            {currentOption.label}
+          </Text>
+        </TouchableOpacity>
+      </Animated.View>
+
+      <Animated.View
+        pointerEvents={expanded ? 'auto' : 'none'}
+        style={[
+          styles.optionsLayer,
+          {
+            opacity: optionsOpacity,
+          },
+        ]}
+        accessibilityRole="radiogroup"
+      >
+        {LANGUAGE_OPTIONS.map((option) => {
+          const selected =
+            locale === option.code;
+
+          const changing =
+            changingLocale === option.code;
+
+          const optionDisabled =
+            disabled ||
+            Boolean(changingLocale);
+
+          return (
+            <TouchableOpacity
+              key={option.code}
+              style={[
+                styles.option,
+                selected && styles.optionSelected,
+                optionDisabled &&
+                  styles.optionDisabled,
+              ]}
+              onPress={() =>
+                handleChange(option.code)
+              }
+              disabled={optionDisabled}
+              activeOpacity={0.72}
+              accessibilityRole="radio"
+              accessibilityState={{
+                selected,
+                disabled: optionDisabled,
+              }}
+              accessibilityLabel={t(
+                `languages.${option.code}`
+              )}
+            >
+              {changing ? (
+                <ActivityIndicator
+                  size="small"
+                  color={
+                    colors.accentStrong ||
+                    colors.tealDark
+                  }
+                />
+              ) : (
+                <Text
+                  style={[
+                    styles.optionText,
+                    selected &&
+                      styles.optionTextSelected,
+                  ]}
+                >
+                  {option.label}
+                </Text>
+              )}
+            </TouchableOpacity>
+          );
+        })}
+      </Animated.View>
+    </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
   wrapper: {
     alignSelf: 'flex-end',
+    height: COLLAPSED_WIDTH,
+    borderRadius: COLLAPSED_WIDTH / 2,
+    backgroundColor:
+      'rgba(255, 255, 255, 0.62)',
+    borderWidth: 1,
+    borderColor:
+      'rgba(14, 116, 144, 0.12)',
+    overflow: 'hidden',
+    direction: 'ltr',
+  },
+
+  collapsedLayer: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  optionsLayer: {
+    flex: 1,
     flexDirection: 'row',
     direction: 'ltr',
     alignItems: 'center',
-    padding: 3,
-    borderRadius: spacing.radii.pill,
-    backgroundColor: 'rgba(255, 255, 255, 0.62)',
-    borderWidth: 1,
-    borderColor: 'rgba(14, 116, 144, 0.12)',
+    justifyContent: 'space-between',
+    paddingHorizontal: 2,
   },
 
   option: {
-    minWidth: 38,
-    minHeight: 32,
-    paddingHorizontal: spacing.sm,
-    borderRadius: spacing.radii.pill,
+    width: CIRCLE_SIZE,
+    height: CIRCLE_SIZE,
+    borderRadius: CIRCLE_SIZE / 2,
     alignItems: 'center',
     justifyContent: 'center',
   },
 
   optionSelected: {
-    backgroundColor: 'rgba(14, 116, 144, 0.14)',
+    backgroundColor:
+      'rgba(14, 116, 144, 0.14)',
   },
 
   optionDisabled: {
@@ -155,11 +302,15 @@ const styles = StyleSheet.create({
     ...typography.caption,
     fontSize: 12,
     fontWeight: '600',
-    color: colors.textSecondary || colors.textMuted,
+    color:
+      colors.textSecondary ||
+      colors.textMuted,
   },
 
   optionTextSelected: {
-    color: colors.accentStrong || colors.tealDark,
+    color:
+      colors.accentStrong ||
+      colors.tealDark,
     fontWeight: '800',
   },
 });
