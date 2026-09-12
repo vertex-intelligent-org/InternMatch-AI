@@ -114,7 +114,7 @@ def complete_signup(
     }
 
     try:
-        StudentProfileRepository.upsert_by_user_id(
+        StudentProfileRepository.create_by_user_id(
             db=db,
             user_id=current_user.user_id,
             full_name=full_name,

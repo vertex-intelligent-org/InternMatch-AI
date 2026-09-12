@@ -87,6 +87,38 @@ class StudentProfileRepository:
         return profile
 
     @staticmethod
+    def create_by_user_id(
+        db: Session,
+        user_id: UUID,
+        full_name: str,
+        headline: Optional[str] = None,
+        cv_storage_path: Optional[str] = None,
+        preferences: Optional[Dict[str, Any]] = None,
+    ) -> StudentProfile:
+        """
+        Create a canonical profile exactly once for the authenticated user_id.
+
+        This method is intentionally create-only. It never reads or updates an
+        existing profile. Database uniqueness on student_profiles.user_id is the
+        authoritative race-safety barrier for concurrent account provisioning.
+
+        Flushes session state; does not commit transaction (owned by endpoint layer).
+        """
+        now = datetime.now(timezone.utc)
+        profile = StudentProfile(
+            user_id=user_id,
+            full_name=full_name,
+            headline=headline,
+            cv_storage_path=cv_storage_path,
+            preferences=preferences or {},
+            created_at=now,
+            updated_at=now,
+        )
+        db.add(profile)
+        db.flush()
+        return profile
+
+    @staticmethod
     def sync_student_skills(
         db: Session,
         student_id: UUID,

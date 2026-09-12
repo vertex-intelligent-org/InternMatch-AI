@@ -18,6 +18,7 @@ from app.core.security import (
     verify_jwt_token,
 )
 from app.db.models import StudentProfile
+from app.repositories.student_profile import StudentProfileRepository
 from fastapi import APIRouter, Depends, FastAPI, HTTPException
 from fastapi.testclient import TestClient
 
@@ -570,6 +571,77 @@ def test_complete_signup_rejects_duplicate_profile_without_role_mutation(
         )
         assert profile.full_name == "Existing Student"
         assert profile.preferences["account_type"] == "intern"
+    finally:
+        db.close()
+
+
+def test_complete_signup_rejects_raced_duplicate_without_role_mutation(
+    client: TestClient,
+    mock_supabase_auth,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """
+    A stale pre-check must never allow complete-signup to repurpose a profile
+    that appears before the create write. Database uniqueness must turn the
+    raced duplicate into 409 without mutating the existing canonical role.
+    """
+    user_id = uuid4()
+
+    db = TestingSessionLocal()
+    try:
+        db.add(
+            StudentProfile(
+                user_id=user_id,
+                full_name="Concurrent Student",
+                preferences={"account_type": "intern", "department": "Engineering"},
+            )
+        )
+        db.commit()
+    finally:
+        db.close()
+
+    original_get_by_user_id = StudentProfileRepository.get_by_user_id
+    lookup_count = 0
+
+    def stale_then_current_lookup(db, user_id):
+        nonlocal lookup_count
+        lookup_count += 1
+
+        if lookup_count == 1:
+            return None
+
+        return original_get_by_user_id(db, user_id=user_id)
+
+    monkeypatch.setattr(
+        StudentProfileRepository,
+        "get_by_user_id",
+        staticmethod(stale_then_current_lookup),
+    )
+
+    token = f"valid-user-{user_id}"
+    response = client.post(
+        "/api/v1/auth/complete-signup",
+        json={
+            "full_name": "Attempted Employer",
+            "department": "Talent",
+            "account_type": "employer",
+        },
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 409
+    assert lookup_count == 1
+
+    db = TestingSessionLocal()
+    try:
+        profile = (
+            db.query(StudentProfile)
+            .filter(StudentProfile.user_id == user_id)
+            .one()
+        )
+        assert profile.full_name == "Concurrent Student"
+        assert profile.preferences["account_type"] == "intern"
+        assert profile.preferences["department"] == "Engineering"
     finally:
         db.close()
 
