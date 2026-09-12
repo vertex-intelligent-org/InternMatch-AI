@@ -15,6 +15,7 @@ from app.db.session import get_db
 from app.repositories.candidate_profile_write import (
     replace_candidate_profile_from_extraction,
 )
+from app.repositories.match import MatchRepository
 from app.repositories.matching_data import MatchingDataRepository
 from app.repositories.processing_job import ProcessingJobRepository
 from app.repositories.student_profile import StudentProfileRepository
@@ -635,8 +636,8 @@ def confirm_cv_replacement(
     enforce_rate_limit(user_id=current_user.user_id, scope="cv_confirm")
 
     # Serialize confirmations for the same user-owned CV job.
-    # The row lock remains held through replacement, embedding, and the
-    # confirmed=True commit below, so concurrent replays observe final state.
+    # The row lock remains held through replacement and the confirmed=True
+    # commit below, so concurrent replays observe final state.
     job = ProcessingJobRepository.get_by_id_and_user_id_for_update(
         db=db,
         job_id=payload.job_id,
@@ -739,6 +740,17 @@ def confirm_cv_replacement(
             extracted=extracted_profile,
         )
 
+        # The accepted CV changes the canonical ranking inputs.
+        # Existing matches therefore belong to the previous profile
+        # revision and must never remain visible as current results.
+        # Keep invalidation in the same transaction as replacement:
+        # rollback restores both if confirmation fails.
+        MatchRepository.delete_stale_matches(
+            db=db,
+            student_id=profile.id,
+            current_internship_ids=[],
+        )
+
         updated_result = dict(job_result)
         updated_result["requires_confirmation"] = False
         updated_result["confirmed"] = True
@@ -777,23 +789,10 @@ def confirm_cv_replacement(
 
         raise
 
-    # Candidate embedding is derived post-processing.
-    # The confirmed CV/profile replacement above is already canonical
-    # user benefit and must not be rolled back if embedding temporarily
-    # fails. Embedding can be regenerated independently.
-    try:
-        generate_and_persist_candidate_embedding(
-            db=db,
-            user_id=current_user.user_id,
-        )
-        db.commit()
-    except Exception as embedding_exc:
-        db.rollback()
-        logger.warning(
-            "Candidate embedding generation failed after confirmed "
-            "CV replacement: %s",
-            type(embedding_exc).__name__,
-        )
+    # Do not block the confirmation response on candidate embedding.
+    # The match-calculation worker regenerates and persists the canonical
+    # candidate embedding before calculating matches. The profile replacement
+    # and quota settlement above are already the authoritative user benefit.
 
     # Trigger initial match calculation after successful confirmed commit
     try:

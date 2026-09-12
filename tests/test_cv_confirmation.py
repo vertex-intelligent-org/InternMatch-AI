@@ -305,7 +305,7 @@ def test_confirm_endpoint_executes_replacement_and_enqueues_matches(monkeypatch)
         db.add(job)
         db.commit()
 
-        # Mock embedding & match queue
+        # Embedding is deferred to the match worker; mock the endpoint symbol to prove confirmation does not call it.
         mock_embed = MagicMock()
         monkeypatch.setattr(
             "app.api.v1.endpoints.profile.generate_and_persist_candidate_embedding",
@@ -331,7 +331,7 @@ def test_confirm_endpoint_executes_replacement_and_enqueues_matches(monkeypatch)
         data1 = res1.json()
         assert data1["status"] == "completed"
         assert "profile_id" in data1
-        mock_embed.assert_called_once()
+        mock_embed.assert_not_called()
         mock_enqueue.assert_called_once()
 
         # Inspect updated DB state
@@ -504,7 +504,7 @@ def test_confirm_endpoint_marks_match_job_failed_when_enqueue_fails(monkeypatch)
 
         # CV replacement itself succeeded; matching is best-effort.
         assert response.status_code == 200
-        mock_embed.assert_called_once()
+        mock_embed.assert_not_called()
         mock_enqueue.assert_called_once()
 
         db.expire_all()
