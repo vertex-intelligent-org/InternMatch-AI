@@ -1,6 +1,7 @@
 module.exports = ({ config }) => {
-  const isProduction =
-    process.env.APP_VARIANT === "production";
+  const variant = process.env.APP_VARIANT;
+  const isProduction = variant === "production";
+  const isDevelopment = variant === "development";
 
   const plugins = config.plugins.map((plugin) => {
     if (
@@ -24,6 +25,19 @@ module.exports = ({ config }) => {
 
   return {
     ...config,
+    name: isDevelopment ? "InternMatch AI Dev" : config.name,
+    android: {
+      ...config.android,
+      package: isDevelopment
+        ? "com.aissclub.internmatchai.dev"
+        : config.android.package,
+    },
+    ios: {
+      ...config.ios,
+      bundleIdentifier: isDevelopment
+        ? "com.aissclub.internmatchai.dev"
+        : config.ios.bundleIdentifier,
+    },
     plugins,
   };
 };

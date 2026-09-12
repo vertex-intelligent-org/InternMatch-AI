@@ -25,6 +25,10 @@ function resolveApiBaseUrl(): string {
     process.env.EXPO_PUBLIC_API_URL ?? ''
   ).replace(/\/+$/, '');
 
+  if (configuredApiBaseUrl) {
+    return configuredApiBaseUrl;
+  }
+
   if (__DEV__) {
     const developmentHost = resolveExpoDevelopmentHost();
 
@@ -33,7 +37,7 @@ function resolveApiBaseUrl(): string {
     }
   }
 
-  return configuredApiBaseUrl;
+  return '';
 }
 
 const apiBaseUrl = resolveApiBaseUrl();
