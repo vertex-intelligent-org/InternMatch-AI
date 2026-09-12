@@ -109,6 +109,13 @@ def _create_profile(
                     tax_number=None,
                     representative_name=full_name,
                     representative_role="Recruiter",
+                    organization_type="company",
+                    verification_method=(
+                        "standard_company"
+                        if employer_verification_status
+                        in {"verified", "suspended"}
+                        else None
+                    ),
                     verification_status=(
                         employer_verification_status
                     ),

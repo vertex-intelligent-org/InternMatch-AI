@@ -71,6 +71,8 @@ class EmployerOrganizationRepository:
             tax_number=tax_number,
             representative_name=representative_name,
             representative_role=representative_role,
+            organization_type="company",
+            verification_method=None,
             verification_status="unverified",
             submitted_at=None,
             reviewed_at=None,
@@ -177,6 +179,8 @@ class EmployerOrganizationRepository:
         new_status: str,
         reviewer_user_id: Optional[UUID] = None,
         rejection_reason_code: Optional[str] = None,
+        organization_type: Optional[str] = None,
+        verification_method: Optional[str] = None,
         submitted_at: Optional[datetime] = None,
         reviewed_at: Optional[datetime] = None,
         clear_reviewed_at: bool = False,
@@ -189,6 +193,18 @@ class EmployerOrganizationRepository:
         organization.verification_status = new_status
         organization.reviewed_by = reviewer_user_id
         organization.rejection_reason_code = rejection_reason_code
+
+        if organization_type is not None:
+            organization.organization_type = organization_type
+
+        if new_status in {
+            "unverified",
+            "pending",
+            "rejected",
+        }:
+            organization.verification_method = None
+        elif verification_method is not None:
+            organization.verification_method = verification_method
 
         if submitted_at is not None:
             organization.submitted_at = submitted_at
@@ -211,6 +227,7 @@ class EmployerOrganizationRepository:
         new_status: str,
         previous_status: Optional[str] = None,
         reviewer_user_id: Optional[UUID] = None,
+        verification_method: Optional[str] = None,
         reason_code: Optional[str] = None,
         internal_note: Optional[str] = None,
     ) -> EmployerVerificationEvent:
@@ -221,6 +238,7 @@ class EmployerOrganizationRepository:
             action=action,
             previous_status=previous_status,
             new_status=new_status,
+            verification_method=verification_method,
             reason_code=reason_code,
             internal_note=internal_note,
             created_at=datetime.now(timezone.utc),

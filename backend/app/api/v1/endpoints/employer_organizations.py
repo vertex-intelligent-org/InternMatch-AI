@@ -45,6 +45,17 @@ VerificationStatus = Literal[
     "suspended",
 ]
 
+OrganizationType = Literal[
+    "company",
+    "university_lab",
+    "research_center",
+]
+
+VerificationMethod = Literal[
+    "standard_company",
+    "manual_admin",
+]
+
 RejectionReasonCode = Literal[
     "company_not_found",
     "registration_mismatch",
@@ -84,6 +95,8 @@ class EmployerOrganizationResponse(BaseModel):
     tax_number: Optional[str]
     representative_name: str
     representative_role: str
+    organization_type: OrganizationType
+    verification_method: Optional[VerificationMethod]
     verification_status: VerificationStatus
     submitted_at: Optional[datetime]
     reviewed_at: Optional[datetime]
@@ -95,6 +108,8 @@ class EmployerOrganizationResponse(BaseModel):
 class AdminApprovalRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    organization_type: OrganizationType = "company"
+    verification_method: VerificationMethod = "standard_company"
     internal_note: Optional[str] = None
 
 
@@ -320,6 +335,8 @@ def _organization_response(
         tax_number=organization.tax_number,
         representative_name=organization.representative_name,
         representative_role=organization.representative_role,
+        organization_type=organization.organization_type,
+        verification_method=organization.verification_method,
         verification_status=organization.verification_status,
         submitted_at=organization.submitted_at,
         reviewed_at=organization.reviewed_at,
@@ -630,6 +647,31 @@ def approve_organization(
             detail="Only pending organizations may be approved.",
         )
 
+    organization_type = payload.organization_type
+    verification_method = payload.verification_method
+    internal_note = _clean_optional(payload.internal_note)
+
+    if (
+        organization_type != "company"
+        and verification_method != "manual_admin"
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "Non-company organizations require manual "
+                "administrative verification."
+            ),
+        )
+
+    if verification_method == "manual_admin" and internal_note is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "Manual administrative verification requires "
+                "an internal review note."
+            ),
+        )
+
     now = datetime.now(timezone.utc)
 
     try:
@@ -639,6 +681,8 @@ def approve_organization(
             new_status="verified",
             reviewer_user_id=admin_user.user_id,
             rejection_reason_code=None,
+            organization_type=organization_type,
+            verification_method=verification_method,
             reviewed_at=now,
         )
 
@@ -649,9 +693,13 @@ def approve_organization(
             action="approved",
             previous_status="pending",
             new_status="verified",
-            internal_note=_clean_optional(
-                payload.internal_note
+            verification_method=verification_method,
+            reason_code=(
+                "manual_admin_verification"
+                if verification_method == "manual_admin"
+                else None
             ),
+            internal_note=internal_note,
         )
 
         (
@@ -801,6 +849,7 @@ def suspend_organization(
             action="suspended",
             previous_status="verified",
             new_status="suspended",
+            verification_method=organization.verification_method,
             reason_code=reason_code,
             internal_note=_clean_optional(
                 payload.internal_note

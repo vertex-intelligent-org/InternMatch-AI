@@ -109,6 +109,8 @@ def test_employer_organization_starts_unverified():
         db.refresh(organization)
 
         assert organization.owner_user_id == owner_user_id
+        assert organization.organization_type == "company"
+        assert organization.verification_method is None
         assert organization.verification_status == "unverified"
         assert organization.reviewed_by is None
         assert organization.reviewed_at is None
@@ -174,6 +176,7 @@ def test_verification_audit_event_is_persisted():
             action="approved",
             previous_status="pending",
             new_status="verified",
+            verification_method="manual_admin",
             internal_note="Registry and domain manually reviewed.",
         )
 
@@ -185,6 +188,7 @@ def test_verification_audit_event_is_persisted():
         assert event.action == "approved"
         assert event.previous_status == "pending"
         assert event.new_status == "verified"
+        assert event.verification_method == "manual_admin"
     finally:
         db.close()
 
@@ -233,3 +237,63 @@ def test_migration_019_contains_server_authoritative_trust_constraints():
         "ON TABLE public.employer_verification_events\n"
         "TO service_role"
     ) in migration
+
+
+def test_invalid_employer_organization_type_rejected_by_database():
+    db = TestingSessionLocal()
+    try:
+        organization = _create_organization(db, uuid4())
+        organization.organization_type = "self_declared_lab"
+
+        with pytest.raises(IntegrityError):
+            db.flush()
+
+        db.rollback()
+    finally:
+        db.close()
+
+
+def test_invalid_employer_verification_method_rejected_by_database():
+    db = TestingSessionLocal()
+    try:
+        organization = _create_organization(db, uuid4())
+        organization.verification_status = "verified"
+        organization.verification_method = "self_verified"
+
+        with pytest.raises(IntegrityError):
+            db.flush()
+
+        db.rollback()
+    finally:
+        db.close()
+
+
+def test_verified_employer_requires_verification_method():
+    db = TestingSessionLocal()
+    try:
+        organization = _create_organization(db, uuid4())
+        organization.verification_status = "verified"
+        organization.verification_method = None
+
+        with pytest.raises(IntegrityError):
+            db.flush()
+
+        db.rollback()
+    finally:
+        db.close()
+
+
+def test_non_company_cannot_use_standard_company_verification():
+    db = TestingSessionLocal()
+    try:
+        organization = _create_organization(db, uuid4())
+        organization.organization_type = "university_lab"
+        organization.verification_status = "verified"
+        organization.verification_method = "standard_company"
+
+        with pytest.raises(IntegrityError):
+            db.flush()
+
+        db.rollback()
+    finally:
+        db.close()

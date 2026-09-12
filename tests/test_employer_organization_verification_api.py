@@ -264,6 +264,8 @@ def test_business_email_must_match_authenticated_email(
         "reviewed_by",
         "reviewed_at",
         "rejection_reason_code",
+        "organization_type",
+        "verification_method",
     ],
 )
 def test_employer_cannot_inject_verification_authority_fields(
@@ -439,6 +441,8 @@ def test_admin_can_approve_pending_organization(
     assert response.status_code == 200
     approved = response.json()
     assert approved["verification_status"] == "verified"
+    assert approved["organization_type"] == "company"
+    assert approved["verification_method"] == "standard_company"
     assert approved["reviewed_at"] is not None
 
     db = TestingSessionLocal()
@@ -449,6 +453,8 @@ def test_admin_can_approve_pending_organization(
         )
         assert stored is not None
         assert stored.reviewed_by == admin_user_id
+        assert stored.organization_type == "company"
+        assert stored.verification_method == "standard_company"
 
         event = (
             db.query(EmployerVerificationEvent)
@@ -461,6 +467,8 @@ def test_admin_can_approve_pending_organization(
             .one()
         )
         assert event.reviewer_user_id == admin_user_id
+        assert event.verification_method == "standard_company"
+        assert event.reason_code is None
         assert event.internal_note == (
             "Registry and company domain reviewed."
         )
@@ -646,6 +654,7 @@ def test_admin_suspension_deactivates_employer_listings(
             .one()
         )
         assert event.reason_code == "suspected_abuse"
+        assert event.verification_method == "standard_company"
     finally:
         db.close()
 
@@ -686,3 +695,207 @@ def test_admin_queue_defaults_to_pending(
     }
 
     assert organization["id"] in returned_ids
+
+
+@pytest.mark.parametrize(
+    "organization_type",
+    [
+        "university_lab",
+        "research_center",
+    ],
+)
+def test_admin_can_manually_verify_academic_organization(
+    client: TestClient,
+    mock_supabase_auth,
+    monkeypatch,
+    organization_type,
+):
+    owner_user_id = uuid4()
+
+    token, organization = _create_org_via_api(
+        client,
+        mock_supabase_auth,
+        user_id=owner_user_id,
+    )
+
+    _submit_org(
+        client,
+        token=token,
+    )
+
+    admin_user_id, headers = _admin_headers(
+        mock_supabase_auth,
+        monkeypatch,
+    )
+
+    response = client.post(
+        (
+            "/api/v1/admin/employer-organizations/"
+            f"{organization['id']}/approve"
+        ),
+        json={
+            "organization_type": organization_type,
+            "verification_method": "manual_admin",
+            "internal_note": (
+                "Academic organization manually verified "
+                "against institutional evidence."
+            ),
+        },
+        headers=headers,
+    )
+
+    assert response.status_code == 200
+
+    approved = response.json()
+
+    assert approved["verification_status"] == "verified"
+    assert approved["organization_type"] == organization_type
+    assert approved["verification_method"] == "manual_admin"
+
+    db = TestingSessionLocal()
+    try:
+        stored = db.get(
+            EmployerOrganization,
+            UUID(organization["id"]),
+        )
+
+        assert stored is not None
+        assert stored.organization_type == organization_type
+        assert stored.verification_method == "manual_admin"
+        assert stored.reviewed_by == admin_user_id
+        assert stored.reviewed_at is not None
+
+        event = (
+            db.query(EmployerVerificationEvent)
+            .filter(
+                EmployerVerificationEvent.organization_id
+                == UUID(organization["id"]),
+                EmployerVerificationEvent.action
+                == "approved",
+            )
+            .one()
+        )
+
+        assert event.reviewer_user_id == admin_user_id
+        assert event.verification_method == "manual_admin"
+        assert event.reason_code == "manual_admin_verification"
+        assert event.internal_note == (
+            "Academic organization manually verified "
+            "against institutional evidence."
+        )
+    finally:
+        db.close()
+
+
+@pytest.mark.parametrize(
+    "organization_type",
+    [
+        "university_lab",
+        "research_center",
+    ],
+)
+def test_non_company_approval_rejects_standard_company_method(
+    client: TestClient,
+    mock_supabase_auth,
+    monkeypatch,
+    organization_type,
+):
+    owner_user_id = uuid4()
+
+    token, organization = _create_org_via_api(
+        client,
+        mock_supabase_auth,
+        user_id=owner_user_id,
+    )
+
+    _submit_org(
+        client,
+        token=token,
+    )
+
+    _, headers = _admin_headers(
+        mock_supabase_auth,
+        monkeypatch,
+    )
+
+    response = client.post(
+        (
+            "/api/v1/admin/employer-organizations/"
+            f"{organization['id']}/approve"
+        ),
+        json={
+            "organization_type": organization_type,
+            "verification_method": "standard_company",
+            "internal_note": "Must fail closed.",
+        },
+        headers=headers,
+    )
+
+    assert response.status_code == 422
+
+    db = TestingSessionLocal()
+    try:
+        stored = db.get(
+            EmployerOrganization,
+            UUID(organization["id"]),
+        )
+
+        assert stored is not None
+        assert stored.verification_status == "pending"
+        assert stored.organization_type == "company"
+        assert stored.verification_method is None
+    finally:
+        db.close()
+
+
+def test_manual_admin_approval_requires_internal_note(
+    client: TestClient,
+    mock_supabase_auth,
+    monkeypatch,
+):
+    owner_user_id = uuid4()
+
+    token, organization = _create_org_via_api(
+        client,
+        mock_supabase_auth,
+        user_id=owner_user_id,
+    )
+
+    _submit_org(
+        client,
+        token=token,
+    )
+
+    _, headers = _admin_headers(
+        mock_supabase_auth,
+        monkeypatch,
+    )
+
+    response = client.post(
+        (
+            "/api/v1/admin/employer-organizations/"
+            f"{organization['id']}/approve"
+        ),
+        json={
+            "organization_type": "university_lab",
+            "verification_method": "manual_admin",
+            "internal_note": "   ",
+        },
+        headers=headers,
+    )
+
+    assert response.status_code == 422
+
+    db = TestingSessionLocal()
+    try:
+        stored = db.get(
+            EmployerOrganization,
+            UUID(organization["id"]),
+        )
+
+        assert stored is not None
+        assert stored.verification_status == "pending"
+        assert stored.organization_type == "company"
+        assert stored.verification_method is None
+    finally:
+        db.close()

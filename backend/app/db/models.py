@@ -185,6 +185,40 @@ class EmployerOrganization(Base):
             "('unverified', 'pending', 'verified', 'rejected', 'suspended')",
             name="ck_employer_organizations_verification_status",
         ),
+        CheckConstraint(
+            "organization_type IN "
+            "('company', 'university_lab', 'research_center')",
+            name="ck_employer_organizations_organization_type",
+        ),
+        CheckConstraint(
+            "verification_method IS NULL OR "
+            "verification_method IN "
+            "('standard_company', 'manual_admin')",
+            name="ck_employer_organizations_verification_method",
+        ),
+        CheckConstraint(
+            "("
+            "verification_status IN ('verified', 'suspended') "
+            "AND verification_method IS NOT NULL"
+            ") OR ("
+            "verification_status IN "
+            "('unverified', 'pending', 'rejected') "
+            "AND verification_method IS NULL"
+            ")",
+            name=(
+                "ck_employer_organizations_"
+                "verification_method_status"
+            ),
+        ),
+        CheckConstraint(
+            "organization_type = 'company' "
+            "OR verification_method IS NULL "
+            "OR verification_method = 'manual_admin'",
+            name=(
+                "ck_employer_organizations_"
+                "non_company_manual_verification"
+            ),
+        ),
     )
 
     id: Mapped[UUID] = mapped_column(
@@ -225,6 +259,15 @@ class EmployerOrganization(Base):
         nullable=False,
         default="unverified",
         index=True,
+    )
+    organization_type: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+        default="company",
+    )
+    verification_method: Mapped[Optional[str]] = mapped_column(
+        String,
+        nullable=True,
     )
     submitted_at: Mapped[Optional[datetime]] = mapped_column(
         nullable=True,
@@ -268,6 +311,15 @@ class EmployerVerificationEvent(Base):
             "'approved', 'rejected', 'suspended')",
             name="ck_employer_verification_events_action",
         ),
+        CheckConstraint(
+            "verification_method IS NULL OR "
+            "verification_method IN "
+            "('standard_company', 'manual_admin')",
+            name=(
+                "ck_employer_verification_events_"
+                "verification_method"
+            ),
+        ),
     )
 
     id: Mapped[UUID] = mapped_column(
@@ -297,6 +349,10 @@ class EmployerVerificationEvent(Base):
     new_status: Mapped[str] = mapped_column(
         String,
         nullable=False,
+    )
+    verification_method: Mapped[Optional[str]] = mapped_column(
+        String,
+        nullable=True,
     )
     reason_code: Mapped[Optional[str]] = mapped_column(
         String,
