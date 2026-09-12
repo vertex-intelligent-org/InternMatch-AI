@@ -22,7 +22,7 @@ from app.schemas.application import (
     ApplicationSubmitRequest,
     ApplicationTrackerResponse,
 )
-from app.schemas.interview_prep import InterviewPrepResponse
+from app.schemas.job import AIJobAcceptedResponse
 from app.services.ai_quota import FEATURE_APPLICATION_SUPPORT
 from app.services.ai_quota_integration import (
     acquire_job_ai_quota_lock,
@@ -34,7 +34,7 @@ from app.services.ai_quota_integration import (
     reserve_job_ai_quota,
 )
 from app.services.application_enqueue import enqueue_application_generation
-from app.services.interview_prep import get_or_create_interview_prep
+from app.services.interview_prep_enqueue import enqueue_interview_prep_generation
 from fastapi import APIRouter, Depends, Header, HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -465,7 +465,8 @@ def update_application_status(
 
 @router.post(
     "/{id}/interview-prep",
-    response_model=InterviewPrepResponse,
+    response_model=AIJobAcceptedResponse,
+    status_code=status.HTTP_202_ACCEPTED,
 )
 def generate_interview_prep(
     id: UUID,
@@ -474,13 +475,25 @@ def generate_interview_prep(
     db: Session = Depends(get_db),
 ):
     """
-    Generate or retrieve cached AI interview preparation for the
-    authenticated candidate's scheduled interview.
+    Enqueue cancellable interview preparation for a scheduled interview.
+
+    Ownership and application/interview eligibility remain synchronous.
+    Fresh AI quota remains worker-owned so cached responses consume no credit.
     """
     enforce_rate_limit(
         user_id=current_user.user_id,
         scope="interview_prep",
     )
+
+    normalized_locale = (
+        content_locale or "en"
+    ).strip().lower()
+
+    if normalized_locale not in {"en", "tr", "ar"}:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="content_locale must be one of: en, tr, ar.",
+        )
 
     record = ApplicationRepository.get_with_internship_for_user(
         db=db,
@@ -499,31 +512,79 @@ def generate_interview_prep(
     if internship is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Interview preparation requires an internship-linked application.",
+            detail=(
+                "Interview preparation requires an "
+                "internship-linked application."
+            ),
         )
 
     if application.status != "interviewing":
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Interview preparation is available only during the interviewing stage.",
+            detail=(
+                "Interview preparation is available only "
+                "during the interviewing stage."
+            ),
         )
 
     if application.interview_scheduled_at is None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Interview preparation requires a scheduled interview.",
+            detail=(
+                "Interview preparation requires a scheduled interview."
+            ),
         )
 
     try:
-        return get_or_create_interview_prep(
+        processing_job = ProcessingJobRepository.create(
             db=db,
-            application=application,
-            internship=internship,
             user_id=current_user.user_id,
-            content_locale=content_locale,
+            job_type="interview_prep",
         )
-    except ValueError as exc:
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+
+    try:
+        enqueue_interview_prep_generation(
+            job_id=processing_job.id,
+            user_id=current_user.user_id,
+            application_id=id,
+            content_locale=normalized_locale,
+        )
+    except Exception:
+        db.rollback()
+
+        try:
+            failed_job = (
+                ProcessingJobRepository
+                .get_by_id_and_user_id_for_update(
+                    db=db,
+                    job_id=processing_job.id,
+                    user_id=current_user.user_id,
+                )
+            )
+
+            if failed_job is not None:
+                failed_job.status = "failed"
+                failed_job.progress_percent = 100
+                failed_job.result = None
+                failed_job.error = (
+                    "Failed to enqueue interview preparation."
+                )
+
+            db.commit()
+        except Exception:
+            db.rollback()
+
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="AI interview preparation is temporarily unavailable.",
-        ) from exc
+            detail="Failed to enqueue interview preparation.",
+        ) from None
+
+    return AIJobAcceptedResponse(
+        job_id=processing_job.id,
+        status="queued",
+        message="Interview preparation generation enqueued.",
+    )

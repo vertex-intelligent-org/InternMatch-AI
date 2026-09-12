@@ -11,7 +11,7 @@ using a content-derived context hash.
 
 import hashlib
 import json
-from typing import Literal
+from typing import Callable,  Literal, Optional
 from uuid import UUID
 
 from google import genai
@@ -25,10 +25,10 @@ from app.repositories.match import MatchRepository
 from app.repositories.matching_data import MatchingDataRepository
 from app.schemas.interview_prep import InterviewPrepResponse
 from app.services.ai_quota import FEATURE_INTERVIEW_PREP
-from app.services.ai_quota_integration import (
-    release_sync_ai_quota,
-    reserve_sync_ai_quota,
-    settle_sync_ai_quota,
+from app.services.ai_generation_quota import (
+    release_generation_ai_quota,
+    reserve_generation_ai_quota,
+    settle_generation_ai_quota,
 )
 from app.services.ai_telemetry import (
     ai_telemetry_context,
@@ -100,6 +100,10 @@ def get_or_create_interview_prep(
     internship: object,
     user_id: UUID,
     content_locale: str = "en",
+    processing_job_id: Optional[UUID] = None,
+    before_async_finalize: Optional[
+        Callable[[InterviewPrepResponse], None]
+    ] = None,
 ) -> InterviewPrepResponse:
     """
     Return cached or newly generated grounded interview preparation.
@@ -107,6 +111,50 @@ def get_or_create_interview_prep(
     Caller must already enforce candidate ownership of the application.
     Requires a scheduled application currently in the interviewing stage.
     """
+
+
+    def _reserve_interview_quota(
+        db_session: Session,
+        *,
+        user_id: UUID,
+        feature_key: str,
+        idempotency_key: str,
+        request_fingerprint: str,
+    ):
+        return reserve_generation_ai_quota(
+            db_session,
+            user_id=user_id,
+            feature_key=feature_key,
+            idempotency_key=idempotency_key,
+            request_fingerprint=request_fingerprint,
+            processing_job_id=processing_job_id,
+        )
+
+    def _settle_interview_quota(
+        db_session: Session,
+        *,
+        operation_id: UUID,
+    ):
+        return settle_generation_ai_quota(
+            db_session,
+            feature_key=FEATURE_INTERVIEW_PREP,
+            operation_id=operation_id,
+            processing_job_id=processing_job_id,
+        )
+
+    def _release_interview_quota(
+        db_session: Session,
+        *,
+        operation_id: UUID,
+        reason: str,
+    ):
+        return release_generation_ai_quota(
+            db_session,
+            feature_key=FEATURE_INTERVIEW_PREP,
+            operation_id=operation_id,
+            processing_job_id=processing_job_id,
+            reason=reason,
+        )
 
     locale = _normalize_locale(content_locale)
 
@@ -334,7 +382,7 @@ STRICT GROUNDING RULES:
 
     application_id = getattr(application, "id")
 
-    quota_reservation = reserve_sync_ai_quota(
+    quota_reservation = _reserve_interview_quota(
         db,
         user_id=user_id,
         feature_key=FEATURE_INTERVIEW_PREP,
@@ -395,7 +443,7 @@ STRICT GROUNDING RULES:
     except Exception:
         db.rollback()
 
-        release_sync_ai_quota(
+        _release_interview_quota(
             db,
             operation_id=quota_operation_id,
             reason="provider_or_validation_failure",
@@ -403,8 +451,20 @@ STRICT GROUNDING RULES:
         db.commit()
         raise
 
+    response_payload = InterviewPrepResponse(
+        application_id=application_id,
+        interview_scheduled_at=scheduled_at,
+        **generated.model_dump(),
+    )
+
     try:
-        settle_sync_ai_quota(
+        if (
+            processing_job_id is not None
+            and before_async_finalize is not None
+        ):
+            before_async_finalize(response_payload)
+
+        _settle_interview_quota(
             db,
             operation_id=quota_operation_id,
         )
@@ -412,7 +472,7 @@ STRICT GROUNDING RULES:
     except Exception:
         db.rollback()
 
-        release_sync_ai_quota(
+        _release_interview_quota(
             db,
             operation_id=quota_operation_id,
             reason="settlement_failure",
@@ -430,8 +490,4 @@ STRICT GROUNDING RULES:
         except Exception:
             pass
 
-    return InterviewPrepResponse(
-        application_id=getattr(application, "id"),
-        interview_scheduled_at=scheduled_at,
-        **generated.model_dump(),
-    )
+    return response_payload

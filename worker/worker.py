@@ -35,6 +35,9 @@ QUEUES = worker_settings.queue_list
 
 _PRELOAD_JOB_MODULES = (
     "tasks.application_generation",
+    "tasks.cv_extraction",
+    "tasks.match_explanation_generation",
+    "tasks.interview_prep_generation",
 )
 
 

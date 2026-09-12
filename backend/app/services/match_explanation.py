@@ -9,7 +9,7 @@ Supports locale-safe English DB persistence and Turkish/Arabic Redis caching.
 import hashlib
 import json
 import logging
-from typing import List, Optional
+from typing import Callable, List, Optional
 from uuid import UUID
 
 import redis
@@ -27,10 +27,10 @@ from app.schemas.match import (
     SkillGapAnalysisResponse,
 )
 from app.services.ai_quota import FEATURE_MATCH_EXPLANATION
-from app.services.ai_quota_integration import (
-    release_sync_ai_quota,
-    reserve_sync_ai_quota,
-    settle_sync_ai_quota,
+from app.services.ai_generation_quota import (
+    release_generation_ai_quota,
+    reserve_generation_ai_quota,
+    settle_generation_ai_quota,
 )
 from app.services.ai_telemetry import (
     ai_telemetry_context,
@@ -287,6 +287,10 @@ def get_or_create_match_explanation(
     match_id: UUID,
     user_id: UUID,
     content_locale: str = "en",
+    processing_job_id: Optional[UUID] = None,
+    before_async_finalize: Optional[
+        Callable[[MatchExplanationResponse], None]
+    ] = None,
 ) -> Optional[MatchExplanationResponse]:
     """
     Fetch an existing grounded match explanation or generate and cache one.
@@ -305,6 +309,50 @@ def get_or_create_match_explanation(
       - If localized generation/Redis fails, returns complete canonical English DB narrative
         as graceful fallback if available.
     """
+
+    def _reserve_match_quota(
+        db_session: Session,
+        *,
+        user_id: UUID,
+        feature_key: str,
+        idempotency_key: str,
+        request_fingerprint: str,
+    ):
+        return reserve_generation_ai_quota(
+            db_session,
+            user_id=user_id,
+            feature_key=feature_key,
+            idempotency_key=idempotency_key,
+            request_fingerprint=request_fingerprint,
+            processing_job_id=processing_job_id,
+        )
+
+    def _settle_match_quota(
+        db_session: Session,
+        *,
+        operation_id: UUID,
+    ):
+        return settle_generation_ai_quota(
+            db_session,
+            feature_key=FEATURE_MATCH_EXPLANATION,
+            operation_id=operation_id,
+            processing_job_id=processing_job_id,
+        )
+
+    def _release_match_quota(
+        db_session: Session,
+        *,
+        operation_id: UUID,
+        reason: str,
+    ):
+        return release_generation_ai_quota(
+            db_session,
+            feature_key=FEATURE_MATCH_EXPLANATION,
+            operation_id=operation_id,
+            processing_job_id=processing_job_id,
+            reason=reason,
+        )
+
     record = MatchRepository.get_match_with_details_for_user(
         db=db, match_id=match_id, user_id=user_id
     )
@@ -518,7 +566,7 @@ def get_or_create_match_explanation(
             internship_preferred_skills=internship.preferred_skills,
         )
 
-        quota_reservation = reserve_sync_ai_quota(
+        quota_reservation = _reserve_match_quota(
             db,
             user_id=user_id,
             feature_key=FEATURE_MATCH_EXPLANATION,
@@ -565,7 +613,25 @@ def get_or_create_match_explanation(
             updated_gap["recommendations"] = explanation.recommendations
             match.skill_gap_analysis = updated_gap
 
-            settle_sync_ai_quota(
+            response_payload = MatchExplanationResponse(
+                match_id=match.id,
+                overall_score=match.overall_score,
+                why_you_match=explanation.why_you_match,
+                matching_skills=matching_skills,
+                missing_skills=missing_skills,
+                skill_gap_analysis=SkillGapAnalysisResponse(
+                    summary=explanation.skill_gap_summary,
+                    recommendations=explanation.recommendations,
+                ),
+            )
+
+            if (
+                processing_job_id is not None
+                and before_async_finalize is not None
+            ):
+                before_async_finalize(response_payload)
+
+            _settle_match_quota(
                 db,
                 operation_id=quota_operation_id,
             )
@@ -574,7 +640,7 @@ def get_or_create_match_explanation(
         except Exception:
             db.rollback()
 
-            release_sync_ai_quota(
+            _release_match_quota(
                 db,
                 operation_id=quota_operation_id,
                 reason="generation_or_persistence_failure",
@@ -582,17 +648,7 @@ def get_or_create_match_explanation(
             db.commit()
             raise
 
-        return MatchExplanationResponse(
-            match_id=match.id,
-            overall_score=match.overall_score,
-            why_you_match=explanation.why_you_match,
-            matching_skills=matching_skills,
-            missing_skills=missing_skills,
-            skill_gap_analysis=SkillGapAnalysisResponse(
-                summary=explanation.skill_gap_summary,
-                recommendations=explanation.recommendations,
-            ),
-        )
+        return response_payload
 
     # -----------------------------------------------------------------------
     # 2. TURKISH / ARABIC LOCALE PATH (Redis cached, strictly zero DB mutations)
@@ -756,7 +812,7 @@ def get_or_create_match_explanation(
             "Match explanation service is temporarily unavailable."
         ) from redis_err
 
-    quota_reservation = reserve_sync_ai_quota(
+    quota_reservation = _reserve_match_quota(
         db,
         user_id=user_id,
         feature_key=FEATURE_MATCH_EXPLANATION,
@@ -796,7 +852,7 @@ def get_or_create_match_explanation(
     except Exception as gen_err:
         db.rollback()
 
-        release_sync_ai_quota(
+        _release_match_quota(
             db,
             operation_id=quota_operation_id,
             reason="provider_failure",
@@ -821,8 +877,26 @@ def get_or_create_match_explanation(
 
         return _build_deterministic_fallback_response()
 
+    response_payload = MatchExplanationResponse(
+        match_id=match.id,
+        overall_score=match.overall_score,
+        why_you_match=explanation.why_you_match,
+        matching_skills=matching_skills,
+        missing_skills=missing_skills,
+        skill_gap_analysis=SkillGapAnalysisResponse(
+            summary=explanation.skill_gap_summary,
+            recommendations=explanation.recommendations,
+        ),
+    )
+
     try:
-        settle_sync_ai_quota(
+        if (
+            processing_job_id is not None
+            and before_async_finalize is not None
+        ):
+            before_async_finalize(response_payload)
+
+        _settle_match_quota(
             db,
             operation_id=quota_operation_id,
         )
@@ -830,7 +904,7 @@ def get_or_create_match_explanation(
     except Exception:
         db.rollback()
 
-        release_sync_ai_quota(
+        _release_match_quota(
             db,
             operation_id=quota_operation_id,
             reason="settlement_failure",
@@ -849,14 +923,4 @@ def get_or_create_match_explanation(
     except Exception as cache_err:
         logger.warning("Failed to store localized match explanation in Redis: %s", cache_err)
 
-    return MatchExplanationResponse(
-        match_id=match.id,
-        overall_score=match.overall_score,
-        why_you_match=explanation.why_you_match,
-        matching_skills=matching_skills,
-        missing_skills=missing_skills,
-        skill_gap_analysis=SkillGapAnalysisResponse(
-            summary=explanation.skill_gap_summary,
-            recommendations=explanation.recommendations,
-        ),
-    )
+    return response_payload

@@ -1,6 +1,6 @@
 """
 Unit & Integration Tests for Grounded Match Explanation (Gate 2.27).
-Tests GET /api/v1/matches/{id}/explanation endpoint, authentication,
+Tests POST /api/v1/matches/{id}/explanation async endpoint authentication,
 tenant isolation, grounding from persisted match/profile data, LLM mocking,
 caching/persistence of why_you_match, and preservation of deterministic scores.
 """
@@ -91,10 +91,149 @@ def _mock_gemini_explanation_generate(monkeypatch, explanation_obj: LLMMatchExpl
 # ---------------------------------------------------------------------------
 
 
+
+class _DirectMatchExplanationResponse:
+    """Small adapter for legacy service-level assertions."""
+
+    def __init__(self, status_code, payload):
+        import json
+
+        self.status_code = status_code
+        self._payload = payload
+        self.text = json.dumps(
+            payload,
+            default=str,
+        )
+        self.content = self.text.encode(
+            "utf-8"
+        )
+
+    def json(self):
+        return self._payload
+
+
+def _direct_match_explanation_service_request(
+    url,
+    headers=None,
+    **_kwargs,
+):
+    """
+    Exercise the Match Explanation service directly.
+
+    The production HTTP boundary is now asynchronous POST/202.
+    Provider/cache/persistence behavior belongs at service level,
+    while endpoint auth/ownership/validation remain HTTP tests.
+    """
+    from urllib.parse import (
+        parse_qs,
+        urlparse,
+    )
+    from uuid import UUID
+
+    from app.services.match_explanation import (
+        get_or_create_match_explanation,
+    )
+
+    parsed = urlparse(str(url))
+    parts = [
+        part
+        for part in parsed.path.split("/")
+        if part
+    ]
+
+    if (
+        len(parts) < 3
+        or parts[-1] != "explanation"
+    ):
+        raise AssertionError(
+            f"Unexpected match explanation URL: {url}"
+        )
+
+    match_id = UUID(parts[-2])
+
+    query = parse_qs(
+        parsed.query
+    )
+
+    locale = query.get(
+        "content_locale",
+        ["en"],
+    )[0]
+
+    authorization = (
+        (headers or {})
+        .get("Authorization", "")
+        .strip()
+    )
+
+    prefix = "Bearer valid-user-"
+
+    if not authorization.startswith(
+        prefix
+    ):
+        return _DirectMatchExplanationResponse(
+            401,
+            {"detail": "Not authenticated"},
+        )
+
+    user_id = UUID(
+        authorization[len(prefix):]
+    )
+
+    db = TestingSessionLocal()
+
+    try:
+        try:
+            result = (
+                get_or_create_match_explanation(
+                    db=db,
+                    match_id=match_id,
+                    user_id=user_id,
+                    content_locale=locale,
+                )
+            )
+        except ValueError:
+            # The old synchronous endpoint translated
+            # service-availability ValueError to safe 503.
+            # Durable worker failure transport is covered
+            # separately by Part C worker tests.
+            return _DirectMatchExplanationResponse(
+                503,
+                {
+                    "detail":
+                    "Match explanation service is "
+                    "temporarily unavailable."
+                },
+            )
+        except Exception:
+            return _DirectMatchExplanationResponse(
+                500,
+                {
+                    "detail":
+                    "Failed to retrieve match explanation."
+                },
+            )
+
+        if result is None:
+            return _DirectMatchExplanationResponse(
+                404,
+                {"detail": "Match not found."},
+            )
+
+        return _DirectMatchExplanationResponse(
+            200,
+            result.model_dump(
+                mode="json"
+            ),
+        )
+    finally:
+        db.close()
+
+
 def test_unauthenticated_explanation_request_returns_401(client: TestClient):
     """Test 1: Unauthenticated GET returns 401 UNAUTHORIZED."""
     match_id = uuid4()
-    response = client.get(f"/api/v1/matches/{match_id}/explanation")
+    response = client.post(f"/api/v1/matches/{match_id}/explanation")
     assert response.status_code == 401
     data = response.json()
     assert data["detail"]["error"]["code"] == "UNAUTHORIZED"
@@ -106,7 +245,7 @@ def test_nonexistent_match_returns_404(client: TestClient):
     token = f"valid-user-{user_id}"
     nonexistent_id = uuid4()
 
-    response = client.get(
+    response = client.post(
         f"/api/v1/matches/{nonexistent_id}/explanation",
         headers={"Authorization": f"Bearer {token}"},
     )
@@ -156,7 +295,7 @@ def test_other_user_match_returns_404_tenant_isolation(client: TestClient):
     finally:
         db.close()
 
-    response = client.get(
+    response = client.post(
         f"/api/v1/matches/{target_match_id}/explanation",
         headers={"Authorization": f"Bearer {token_b}"},
     )
@@ -236,7 +375,7 @@ def test_authenticated_owner_gets_explanation_successfully(client: TestClient, m
     )
     _mock_gemini_explanation_generate(monkeypatch, mock_llm_output)
 
-    response = client.get(
+    response = _direct_match_explanation_service_request(
         f"/api/v1/matches/{target_match_id}/explanation",
         headers={"Authorization": f"Bearer {token}"},
     )
@@ -308,7 +447,7 @@ def test_generated_explanation_is_persisted_and_cached(client: TestClient, monke
     mock_client = _mock_gemini_explanation_generate(monkeypatch, mock_llm_output)
 
     # First call: triggers Gemini generate_content
-    resp1 = client.get(
+    resp1 = _direct_match_explanation_service_request(
         f"/api/v1/matches/{target_match_id}/explanation",
         headers={"Authorization": f"Bearer {token}"},
     )
@@ -335,7 +474,7 @@ def test_generated_explanation_is_persisted_and_cached(client: TestClient, monke
         db.close()
 
     # Second call: uses cached explanation (Gemini not called again)
-    resp2 = client.get(
+    resp2 = _direct_match_explanation_service_request(
         f"/api/v1/matches/{target_match_id}/explanation",
         headers={"Authorization": f"Bearer {token}"},
     )
@@ -397,7 +536,7 @@ def test_matching_and_missing_skills_are_never_overwritten_by_llm(client: TestCl
     )
     _mock_gemini_explanation_generate(monkeypatch, mock_llm_output)
 
-    resp = client.get(
+    resp = _direct_match_explanation_service_request(
         f"/api/v1/matches/{target_match_id}/explanation",
         headers={"Authorization": f"Bearer {token}"},
     )
@@ -458,7 +597,7 @@ def test_provider_failure_returns_safe_503_and_does_not_leak_secrets(
         failing_gemini,
     )
 
-    response = client.get(
+    response = _direct_match_explanation_service_request(
         f"/api/v1/matches/{target_match_id}/explanation",
         headers={"Authorization": f"Bearer {token}"},
     )
@@ -512,7 +651,7 @@ def test_malformed_canonical_skill_gap_handled_gracefully(client: TestClient, mo
     )
     _mock_gemini_explanation_generate(monkeypatch, mock_llm_output)
 
-    response = client.get(
+    response = _direct_match_explanation_service_request(
         f"/api/v1/matches/{target_match_id}/explanation",
         headers={"Authorization": f"Bearer {token}"},
     )
@@ -603,11 +742,11 @@ def test_get_match_explanation_rate_limited_returns_429(client: TestClient, monk
 
     llm_called = []
     monkeypatch.setattr(
-        "app.api.v1.endpoints.matches.get_or_create_match_explanation",
+        "app.api.v1.endpoints.matches.enqueue_match_explanation_generation",
         lambda *args, **kwargs: llm_called.append(1),
     )
 
-    response = client.get(
+    response = client.post(
         f"/api/v1/matches/{match_id}/explanation",
         headers={"Authorization": f"Bearer {token}"},
     )
@@ -719,7 +858,7 @@ def test_get_match_explanation_backward_compatible_default_locale(
     )
 
     # 1. No content_locale parameter
-    res_default = client.get(
+    res_default = _direct_match_explanation_service_request(
         f"/api/v1/matches/{target_match_id}/explanation",
         headers={"Authorization": f"Bearer {token}"},
     )
@@ -727,7 +866,7 @@ def test_get_match_explanation_backward_compatible_default_locale(
     assert res_default.json()["why_you_match"] == "Persisted English narrative."
 
     # 2. Explicit content_locale=en
-    res_en = client.get(
+    res_en = _direct_match_explanation_service_request(
         f"/api/v1/matches/{target_match_id}/explanation?content_locale=en",
         headers={"Authorization": f"Bearer {token}"},
     )
@@ -754,7 +893,7 @@ def test_get_match_explanation_backward_compatible_default_locale(
     finally:
         db.close()
 
-    res_repaired = client.get(
+    res_repaired = _direct_match_explanation_service_request(
         f"/api/v1/matches/{target_match_id}/explanation?content_locale=en",
         headers={"Authorization": f"Bearer {token}"},
     )
@@ -780,13 +919,13 @@ def test_get_match_explanation_invalid_locale_returns_422(client: TestClient):
     match_id = uuid4()
     token = f"valid-user-{user_id}"
 
-    response = client.get(
+    response = client.post(
         f"/api/v1/matches/{match_id}/explanation?content_locale=fr",
         headers={"Authorization": f"Bearer {token}"},
     )
     assert response.status_code == 422
 
-    response_malformed = client.get(
+    response_malformed = client.post(
         f"/api/v1/matches/{match_id}/explanation?content_locale=invalid",
         headers={"Authorization": f"Bearer {token}"},
     )
@@ -863,7 +1002,7 @@ def test_get_match_explanation_tr_does_not_use_english_db_cache_and_does_not_mut
     )
     _mock_gemini_explanation_generate(monkeypatch, mock_llm_output)
 
-    response = client.get(
+    response = _direct_match_explanation_service_request(
         f"/api/v1/matches/{target_match_id}/explanation?content_locale=tr",
         headers={"Authorization": f"Bearer {token}"},
     )
@@ -956,7 +1095,7 @@ def test_get_match_explanation_ar_does_not_use_english_db_cache_and_does_not_mut
     )
     _mock_gemini_explanation_generate(monkeypatch, mock_llm_output)
 
-    response = client.get(
+    response = _direct_match_explanation_service_request(
         f"/api/v1/matches/{target_match_id}/explanation?content_locale=ar",
         headers={"Authorization": f"Bearer {token}"},
     )
@@ -1034,7 +1173,7 @@ def test_get_match_explanation_tr_redis_cache_hit_avoids_second_gemini_call(
     mock_client = _mock_gemini_explanation_generate(monkeypatch, mock_llm_output)
 
     # 1. First call triggers Gemini
-    res1 = client.get(
+    res1 = _direct_match_explanation_service_request(
         f"/api/v1/matches/{target_match_id}/explanation?content_locale=tr",
         headers={"Authorization": f"Bearer {token}"},
     )
@@ -1042,7 +1181,7 @@ def test_get_match_explanation_tr_redis_cache_hit_avoids_second_gemini_call(
     assert mock_client.models.generate_content.call_count == 1
 
     # 2. Second call uses Redis cache (Gemini not called again)
-    res2 = client.get(
+    res2 = _direct_match_explanation_service_request(
         f"/api/v1/matches/{target_match_id}/explanation?content_locale=tr",
         headers={"Authorization": f"Bearer {token}"},
     )
@@ -1128,14 +1267,14 @@ def test_get_match_explanation_tr_and_ar_cache_keys_are_independent(
         gemini_mock,
     )
 
-    res_tr = client.get(
+    res_tr = _direct_match_explanation_service_request(
         f"/api/v1/matches/{target_match_id}/explanation?content_locale=tr",
         headers={"Authorization": f"Bearer {token}"},
     )
     assert res_tr.status_code == 200
     assert res_tr.json()["why_you_match"] == "Turkce metin"
 
-    res_ar = client.get(
+    res_ar = _direct_match_explanation_service_request(
         f"/api/v1/matches/{target_match_id}/explanation?content_locale=ar",
         headers={"Authorization": f"Bearer {token}"},
     )
@@ -1144,7 +1283,7 @@ def test_get_match_explanation_tr_and_ar_cache_keys_are_independent(
     assert gemini_mock.call_count == 2
 
     # Second Arabic request must hit Redis and must not call Gemini again.
-    res_ar_cached = client.get(
+    res_ar_cached = _direct_match_explanation_service_request(
         f"/api/v1/matches/{target_match_id}/explanation?content_locale=ar",
         headers={"Authorization": f"Bearer {token}"},
     )
@@ -1225,7 +1364,7 @@ def test_get_match_explanation_redis_unavailable_fallback_to_english_and_zero_ge
         gemini_mock,
     )
 
-    response = client.get(
+    response = _direct_match_explanation_service_request(
         f"/api/v1/matches/{target_match_id}/explanation?content_locale=tr",
         headers={"Authorization": f"Bearer {token}"},
     )
@@ -1318,7 +1457,7 @@ def test_get_match_explanation_active_failure_sentinel_prevents_gemini_retry(
         gemini_mock,
     )
 
-    response = client.get(
+    response = _direct_match_explanation_service_request(
         f"/api/v1/matches/{target_match_id}/explanation?content_locale=tr",
         headers={"Authorization": f"Bearer {token}"},
     )
@@ -1410,7 +1549,7 @@ def test_get_match_explanation_stampede_lock_loser_does_not_call_gemini(
         gemini_mock,
     )
 
-    response = client.get(
+    response = _direct_match_explanation_service_request(
         f"/api/v1/matches/{target_match_id}/explanation?content_locale=tr",
         headers={"Authorization": f"Bearer {token}"},
     )
@@ -1502,7 +1641,7 @@ def test_get_match_explanation_corrupted_redis_cache_is_discarded_and_repaired(
     )
     _mock_gemini_explanation_generate(monkeypatch, mock_llm_output)
 
-    response = client.get(
+    response = _direct_match_explanation_service_request(
         f"/api/v1/matches/{target_match_id}/explanation?content_locale=tr",
         headers={"Authorization": f"Bearer {token}"},
     )
@@ -1618,7 +1757,7 @@ def test_get_match_explanation_ar_provider_failure_without_english_cache_returns
         gemini_mock,
     )
 
-    response = client.get(
+    response = _direct_match_explanation_service_request(
         f"/api/v1/matches/{target_match_id}/explanation?content_locale=ar",
         headers={"Authorization": f"Bearer {token}"},
     )
@@ -1742,7 +1881,7 @@ def test_get_match_explanation_active_sentinel_without_english_cache_returns_gro
         gemini_mock,
     )
 
-    response = client.get(
+    response = _direct_match_explanation_service_request(
         f"/api/v1/matches/{target_match_id}/explanation?content_locale=ar",
         headers={"Authorization": f"Bearer {token}"},
     )

@@ -10,6 +10,16 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
 
 
+class AIJobAcceptedResponse(BaseModel):
+    """Accepted response for a durable asynchronous AI operation."""
+
+    job_id: UUID
+    status: Literal["queued"]
+    message: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class ProcessingJobResponse(BaseModel):
     """Response schema for GET /api/v1/jobs/{job_id} endpoint."""
 

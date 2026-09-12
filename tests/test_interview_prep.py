@@ -152,6 +152,149 @@ def _create_interviewing_application(
         db.close()
 
 
+
+class _DirectInterviewPrepResponse:
+    """Small adapter for service-level regression assertions."""
+
+    def __init__(self, status_code, payload):
+        import json
+
+        self.status_code = status_code
+        self._payload = payload
+        self.text = json.dumps(
+            payload,
+            default=str,
+        )
+        self.content = self.text.encode(
+            "utf-8"
+        )
+
+    def json(self):
+        return self._payload
+
+
+def _direct_interview_prep_service_request(
+    url,
+    headers=None,
+    **_kwargs,
+):
+    """
+    Exercise interview-prep provider/cache logic directly.
+
+    Ownership/status/scheduled-interview validation remains covered
+    by the real asynchronous HTTP endpoint tests above.
+    """
+    from urllib.parse import (
+        parse_qs,
+        urlparse,
+    )
+    from uuid import UUID
+
+    from app.repositories.application import (
+        ApplicationRepository,
+    )
+    from app.services.interview_prep import (
+        get_or_create_interview_prep,
+    )
+
+    parsed = urlparse(str(url))
+    parts = [
+        part
+        for part in parsed.path.split("/")
+        if part
+    ]
+
+    if (
+        len(parts) < 3
+        or parts[-1] != "interview-prep"
+    ):
+        raise AssertionError(
+            f"Unexpected interview-prep URL: {url}"
+        )
+
+    application_id = UUID(
+        parts[-2]
+    )
+
+    query = parse_qs(
+        parsed.query
+    )
+
+    locale = query.get(
+        "content_locale",
+        ["en"],
+    )[0]
+
+    authorization = (
+        (headers or {})
+        .get("Authorization", "")
+        .strip()
+    )
+
+    prefix = "Bearer valid-user-"
+
+    if not authorization.startswith(
+        prefix
+    ):
+        return _DirectInterviewPrepResponse(
+            401,
+            {"detail": "Not authenticated"},
+        )
+
+    user_id = UUID(
+        authorization[len(prefix):]
+    )
+
+    db = TestingSessionLocal()
+
+    try:
+        record = (
+            ApplicationRepository
+            .get_with_internship_for_user(
+                db=db,
+                application_id=application_id,
+                user_id=user_id,
+            )
+        )
+
+        if not record:
+            return _DirectInterviewPrepResponse(
+                404,
+                {"detail": "Application not found."},
+            )
+
+        application, internship = record
+
+        try:
+            result = (
+                get_or_create_interview_prep(
+                    db=db,
+                    application=application,
+                    internship=internship,
+                    user_id=user_id,
+                    content_locale=locale,
+                )
+            )
+        except ValueError:
+            return _DirectInterviewPrepResponse(
+                503,
+                {
+                    "detail":
+                    "AI interview preparation is "
+                    "temporarily unavailable."
+                },
+            )
+
+        return _DirectInterviewPrepResponse(
+            200,
+            result.model_dump(
+                mode="json"
+            ),
+        )
+    finally:
+        db.close()
+
+
 def test_interview_prep_requires_candidate_ownership(
     client: TestClient,
 ):
@@ -287,7 +430,7 @@ def test_interview_prep_returns_structured_gemini_response(
         "test-gemini-key",
     )
 
-    response = client.post(
+    response = _direct_interview_prep_service_request(
         f"/api/v1/applications/{application_id}/interview-prep"
         "?content_locale=en",
         headers={
@@ -408,12 +551,12 @@ def test_interview_prep_uses_cache_without_second_gemini_call(
         "Authorization": f"Bearer valid-user-{user_id}"
     }
 
-    first = client.post(
+    first = _direct_interview_prep_service_request(
         url,
         headers=headers,
     )
 
-    second = client.post(
+    second = _direct_interview_prep_service_request(
         url,
         headers=headers,
     )

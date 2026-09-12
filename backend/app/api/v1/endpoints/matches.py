@@ -12,15 +12,15 @@ from app.core.security import AuthenticatedUser, get_current_user
 from app.db.session import get_db
 from app.repositories.match import MatchRepository
 from app.repositories.processing_job import ProcessingJobRepository
+from app.schemas.job import AIJobAcceptedResponse
 from app.schemas.match import (
     MatchCalculationAcceptedResponse,
-    MatchExplanationResponse,
     MatchItemResponse,
     MatchListResponse,
 )
 from app.services.ai_quota import AIQuotaExceededError
 from app.services.match_enqueue import enqueue_match_calculation
-from app.services.match_explanation import get_or_create_match_explanation
+from app.services.match_explanation_enqueue import enqueue_match_explanation_generation
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
@@ -109,54 +109,93 @@ def calculate_matches(
     )
 
 
-@router.get(
+@router.post(
     "/{id}/explanation",
-    response_model=MatchExplanationResponse,
+    response_model=AIJobAcceptedResponse,
+    status_code=status.HTTP_202_ACCEPTED,
 )
 def get_match_explanation(
     id: UUID,
     content_locale: Literal["en", "tr", "ar"] = Query(
-        "en", description="Target content display locale ('en', 'tr', 'ar')"
+        "en",
+        description="Target content display locale ('en', 'tr', 'ar')",
     ),
     current_user: AuthenticatedUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """
-    Retrieve grounded LLM explanation ('Why You Match') and skill gap
-    analysis for a match in target content_locale.
-    Requires valid Supabase Bearer JWT authentication token.
-    Identity is strictly derived from the validated JWT subject UUID.
-    Returns 404 if match is not found or owned by another user.
+    Enqueue cancellable grounded Why You Match generation.
+
+    Ownership is verified before creating the durable user-scoped job.
+    Fresh AI quota remains worker-owned so cache hits consume no credit.
     """
     enforce_rate_limit(
-        user_id=current_user.user_id, scope="match_explanation"
+        user_id=current_user.user_id,
+        scope="match_explanation",
     )
 
-    try:
-        explanation = get_or_create_match_explanation(
-            db=db,
-            match_id=id,
-            user_id=current_user.user_id,
-            content_locale=content_locale,
-        )
-    except AIQuotaExceededError:
-        # Global handler emits the machine-readable AI_QUOTA_EXCEEDED contract.
-        raise
-    except ValueError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Match explanation service is temporarily unavailable.",
-        ) from exc
-    except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to retrieve match explanation.",
-        ) from exc
+    record = MatchRepository.get_match_with_details_for_user(
+        db=db,
+        match_id=id,
+        user_id=current_user.user_id,
+    )
 
-    if explanation is None:
+    if not record:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Match not found.",
         )
 
-    return explanation
+    try:
+        processing_job = ProcessingJobRepository.create(
+            db=db,
+            user_id=current_user.user_id,
+            job_type="match_explanation",
+        )
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+
+    try:
+        enqueue_match_explanation_generation(
+            job_id=processing_job.id,
+            user_id=current_user.user_id,
+            match_id=id,
+            content_locale=content_locale,
+        )
+    except Exception:
+        db.rollback()
+
+        try:
+            failed_job = (
+                ProcessingJobRepository
+                .get_by_id_and_user_id_for_update(
+                    db=db,
+                    job_id=processing_job.id,
+                    user_id=current_user.user_id,
+                )
+            )
+
+            if failed_job is not None:
+                failed_job.status = "failed"
+                failed_job.progress_percent = 100
+                failed_job.result = None
+                failed_job.error = (
+                    "Failed to enqueue match explanation generation."
+                )
+
+            db.commit()
+        except Exception:
+            db.rollback()
+
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Failed to enqueue match explanation generation.",
+        ) from None
+
+    return AIJobAcceptedResponse(
+        job_id=processing_job.id,
+        status="queued",
+        message="Match explanation generation enqueued.",
+    )
