@@ -45,6 +45,64 @@ def _normalize_uuid(val: Union[UUID, str], param_name: str) -> UUID:
     )
 
 
+class ApplicationGenerationCancelled(Exception):
+    """Raised when authoritative user cancellation wins the job race."""
+
+
+def _job_cancel_requested(job) -> bool:
+    if job is None:
+        return False
+
+    result = (
+        job.result
+        if isinstance(job.result, dict)
+        else {}
+    )
+
+    return (
+        job.status == "failed"
+        and result.get("cancelled") is True
+    )
+
+
+def _lock_active_job_or_cancel(
+    db,
+    *,
+    job_id: UUID,
+    user_id: UUID,
+):
+    """
+    Serialize cancellation against worker continuation/finalization.
+
+    Whoever obtains the ProcessingJob row lock first wins:
+    - cancellation first -> worker rolls back and publishes no benefit
+    - completion first -> later cancellation receives terminal conflict
+    """
+    locked_job = (
+        ProcessingJobRepository
+        .get_by_id_and_user_id_for_update(
+            db=db,
+            job_id=job_id,
+            user_id=user_id,
+        )
+    )
+
+    if locked_job is None:
+        raise ValueError(
+            f"ProcessingJob {job_id} not found for user {user_id}."
+        )
+
+    # The ORM identity may have been loaded before the competing
+    # cancellation transaction committed. Refresh while holding the
+    # row lock so stale attributes cannot reopen a cancelled job.
+    db.refresh(locked_job)
+
+    if _job_cancel_requested(locked_job):
+        raise ApplicationGenerationCancelled()
+
+    return locked_job
+
+
 def run_application_generation(
     job_id: Union[UUID, str],
     user_id: Union[UUID, str],
@@ -89,6 +147,15 @@ def run_application_generation(
         # Precondition checks passed for target job
         job_validated = True
 
+        # Cooperative cancellation precondition:
+        # a job cancelled before RQ began must never start work.
+        if _job_cancel_requested(job):
+            return {
+                "job_id": str(norm_job_id),
+                "status": "cancelled",
+            }
+
+
         # A successfully completed durable job is idempotent. Never invoke
         # the AI provider again if RQ delivers the same job more than once.
         completed_result = (
@@ -110,6 +177,13 @@ def run_application_generation(
 
         # A retry after worker/provider failure reuses the same durable
         # operation idempotency key and re-reserves only if it was released.
+        # Cancellation must win before quota can be re-reserved.
+        job = _lock_active_job_or_cancel(
+            db,
+            job_id=norm_job_id,
+            user_id=norm_user_id,
+        )
+
         quota_state = ensure_job_ai_quota_reserved_if_present(
             db,
             user_id=norm_user_id,
@@ -134,11 +208,20 @@ def run_application_generation(
             db.commit()
 
         # Transition to processing state
+        # Serialize the transition into active processing.
+        # This second lock matters for quota-backed jobs because a
+        # re-reservation path may have committed before this transition.
+        job = _lock_active_job_or_cancel(
+            db,
+            job_id=norm_job_id,
+            user_id=norm_user_id,
+        )
+
         job.status = "processing"
         job.progress_percent = 10
         job.result = None
         job.error = None
-        db.flush()
+        db.commit()
 
         # Fetch match and verify ownership in SQL
         match_record = MatchRepository.get_match_with_details_for_user(
@@ -188,6 +271,16 @@ def run_application_generation(
         )
 
         # Transition job to completed state
+        # Final completion is serialized against cancellation.
+        # If cancellation committed while expensive work was running,
+        # this raises and the worker transaction is rolled back before
+        # any generated result can become authoritative.
+        job = _lock_active_job_or_cancel(
+            db,
+            job_id=norm_job_id,
+            user_id=norm_user_id,
+        )
+
         job.status = "completed"
         job.progress_percent = 100
         job.error = None
@@ -205,6 +298,30 @@ def run_application_generation(
             "status": "completed",
             "application_id": str(application.id),
         }
+    except ApplicationGenerationCancelled:
+        db.rollback()
+
+        # The HTTP cancellation path normally releases the reservation
+        # atomically with the durable cancellation marker.
+        #
+        # Keep an idempotent worker-side safety release as well so a
+        # cancellation/worker race can never leave application_support
+        # capacity stranded.
+        try:
+            release_job_ai_quota_if_present(
+                db,
+                feature_key=FEATURE_APPLICATION_SUPPORT,
+                job_id=norm_job_id,
+                reason="user_cancelled",
+            )
+            db.commit()
+        except Exception:
+            db.rollback()
+
+        return {
+            "job_id": str(norm_job_id),
+            "status": "cancelled",
+        }
     except Exception:
         try:
             db.rollback()
@@ -218,7 +335,7 @@ def run_application_generation(
                 fail_job = ProcessingJobRepository.get_by_id(
                     fail_db, norm_job_id
                 )
-                if fail_job:
+                if fail_job and not _job_cancel_requested(fail_job):
                     fail_job.status = "failed"
                     fail_job.progress_percent = 100
                     fail_job.result = None

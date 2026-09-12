@@ -64,6 +64,64 @@ def _publish_progress(
         connection.rollback()
 
 
+class MatchCalculationCancelled(Exception):
+    """Raised when authoritative user cancellation wins the job race."""
+
+
+def _job_cancel_requested(job) -> bool:
+    if job is None:
+        return False
+
+    result = (
+        job.result
+        if isinstance(job.result, dict)
+        else {}
+    )
+
+    return (
+        job.status == "failed"
+        and result.get("cancelled") is True
+    )
+
+
+def _lock_active_job_or_cancel(
+    db,
+    *,
+    job_id: UUID,
+    user_id: UUID,
+):
+    """
+    Serialize cancellation against worker continuation/finalization.
+
+    Whoever obtains the ProcessingJob row lock first wins:
+    - cancellation first -> worker rolls back and publishes no benefit
+    - completion first -> later cancellation receives terminal conflict
+    """
+    locked_job = (
+        ProcessingJobRepository
+        .get_by_id_and_user_id_for_update(
+            db=db,
+            job_id=job_id,
+            user_id=user_id,
+        )
+    )
+
+    if locked_job is None:
+        raise ValueError(
+            f"ProcessingJob {job_id} not found for user {user_id}."
+        )
+
+    # The ORM identity may have been loaded before the competing
+    # cancellation transaction committed. Refresh while holding the
+    # row lock so stale attributes cannot reopen a cancelled job.
+    db.refresh(locked_job)
+
+    if _job_cancel_requested(locked_job):
+        raise MatchCalculationCancelled()
+
+    return locked_job
+
+
 def run_match_calculation(
     job_id: Union[UUID, str],
     user_id: Union[UUID, str],
@@ -105,7 +163,25 @@ def run_match_calculation(
         # Precondition checks passed for target job
         job_validated = True
 
+        # Cooperative cancellation precondition:
+        # a job cancelled before RQ began must never start work.
+        if _job_cancel_requested(job):
+            return {
+                "job_id": str(norm_job_id),
+                "status": "cancelled",
+            }
+
+
         # Transition to processing state
+        # Serialize the transition into active processing.
+        # This second lock matters for quota-backed jobs because a
+        # re-reservation path may have committed before this transition.
+        job = _lock_active_job_or_cancel(
+            db,
+            job_id=norm_job_id,
+            user_id=norm_user_id,
+        )
+
         job.status = "processing"
         job.progress_percent = 10
         job.result = None
@@ -139,6 +215,16 @@ def run_match_calculation(
 
         # Transition to completed state
         match_count = len(matches)
+        # Final completion is serialized against cancellation.
+        # If cancellation committed while expensive work was running,
+        # this raises and the worker transaction is rolled back before
+        # any generated result can become authoritative.
+        job = _lock_active_job_or_cancel(
+            db,
+            job_id=norm_job_id,
+            user_id=norm_user_id,
+        )
+
         job.status = "completed"
         job.progress_percent = 100
         job.error = None
@@ -151,6 +237,13 @@ def run_match_calculation(
             "status": "completed",
             "match_count": match_count,
         }
+    except MatchCalculationCancelled:
+        db.rollback()
+
+        return {
+            "job_id": str(norm_job_id),
+            "status": "cancelled",
+        }
     except Exception:
         try:
             db.rollback()
@@ -162,7 +255,7 @@ def run_match_calculation(
             fail_db = SessionLocal()
             try:
                 fail_job = ProcessingJobRepository.get_by_id(fail_db, norm_job_id)
-                if fail_job:
+                if fail_job and not _job_cancel_requested(fail_job):
                     fail_job.status = "failed"
                     fail_job.progress_percent = 100
                     fail_job.result = None
@@ -178,4 +271,3 @@ def run_match_calculation(
         if progress_connection is not None:
             progress_connection.close()
         db.close()
-
