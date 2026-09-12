@@ -193,6 +193,20 @@ def generate_application(
             detail="Match not found.",
         )
 
+    _, _, internship = match_record
+    public_internship = InternshipRepository.get_public_by_id(
+        db=db,
+        internship_id=internship.id,
+    )
+    if public_internship is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "This internship opportunity is not currently "
+                "available for application generation."
+            ),
+        )
+
     application_request_fingerprint = build_ai_request_fingerprint(
         {
             "match_id": str(payload.match_id),

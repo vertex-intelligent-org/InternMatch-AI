@@ -9,6 +9,7 @@ from uuid import UUID
 
 from app.db.session import SessionLocal
 from app.repositories.application import ApplicationRepository
+from app.repositories.internship import InternshipRepository
 from app.repositories.match import MatchRepository
 from app.repositories.matching_data import MatchingDataRepository
 from app.repositories.processing_job import ProcessingJobRepository
@@ -184,6 +185,33 @@ def run_application_generation(
             user_id=norm_user_id,
         )
 
+        # Fail closed before quota recovery or expensive AI work.
+        # A Match can outlive the listing's public eligibility.
+        match_record = MatchRepository.get_match_with_details_for_user(
+            db=db,
+            match_id=norm_match_id,
+            user_id=norm_user_id,
+        )
+        if not match_record:
+            raise ValueError(
+                f"Match '{norm_match_id}' not found or not owned "
+                f"by user '{norm_user_id}'."
+            )
+
+        match, profile, internship = match_record
+
+        public_internship = InternshipRepository.get_public_by_id(
+            db=db,
+            internship_id=internship.id,
+        )
+        if public_internship is None:
+            raise ValueError(
+                "Internship opportunity is not currently available "
+                "for application generation."
+            )
+
+        internship = public_internship
+
         quota_state = ensure_job_ai_quota_reserved_if_present(
             db,
             user_id=norm_user_id,
@@ -223,21 +251,8 @@ def run_application_generation(
         job.error = None
         db.commit()
 
-        # Fetch match and verify ownership in SQL
-        match_record = MatchRepository.get_match_with_details_for_user(
-            db=db,
-            match_id=norm_match_id,
-            user_id=norm_user_id,
-        )
-        if not match_record:
-            raise ValueError(
-                f"Match '{norm_match_id}' not found or not owned "
-                f"by user '{norm_user_id}'."
-            )
-
-        match, profile, internship = match_record
-
-        # Gather the same grounded candidate context in one DB round trip.
+        # Match ownership and listing visibility were verified before
+        # quota recovery. Gather grounded candidate context only now.
         grounding_context = (
             MatchingDataRepository.get_ai_grounding_context(
                 db,
@@ -262,7 +277,23 @@ def run_application_generation(
             content_locale=content_locale,
         )
 
-        # Create or update application in database
+        # The listing may become hidden while the provider is running.
+        # Re-check under row lock immediately before publishing the result.
+        public_internship = (
+            InternshipRepository.get_public_by_id_for_update(
+                db=db,
+                internship_id=internship.id,
+            )
+        )
+        if public_internship is None:
+            raise ValueError(
+                "Internship opportunity is not currently available "
+                "for application generation."
+            )
+
+        internship = public_internship
+
+        # Create or update application only while the listing remains public.
         application = ApplicationRepository.upsert_generated_cover_letter(
             db=db,
             student_id=profile.id,

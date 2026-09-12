@@ -141,6 +141,9 @@ def test_owner_can_enqueue_application_generation(client: TestClient, monkeypatc
 
         listing = InternshipListing(
             id=uuid4(),
+            listing_source="curated",
+            publication_status="published",
+            is_active=True,
             title="Backend Intern",
             company="TechCorp",
             location="Remote",
@@ -312,6 +315,9 @@ def test_enqueue_failure_updates_job_to_failed_and_returns_503(client: TestClien
 
         listing = InternshipListing(
             id=uuid4(),
+            listing_source="curated",
+            publication_status="published",
+            is_active=True,
             title="Dev",
             company="Co",
             location="Remote",
@@ -694,6 +700,9 @@ def test_worker_run_application_generation_success(monkeypatch):
 
         listing = InternshipListing(
             id=uuid4(),
+            listing_source="curated",
+            publication_status="published",
+            is_active=True,
             title="Backend Intern",
             company="AlphaCorp",
             location="Remote",
@@ -899,6 +908,9 @@ def test_worker_provider_failure_rolls_back_application_mutation(monkeypatch):
 
         listing = InternshipListing(
             id=uuid4(),
+            listing_source="curated",
+            publication_status="published",
+            is_active=True,
             title="Dev",
             company="Co",
             location="Remote",
@@ -1122,5 +1134,341 @@ def test_submitted_application_cannot_be_discarded(client: TestClient):
         persisted = db.query(Application).filter_by(id=application_id).first()
         assert persisted is not None
         assert persisted.status == "applied"
+    finally:
+        db.close()
+
+# ---------------------------------------------------------------------------
+# APPLICATION GENERATION PUBLIC-VISIBILITY SECURITY REGRESSIONS
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("listing_source", "publication_status"),
+    [
+        ("curated", "draft"),
+        ("legacy_unknown", "published"),
+    ],
+)
+def test_generate_rejects_owned_match_for_non_public_listing_before_job_creation(
+    client: TestClient,
+    monkeypatch,
+    listing_source: str,
+    publication_status: str,
+):
+    user_id = uuid4()
+    token = f"valid-user-{user_id}"
+
+    db = TestingSessionLocal()
+    try:
+        profile = StudentProfile(
+            id=uuid4(),
+            user_id=user_id,
+            full_name="Visibility Candidate",
+        )
+        db.add(profile)
+        db.flush()
+
+        listing = InternshipListing(
+            id=uuid4(),
+            listing_source=listing_source,
+            publication_status=publication_status,
+            # Intentionally stale compatibility mirror: public authority
+            # must come from publication status + provenance, not is_active.
+            is_active=True,
+            title="Hidden Application Opportunity",
+            company="Boundary Corp",
+            location="Remote",
+            work_type="remote",
+            description="Must not allow AI application generation.",
+        )
+        db.add(listing)
+        db.flush()
+
+        match = Match(
+            id=uuid4(),
+            student_id=profile.id,
+            internship_id=listing.id,
+            overall_score=90,
+            skill_score=90,
+            vector_score=90,
+            attribute_score=90,
+        )
+        db.add(match)
+        db.commit()
+        match_id = match.id
+    finally:
+        db.close()
+
+    mock_enqueue = MagicMock()
+    monkeypatch.setattr(
+        "app.api.v1.endpoints.applications.enqueue_application_generation",
+        mock_enqueue,
+    )
+
+    response = client.post(
+        "/api/v1/applications/generate",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "match_id": str(match_id),
+            "tone": "professional",
+        },
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == (
+        "This internship opportunity is not currently "
+        "available for application generation."
+    )
+    mock_enqueue.assert_not_called()
+
+    db = TestingSessionLocal()
+    try:
+        jobs = (
+            db.query(ProcessingJob)
+            .filter_by(
+                user_id=user_id,
+                job_type="application_generation",
+            )
+            .all()
+        )
+        assert jobs == []
+    finally:
+        db.close()
+
+
+def test_worker_rejects_hidden_listing_before_quota_or_ai(
+    monkeypatch,
+):
+    user_id = uuid4()
+    job_id = uuid4()
+
+    db = TestingSessionLocal()
+    try:
+        job = ProcessingJob(
+            id=job_id,
+            user_id=user_id,
+            job_type="application_generation",
+            status="queued",
+        )
+        db.add(job)
+
+        profile = StudentProfile(
+            id=uuid4(),
+            user_id=user_id,
+            full_name="Worker Visibility Candidate",
+        )
+        db.add(profile)
+        db.flush()
+
+        listing = InternshipListing(
+            id=uuid4(),
+            listing_source="curated",
+            publication_status="draft",
+            is_active=True,
+            title="Draft Worker Opportunity",
+            company="Boundary Corp",
+            location="Remote",
+            work_type="remote",
+            description="Must fail before quota recovery or AI.",
+        )
+        db.add(listing)
+        db.flush()
+
+        match = Match(
+            id=uuid4(),
+            student_id=profile.id,
+            internship_id=listing.id,
+            overall_score=85,
+            skill_score=85,
+            vector_score=85,
+            attribute_score=85,
+        )
+        db.add(match)
+        db.commit()
+        match_id = match.id
+        profile_id = profile.id
+    finally:
+        db.close()
+
+    quota_recovery = MagicMock(
+        side_effect=AssertionError(
+            "Quota recovery must not run for a hidden listing."
+        )
+    )
+    ai_generation = MagicMock(
+        side_effect=AssertionError(
+            "AI generation must not run for a hidden listing."
+        )
+    )
+
+    monkeypatch.setattr(
+        "tasks.application_generation.ensure_job_ai_quota_reserved_if_present",
+        quota_recovery,
+    )
+    monkeypatch.setattr(
+        "tasks.application_generation.generate_grounded_cover_letter",
+        ai_generation,
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="not currently available",
+    ):
+        run_application_generation(
+            job_id=job_id,
+            user_id=user_id,
+            match_id=match_id,
+            tone="professional",
+        )
+
+    quota_recovery.assert_not_called()
+    ai_generation.assert_not_called()
+
+    db = TestingSessionLocal()
+    try:
+        persisted_job = (
+            db.query(ProcessingJob)
+            .filter_by(id=job_id)
+            .first()
+        )
+        assert persisted_job is not None
+        assert persisted_job.status == "failed"
+        assert persisted_job.progress_percent == 100
+
+        applications = (
+            db.query(Application)
+            .filter_by(student_id=profile_id)
+            .all()
+        )
+        assert applications == []
+    finally:
+        db.close()
+
+
+def test_worker_rechecks_public_visibility_after_ai_before_persistence(
+    monkeypatch,
+):
+    user_id = uuid4()
+    job_id = uuid4()
+
+    db = TestingSessionLocal()
+    try:
+        job = ProcessingJob(
+            id=job_id,
+            user_id=user_id,
+            job_type="application_generation",
+            status="queued",
+        )
+        db.add(job)
+
+        profile = StudentProfile(
+            id=uuid4(),
+            user_id=user_id,
+            full_name="Race Candidate",
+        )
+        db.add(profile)
+        db.flush()
+
+        listing = InternshipListing(
+            id=uuid4(),
+            listing_source="curated",
+            publication_status="published",
+            is_active=True,
+            title="Initially Public Opportunity",
+            company="Boundary Corp",
+            location="Remote",
+            work_type="remote",
+            description="Becomes hidden while generation is running.",
+        )
+        db.add(listing)
+        db.flush()
+
+        match = Match(
+            id=uuid4(),
+            student_id=profile.id,
+            internship_id=listing.id,
+            overall_score=92,
+            skill_score=92,
+            vector_score=92,
+            attribute_score=92,
+        )
+        db.add(match)
+        db.commit()
+
+        profile_id = profile.id
+        listing_id = listing.id
+        match_id = match.id
+    finally:
+        db.close()
+
+    call_order = []
+
+    def generate_before_visibility_loss(
+        *,
+        profile,
+        internship,
+        match,
+        tone,
+        candidate_skills,
+        education_entries,
+        experience_entries,
+        project_entries,
+        content_locale,
+    ):
+        call_order.append("ai")
+        return "Generated text that must never be persisted."
+
+    def listing_became_non_public(
+        *,
+        db,
+        internship_id,
+    ):
+        call_order.append("final_visibility")
+        assert internship_id == listing_id
+        return None
+
+    monkeypatch.setattr(
+        "tasks.application_generation.generate_grounded_cover_letter",
+        generate_before_visibility_loss,
+    )
+    monkeypatch.setattr(
+        (
+            "tasks.application_generation."
+            "InternshipRepository.get_public_by_id_for_update"
+        ),
+        listing_became_non_public,
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="not currently available",
+    ):
+        run_application_generation(
+            job_id=job_id,
+            user_id=user_id,
+            match_id=match_id,
+            tone="professional",
+            content_locale="en",
+        )
+
+    assert call_order == ["ai", "final_visibility"]
+
+    db = TestingSessionLocal()
+    try:
+        persisted_job = (
+            db.query(ProcessingJob)
+            .filter_by(id=job_id)
+            .first()
+        )
+        assert persisted_job is not None
+        assert persisted_job.status == "failed"
+        assert persisted_job.progress_percent == 100
+
+        application = (
+            db.query(Application)
+            .filter_by(student_id=profile_id)
+            .first()
+        )
+        assert application is None
     finally:
         db.close()

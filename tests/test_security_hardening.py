@@ -398,6 +398,9 @@ def test_application_enqueue_failure_persists_exact_generic_error(
 
         listing = InternshipListing(
             id=uuid4(),
+            listing_source="curated",
+            publication_status="published",
+            is_active=True,
             title="Dev",
             company="Co",
             location="Remote",
@@ -570,6 +573,9 @@ def test_application_worker_failure_persists_safe_error(monkeypatch):
 
         listing = InternshipListing(
             id=uuid4(),
+            listing_source="curated",
+            publication_status="published",
+            is_active=True,
             title="Dev",
             company="Co",
             location="Remote",
