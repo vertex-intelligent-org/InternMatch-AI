@@ -168,6 +168,150 @@ class ProjectEntry(Base):
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
 
+class EmployerOrganization(Base):
+    """
+    Canonical employer organization identity and verification state.
+
+    Employer account role and organization verification are deliberately
+    separate authorities. Public signup can create an employer account, but
+    only this server-controlled lifecycle may establish verified company trust.
+    """
+
+    __tablename__ = "employer_organizations"
+
+    __table_args__ = (
+        CheckConstraint(
+            "verification_status IN "
+            "('unverified', 'pending', 'verified', 'rejected', 'suspended')",
+            name="ck_employer_organizations_verification_status",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid4,
+    )
+    owner_user_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        nullable=False,
+        unique=True,
+        index=True,
+    )
+    legal_name: Mapped[str] = mapped_column(String, nullable=False)
+    display_name: Mapped[str] = mapped_column(String, nullable=False)
+    website_url: Mapped[str] = mapped_column(Text, nullable=False)
+    normalized_domain: Mapped[str] = mapped_column(String, nullable=False)
+    business_email: Mapped[str] = mapped_column(String, nullable=False)
+    country_code: Mapped[str] = mapped_column(String(2), nullable=False)
+    registration_number: Mapped[Optional[str]] = mapped_column(
+        String,
+        nullable=True,
+    )
+    tax_number: Mapped[Optional[str]] = mapped_column(
+        String,
+        nullable=True,
+    )
+    representative_name: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+    )
+    representative_role: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+    )
+    verification_status: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+        default="unverified",
+        index=True,
+    )
+    submitted_at: Mapped[Optional[datetime]] = mapped_column(
+        nullable=True,
+    )
+    reviewed_at: Mapped[Optional[datetime]] = mapped_column(
+        nullable=True,
+    )
+    reviewed_by: Mapped[Optional[UUID]] = mapped_column(
+        PG_UUID(as_uuid=True),
+        nullable=True,
+    )
+    rejection_reason_code: Mapped[Optional[str]] = mapped_column(
+        String,
+        nullable=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+
+class EmployerVerificationEvent(Base):
+    """
+    Append-only audit history for employer verification lifecycle actions.
+
+    Reviewer UUID and private internal notes are administrative data and are
+    never intended for public company responses.
+    """
+
+    __tablename__ = "employer_verification_events"
+
+    __table_args__ = (
+        CheckConstraint(
+            "action IN "
+            "('created', 'submitted', 'resubmitted', "
+            "'approved', 'rejected', 'suspended')",
+            name="ck_employer_verification_events_action",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid4,
+    )
+    organization_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("employer_organizations.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    reviewer_user_id: Mapped[Optional[UUID]] = mapped_column(
+        PG_UUID(as_uuid=True),
+        nullable=True,
+        index=True,
+    )
+    action: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+    )
+    previous_status: Mapped[Optional[str]] = mapped_column(
+        String,
+        nullable=True,
+    )
+    new_status: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+    )
+    reason_code: Mapped[Optional[str]] = mapped_column(
+        String,
+        nullable=True,
+    )
+    internal_note: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+
 class InternshipListing(Base):
     """ORM Model mapping public.internship_listings table."""
 

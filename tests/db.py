@@ -7,6 +7,8 @@ from app.db.models import (  # noqa: F401
     ApplicationStatusEvent,
     EducationEntry,
     ExperienceEntry,
+    EmployerOrganization,
+    EmployerVerificationEvent,
     InternshipListing,
     Match,
     ProcessingJob,

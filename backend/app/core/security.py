@@ -210,6 +210,51 @@ async def get_current_user_id(
     return current_user.user_id
 
 
+def require_admin_user(
+    current_user: AuthenticatedUser = Depends(get_current_user),
+) -> AuthenticatedUser:
+    """
+    Require server-authorized InternMatch administrative access.
+
+    Administrative authority is derived only from the authenticated Supabase
+    user UUID and the server-side ADMIN_USER_IDS allowlist. Public account
+    roles, profile preferences, email addresses, and client metadata never
+    grant administrative privileges.
+
+    An empty allowlist denies all administrative access.
+    Invalid configured UUID values fail closed.
+    """
+    configured_admin_ids = set()
+
+    for raw_value in (settings.ADMIN_USER_IDS or "").split(","):
+        candidate = raw_value.strip()
+        if not candidate:
+            continue
+
+        try:
+            configured_admin_ids.add(UUID(candidate))
+        except (ValueError, TypeError) as exc:
+            logger.error("Invalid UUID found in ADMIN_USER_IDS configuration.")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=format_auth_error(
+                    "Administrative access is not configured correctly.",
+                    code="ADMIN_CONFIGURATION_ERROR",
+                ),
+            ) from exc
+
+    if current_user.user_id not in configured_admin_ids:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=format_auth_error(
+                "Administrative access denied.",
+                code="FORBIDDEN",
+            ),
+        )
+
+    return current_user
+
+
 def require_employer_user(
     current_user: AuthenticatedUser = Depends(get_current_user),
     db: Session = Depends(get_db),

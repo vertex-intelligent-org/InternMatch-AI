@@ -67,6 +67,10 @@ class Settings(BaseSettings):
     REVENUECAT_WEBHOOK_SIGNING_SECRET: str = ""
 
     # Security & CORS Origins Configuration
+    # Comma-separated Supabase auth user UUIDs allowed to access
+    # privileged InternMatch administrative endpoints.
+    # Empty by default: administrative access fails closed.
+    ADMIN_USER_IDS: str = ""
     ALLOWED_ORIGINS: str = "http://localhost:3000,http://localhost:8000,http://localhost:19006"
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
