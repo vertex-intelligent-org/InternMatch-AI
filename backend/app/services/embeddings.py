@@ -82,9 +82,14 @@ def _generate_openai_embedding(
     This function never falls back to Gemini. Mixing providers in one
     vector index would make cosine similarity semantically invalid.
     """
-    if not isinstance(text, str) or not text.strip():
+    if not isinstance(text, str):
+        raise TypeError(
+            f"text input must be a string, got {type(text).__name__}"
+        )
+
+    if not text.strip():
         raise ValueError(
-            "Embedding input text must be a non-empty string."
+            "text input cannot be empty or whitespace-only"
         )
 
     api_key = (
@@ -149,16 +154,36 @@ def _generate_openai_embedding(
             "OpenAI embedding response contained an invalid vector."
         )
 
-    embedding = [
-        float(value)
-        for value in raw_embedding
-    ]
-
-    if len(embedding) != dimension:
+    if len(raw_embedding) != dimension:
         raise ValueError(
             "OpenAI embedding dimension mismatch: "
-            f"expected {dimension}, got {len(embedding)}."
+            f"expected {dimension}, got {len(raw_embedding)}."
         )
+
+    embedding: list[float] = []
+
+    for value in raw_embedding:
+        if (
+            value is None
+            or not isinstance(value, (int, float))
+            or isinstance(value, bool)
+        ):
+            raise ValueError(
+                "Embedding vector contains non-numeric element"
+            )
+
+        float_value = float(value)
+
+        if (
+            math.isnan(float_value)
+            or math.isinf(float_value)
+        ):
+            raise ValueError(
+                "Embedding vector contains non-finite float value "
+                "(NaN or Inf)"
+            )
+
+        embedding.append(float_value)
 
     return embedding
 
