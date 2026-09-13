@@ -899,3 +899,77 @@ def test_manual_admin_approval_requires_internal_note(
         assert stored.verification_method is None
     finally:
         db.close()
+
+def test_admin_cannot_reopen_listing_for_unverified_organization(
+    client: TestClient,
+    mock_supabase_auth,
+    monkeypatch,
+):
+    owner_user_id = uuid4()
+
+    _, organization = _create_org_via_api(
+        client,
+        mock_supabase_auth,
+        user_id=owner_user_id,
+    )
+
+    assert organization["verification_status"] == "unverified"
+
+    listing_id = uuid4()
+
+    db = TestingSessionLocal()
+    try:
+        db.add(
+            InternshipListing(
+                id=listing_id,
+                employer_user_id=owner_user_id,
+                employer_organization_id=UUID(
+                    organization["id"]
+                ),
+                listing_source="employer",
+                title="Closed Employer Internship",
+                company="Acme",
+                location="Istanbul",
+                work_type="hybrid",
+                description="Internship description",
+                required_skills=["Python"],
+                preferred_skills=[],
+                language="English",
+                publication_status="closed",
+                is_active=False,
+            )
+        )
+        db.commit()
+    finally:
+        db.close()
+
+    _, headers = _admin_headers(
+        mock_supabase_auth,
+        monkeypatch,
+    )
+
+    response = client.post(
+        (
+            f"/api/v1/admin/internships/"
+            f"{listing_id}/reopen"
+        ),
+        headers=headers,
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == (
+        "Employer organization must be verified "
+        "before reopening."
+    )
+
+    db = TestingSessionLocal()
+    try:
+        listing = db.get(
+            InternshipListing,
+            listing_id,
+        )
+        assert listing is not None
+        assert listing.publication_status == "closed"
+        assert listing.is_active is False
+    finally:
+        db.close()
