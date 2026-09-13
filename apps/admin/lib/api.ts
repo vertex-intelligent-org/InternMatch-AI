@@ -1,5 +1,8 @@
 import { getSupabaseClient } from './supabase';
 import type {
+  AdminApprovalPayload,
+  AdminRejectionPayload,
+  AdminSuspensionPayload,
   EmployerOrganization,
   VerificationStatus,
 } from './types';
@@ -233,6 +236,57 @@ export async function getOrganizationForReview(
     ),
     {
       method: 'GET',
+    }
+  );
+}
+
+export async function approveOrganization(
+  organizationId: string,
+  payload: AdminApprovalPayload
+): Promise<EmployerOrganization> {
+  return adminApiRequest<EmployerOrganization>(
+    (
+      '/admin/employer-organizations/'
+      + encodeURIComponent(organizationId)
+      + '/approve'
+    ),
+    {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }
+  );
+}
+
+export async function rejectOrganization(
+  organizationId: string,
+  payload: AdminRejectionPayload
+): Promise<EmployerOrganization> {
+  return adminApiRequest<EmployerOrganization>(
+    (
+      '/admin/employer-organizations/'
+      + encodeURIComponent(organizationId)
+      + '/reject'
+    ),
+    {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }
+  );
+}
+
+export async function suspendOrganization(
+  organizationId: string,
+  payload: AdminSuspensionPayload
+): Promise<EmployerOrganization> {
+  return adminApiRequest<EmployerOrganization>(
+    (
+      '/admin/employer-organizations/'
+      + encodeURIComponent(organizationId)
+      + '/suspend'
+    ),
+    {
+      method: 'POST',
+      body: JSON.stringify(payload),
     }
   );
 }

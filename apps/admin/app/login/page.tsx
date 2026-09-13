@@ -16,12 +16,41 @@ import {
   getSupabaseClient,
 } from '../../lib/supabase';
 
-function errorMessage(error: unknown): string {
-  if (
-    error instanceof ApiError
-    || error instanceof AdminConfigurationError
-    || error instanceof Error
-  ) {
+function errorMessage(
+  error: unknown
+): string {
+  if (error instanceof AdminConfigurationError) {
+    return (
+      'This admin workspace is not fully '
+      + 'configured on this device yet.'
+    );
+  }
+
+  if (error instanceof ApiError) {
+    if (
+      error.code === 'API_NOT_CONFIGURED'
+    ) {
+      return (
+        'The InternMatch admin service is not '
+        + 'connected yet. Please complete the '
+        + 'local setup and try again.'
+      );
+    }
+
+    if (
+      error.code === 'NETWORK_ERROR'
+      || error.status === 0
+    ) {
+      return (
+        'We cannot reach the InternMatch admin '
+        + 'service right now. Please try again.'
+      );
+    }
+
+    return error.message;
+  }
+
+  if (error instanceof Error) {
     return error.message;
   }
 
@@ -90,8 +119,8 @@ export default function AdminLoginPage() {
             if (active) {
               setError(
                 requestError.status === 403
-                  ? 'This account is not authorized for administrative access.'
-                  : 'Your administrative session is no longer valid.'
+                  ? 'This account does not have permission to open the admin workspace.'
+                  : 'Your admin session has expired. Please sign in again.'
               );
               setCheckingSession(false);
             }
@@ -165,8 +194,8 @@ export default function AdminLoginPage() {
 
           setError(
             requestError.status === 403
-              ? 'This account is authenticated but is not in the server administrator allowlist.'
-              : 'The new session could not be verified by the API.'
+              ? 'This account does not have permission to open the admin workspace.'
+              : 'We could not verify this admin session. Please sign in again.'
           );
 
           return;
@@ -198,7 +227,7 @@ export default function AdminLoginPage() {
             </span>
             <div>
               <strong>InternMatch</strong>
-              <span>Admin Console</span>
+              <span>Trust Console</span>
             </div>
           </div>
 
@@ -207,7 +236,7 @@ export default function AdminLoginPage() {
               className="spinner"
               aria-hidden="true"
             />
-            Verifying session?
+            Preparing your workspace?
           </div>
         </section>
       </main>
@@ -223,22 +252,22 @@ export default function AdminLoginPage() {
           </span>
           <div>
             <strong>InternMatch</strong>
-            <span>Admin Console</span>
+            <span>Trust Console</span>
           </div>
         </div>
 
         <div className="loginHeading">
           <p className="eyebrow">
-            Restricted access
+            InternMatch Admin
           </p>
           <h1>
-            Sign in to the verification console
+            Welcome back
           </h1>
           <p>
-            Authentication uses your InternMatch
-            Supabase account. Administrative
-            authority is verified separately by
-            the API.
+            Sign in to continue to your
+            InternMatch trust workspace.
+            Administrative access is checked
+            securely before the console opens.
           </p>
         </div>
 
@@ -293,7 +322,7 @@ export default function AdminLoginPage() {
             disabled={submitting}
           >
             {submitting
-              ? 'Verifying access?'
+              ? 'Verifying access...'
               : 'Sign in securely'}
           </button>
         </form>
