@@ -187,14 +187,14 @@ export default function ProfileScreen({ navigation }) {
                     style={isRTL ? styles.iconRTL : styles.iconLTR}
                   />
                   <Text style={[styles.employerNoticeBadge, isRTL && styles.textRTL]}>
-                    {t('profile.employer.previewBadge')}
+                    {t('profile.employer.workspaceBadge')}
                   </Text>
                 </View>
                 <Text style={[styles.employerNoticeText, isRTL && styles.textRTL]}>
-                  {t('profile.employer.previewNotice')}
+                  {t('profile.employer.workspaceNotice')}
                 </Text>
                 <GradientButton
-                  title={t('profile.employer.previewPlans', { defaultValue: t('profile.employer.viewPlans') })}
+                  title={t('profile.employer.viewPlans')}
                   color={colors.accent || colors.teal}
                   onPress={() => navigation.navigate('Plans')}
                   style={{ marginTop: spacing.md, width: '100%' }}

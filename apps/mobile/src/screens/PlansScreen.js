@@ -382,24 +382,7 @@ export default function PlansScreen({ navigation }) {
         </View>
 
         {/* Employer Preview Notice */}
-        {isEmployer ? (
-          <GlassSurface variant="subtle" style={styles.employerNoticeCard}>
-            <View style={styles.noticeHeaderRow}>
-              <Ionicons
-                name="briefcase-outline"
-                size={18}
-                color={colors.accentStrong || colors.tealDark}
-                style={isRTL ? styles.iconRTL : styles.iconLTR}
-              />
-              <Text style={[styles.employerNoticeTitle, isRTL && styles.textRTL]}>
-                {t('plans.previewTag')}
-              </Text>
-            </View>
-            <Text style={[styles.employerNoticeText, isRTL && styles.textRTL]}>
-              {t('plans.employer.previewNotice')}
-            </Text>
-          </GlassSurface>
-        ) : null}
+
 
         {!isEmployer && aiUsage?.features?.length > 0 ? (
           <GlassSurface
@@ -675,27 +658,24 @@ export default function PlansScreen({ navigation }) {
           </View>
         ) : null}
 
-        {/* Truthful Footer Disclosure */}
-        <GlassSurface variant="subtle" style={styles.footerNoticeCard}>
-          <View style={styles.footerNoticeHeader}>
-            <Ionicons
-              name="information-circle-outline"
-              size={18}
-              color={colors.textSecondary || '#64748B'}
-              style={isRTL ? styles.iconRTL : styles.iconLTR}
-            />
-            <Text style={[styles.footerNoticeTitle, isRTL && styles.textRTL]}>
-              {isEmployer
-                ? t('plans.footerNoticeTitle')
-                : t('plans.candidateDisclosure.title')}
+        {!isEmployer && __DEV__ ? (
+          <GlassSurface variant="subtle" style={styles.footerNoticeCard}>
+            <View style={styles.footerNoticeHeader}>
+              <Ionicons
+                name="information-circle-outline"
+                size={18}
+                color={colors.textSecondary || '#64748B'}
+                style={isRTL ? styles.iconRTL : styles.iconLTR}
+              />
+              <Text style={[styles.footerNoticeTitle, isRTL && styles.textRTL]}>
+                {t('plans.candidateDisclosure.title')}
+              </Text>
+            </View>
+            <Text style={[styles.footerNoticeBody, isRTL && styles.textRTL]}>
+              {t('plans.candidateDisclosure.message')}
             </Text>
-          </View>
-          <Text style={[styles.footerNoticeBody, isRTL && styles.textRTL]}>
-            {isEmployer
-              ? t('plans.footerNoticeMessage')
-              : t('plans.candidateDisclosure.message')}
-          </Text>
-        </GlassSurface>
+          </GlassSurface>
+        ) : null}
       </ScrollView>
     </ScreenContainer>
   );
