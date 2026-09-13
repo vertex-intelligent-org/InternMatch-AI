@@ -95,3 +95,72 @@ export type AdminInternshipListResponse = {
   limit: number;
   offset: number;
 };
+
+// Employer compliance evidence is intentionally independent from
+// organization identity verification.
+export type ComplianceClaimStatus =
+  | 'draft'
+  | 'pending'
+  | 'approved'
+  | 'rejected'
+  | 'revoked'
+  | 'expired';
+
+export type ComplianceClaimType =
+  | 'insurance_arrangement'
+  | 'completion_certificate'
+  | 'university_agreement'
+  | 'legal_internship_eligibility';
+
+export type EmployerComplianceEvidence = {
+  id: string;
+  original_filename: string;
+  content_type: string;
+  size_bytes: number;
+  created_at: string;
+  [key: string]: unknown;
+};
+
+export type EmployerComplianceClaim = {
+  id: string;
+  organization_id: string;
+  claim_type: ComplianceClaimType;
+  jurisdiction_country_code: string;
+  scope_key: string;
+  scope_label: string | null;
+  statement: string | null;
+  status: ComplianceClaimStatus;
+  version: number;
+  submitted_at: string | null;
+  reviewed_at: string | null;
+  rejection_reason_code: string | null;
+  valid_from: string | null;
+  valid_until: string | null;
+  created_at: string;
+  updated_at: string;
+  evidence: EmployerComplianceEvidence[];
+  [key: string]: unknown;
+};
+
+export type ComplianceEvidenceAccessResponse = {
+  evidence_url: string;
+  expires_in: number;
+  file_type: 'pdf';
+};
+
+export type ComplianceAdminApprovalPayload = {
+  expected_version: number;
+  internal_note?: string | null;
+};
+
+export type ComplianceAdminRejectionPayload = {
+  expected_version: number;
+  reason_code: string;
+  internal_note?: string | null;
+};
+
+export type ComplianceAdminRevocationPayload = {
+  expected_version: number;
+  reason_code: string;
+  internal_note?: string | null;
+};

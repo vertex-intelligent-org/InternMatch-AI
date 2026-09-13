@@ -213,6 +213,186 @@ export default function EmployerOpportunitiesScreen({ navigation }) {
           </View>
         </Reveal>
 
+        {/* EMPLOYER_TRUST_CENTER_ENTRY */}
+        <View
+          style={{
+            marginBottom: spacing.lg,
+            padding: spacing.md,
+            borderRadius: 16,
+            borderWidth: 1,
+            borderColor:
+              colors.border
+              || 'rgba(22, 35, 46, 0.10)',
+            backgroundColor:
+              colors.surface
+              || colors.white
+              || '#FFFFFF',
+          }}
+        >
+          <Text
+            style={[
+              {
+                fontSize: 13,
+                fontWeight: '800',
+                letterSpacing: 0.7,
+                color:
+                  colors.textSecondary
+                  || colors.textMuted
+                  || '#687783',
+                marginBottom: spacing.xs,
+              },
+              isRTL && styles.rtlText,
+            ]}
+          >
+            {t(
+              'employerCompliance.trustTitle',
+              'TRUST & SAFETY'
+            )}
+          </Text>
+
+          <Text
+            style={[
+              {
+                fontSize: 16,
+                fontWeight: '700',
+                color:
+                  colors.textPrimary
+                  || colors.text
+                  || '#16232E',
+                marginBottom: spacing.sm,
+              },
+              isRTL && styles.rtlText,
+            ]}
+          >
+            {t(
+              'employerCompliance.trustSubtitle',
+              'Manage organization identity and compliance evidence separately.'
+            )}
+          </Text>
+
+          <View
+            style={[
+              {
+                flexDirection: 'row',
+                gap: spacing.sm,
+              },
+              isRTL && {
+                flexDirection: 'row-reverse',
+              },
+            ]}
+          >
+            <TouchableOpacity
+              style={{
+                flex: 1,
+                paddingVertical: spacing.sm,
+                paddingHorizontal: spacing.sm,
+                borderRadius: 12,
+                borderWidth: 1,
+                borderColor:
+                  colors.border
+                  || 'rgba(22, 35, 46, 0.12)',
+                backgroundColor:
+                  colors.backgroundSecondary
+                  || '#F5F8F9',
+              }}
+              onPress={() =>
+                navigation.navigate(
+                  'EmployerVerification'
+                )
+              }
+              accessibilityRole="button"
+              accessibilityLabel={t(
+                'employerCompliance.identityVerification',
+                'Organization verification'
+              )}
+            >
+              <Ionicons
+                name="shield-checkmark-outline"
+                size={19}
+                color={
+                  colors.accentStrong
+                  || colors.accent
+                  || '#147D72'
+                }
+              />
+              <Text
+                style={[
+                  {
+                    marginTop: 6,
+                    fontSize: 13,
+                    fontWeight: '700',
+                    color:
+                      colors.textPrimary
+                      || colors.text
+                      || '#16232E',
+                  },
+                  isRTL && styles.rtlText,
+                ]}
+              >
+                {t(
+                  'employerCompliance.identityVerification',
+                  'Organization verification'
+                )}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={{
+                flex: 1,
+                paddingVertical: spacing.sm,
+                paddingHorizontal: spacing.sm,
+                borderRadius: 12,
+                borderWidth: 1,
+                borderColor:
+                  colors.border
+                  || 'rgba(22, 35, 46, 0.12)',
+                backgroundColor:
+                  colors.backgroundSecondary
+                  || '#F5F8F9',
+              }}
+              onPress={() =>
+                navigation.navigate(
+                  'EmployerCompliance'
+                )
+              }
+              accessibilityRole="button"
+              accessibilityLabel={t(
+                'employerCompliance.complianceEvidence',
+                'Compliance evidence'
+              )}
+            >
+              <Ionicons
+                name="document-lock-outline"
+                size={19}
+                color={
+                  colors.accentStrong
+                  || colors.accent
+                  || '#147D72'
+                }
+              />
+              <Text
+                style={[
+                  {
+                    marginTop: 6,
+                    fontSize: 13,
+                    fontWeight: '700',
+                    color:
+                      colors.textPrimary
+                      || colors.text
+                      || '#16232E',
+                  },
+                  isRTL && styles.rtlText,
+                ]}
+              >
+                {t(
+                  'employerCompliance.complianceEvidence',
+                  'Compliance evidence'
+                )}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
         {/* Loading State */}
         {loading && !refreshing && (
           <View style={styles.centerLoading}>

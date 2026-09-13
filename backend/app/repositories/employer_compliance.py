@@ -290,3 +290,52 @@ class EmployerComplianceRepository:
         db.flush()
 
         return event
+
+
+    @staticmethod
+    def get_evidence(
+        db: Session,
+        evidence_id: UUID,
+    ) -> Optional[EmployerComplianceEvidence]:
+        return db.get(
+            EmployerComplianceEvidence,
+            evidence_id,
+        )
+
+    @staticmethod
+    def list_evidence_for_claim_ids(
+        db: Session,
+        claim_ids: list[UUID],
+    ) -> list[EmployerComplianceEvidence]:
+        if not claim_ids:
+            return []
+
+        stmt = (
+            select(EmployerComplianceEvidence)
+            .where(
+                EmployerComplianceEvidence.claim_id.in_(
+                    claim_ids
+                )
+            )
+            .order_by(
+                EmployerComplianceEvidence.created_at.asc()
+            )
+        )
+
+        return list(
+            db.scalars(stmt).all()
+        )
+
+    @staticmethod
+    def bump_claim_version(
+        db: Session,
+        claim: EmployerComplianceClaim,
+    ) -> EmployerComplianceClaim:
+        claim.version += 1
+        claim.updated_at = datetime.now(
+            timezone.utc
+        )
+
+        db.flush()
+
+        return claim

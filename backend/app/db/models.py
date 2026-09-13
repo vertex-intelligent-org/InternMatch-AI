@@ -592,9 +592,9 @@ class EmployerComplianceEvidence(Base):
         nullable=False,
     )
 
-    uploaded_by_user_id: Mapped[UUID] = mapped_column(
+    uploaded_by_user_id: Mapped[Optional[UUID]] = mapped_column(
         PG_UUID(as_uuid=True),
-        nullable=False,
+        nullable=True,
     )
 
     created_at: Mapped[datetime] = mapped_column(

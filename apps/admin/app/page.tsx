@@ -843,6 +843,13 @@ export default function AdminDashboardPage() {
           >
             Internship listings
           </Link>
+
+          <Link
+            className="sidebarLink"
+            href="/compliance"
+          >
+            Compliance reviews
+          </Link>
         </nav>
 
         <div className="sidebarFooter">

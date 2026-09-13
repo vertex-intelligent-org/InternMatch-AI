@@ -136,9 +136,9 @@ CREATE TABLE IF NOT EXISTS public.employer_compliance_evidence (
     -- Lower-case SHA-256 digest of stored bytes.
     sha256_hex VARCHAR(64) NOT NULL,
 
-    uploaded_by_user_id UUID NOT NULL
+    uploaded_by_user_id UUID
         REFERENCES auth.users(id)
-        ON DELETE RESTRICT,
+        ON DELETE SET NULL,
 
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 

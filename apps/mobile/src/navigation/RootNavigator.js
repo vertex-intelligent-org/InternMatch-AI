@@ -22,6 +22,7 @@ import SavedInternshipsScreen from '../screens/SavedInternshipsScreen';
 import ApplicationDetailScreen from '../screens/ApplicationDetailScreen';
 import CreateOpportunityScreen from '../screens/CreateOpportunityScreen';
 import EmployerVerificationScreen from '../screens/EmployerVerificationScreen';
+import EmployerComplianceScreen from '../screens/EmployerComplianceScreen';
 import EmployerApplicantsScreen from '../screens/EmployerApplicantsScreen';
 import EmployerApplicantDetailScreen from '../screens/EmployerApplicantDetailScreen';
 import PrivacyPolicyScreen from '../screens/PrivacyPolicyScreen';
@@ -304,6 +305,7 @@ export default function RootNavigator() {
         <Stack.Screen name="CVUpload" component={CVUploadScreen} options={{ presentation: 'modal' }} />
         {/* Employer flow screens */}
         <Stack.Screen name="EmployerVerification" component={EmployerVerificationScreen} />
+        <Stack.Screen name="EmployerCompliance" component={EmployerComplianceScreen} />
         <Stack.Screen name="CreateOpportunity" component={CreateOpportunityScreen} />
         <Stack.Screen name="EmployerApplicants" component={EmployerApplicantsScreen} />
         <Stack.Screen name="EmployerApplicantDetail" component={EmployerApplicantDetailScreen} />

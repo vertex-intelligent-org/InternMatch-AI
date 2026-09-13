@@ -90,6 +90,22 @@ api_v1_router.include_router(
     tags=["Admin Employer Verification"],
 )
 
+# Employer compliance claims are a separate trust domain from
+# organization identity verification.
+from app.api.v1.endpoints import employer_compliance as employer_compliance_endpoints
+
+api_v1_router.include_router(
+    employer_compliance_endpoints.employer_router,
+    prefix="/employer-compliance",
+    tags=["Employer Compliance"],
+)
+
+api_v1_router.include_router(
+    employer_compliance_endpoints.admin_router,
+    prefix="/admin/employer-compliance",
+    tags=["Admin Employer Compliance"],
+)
+
 api_v1_router.include_router(
     admin_internships.router,
     prefix="/admin/internships",

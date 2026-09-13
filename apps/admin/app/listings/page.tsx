@@ -510,6 +510,13 @@ export default function AdminListingsPage() {
           >
             Internship listings
           </Link>
+
+          <Link
+            className="sidebarLink"
+            href="/compliance"
+          >
+            Compliance reviews
+          </Link>
         </nav>
 
         <div className="sidebarFooter">

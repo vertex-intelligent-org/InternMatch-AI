@@ -1165,3 +1165,181 @@ export async function cancelProcessingJob(
     }
   );
 }
+
+export type EmployerComplianceClaimType =
+  | 'insurance_arrangement'
+  | 'completion_certificate'
+  | 'university_agreement'
+  | 'legal_internship_eligibility';
+
+export type EmployerComplianceClaimStatus =
+  | 'draft'
+  | 'pending'
+  | 'approved'
+  | 'rejected'
+  | 'revoked'
+  | 'expired';
+
+export type EmployerComplianceEvidence = {
+  id: string;
+  original_filename: string;
+  content_type: string;
+  size_bytes: number;
+  created_at: string;
+};
+
+export type EmployerComplianceClaim = {
+  id: string;
+  organization_id: string;
+  claim_type: EmployerComplianceClaimType;
+  jurisdiction_country_code: string;
+  scope_key: string;
+  scope_label: string | null;
+  statement: string | null;
+  status: EmployerComplianceClaimStatus;
+  version: number;
+  submitted_at: string | null;
+  reviewed_at: string | null;
+  rejection_reason_code: string | null;
+  valid_from: string | null;
+  valid_until: string | null;
+  created_at: string;
+  updated_at: string;
+  evidence: EmployerComplianceEvidence[];
+};
+
+export type EmployerComplianceCreatePayload = {
+  claim_type: EmployerComplianceClaimType;
+  jurisdiction_country_code: string;
+  scope_key?: string;
+  scope_label?: string | null;
+  statement?: string | null;
+  valid_from?: string | null;
+  valid_until?: string | null;
+};
+
+export type EmployerComplianceUpdatePayload = {
+  expected_version: number;
+  scope_label?: string | null;
+  statement?: string | null;
+  valid_from?: string | null;
+  valid_until?: string | null;
+};
+
+export type EmployerComplianceEvidenceAccess = {
+  evidence_url: string;
+  expires_in: number;
+  file_type: 'pdf';
+};
+
+export async function listEmployerComplianceClaims(
+): Promise<EmployerComplianceClaim[]> {
+  return apiRequest<EmployerComplianceClaim[]>(
+    '/employer-compliance/claims',
+    {
+      method: 'GET',
+    }
+  );
+}
+
+export async function createEmployerComplianceClaim(
+  payload: EmployerComplianceCreatePayload
+): Promise<EmployerComplianceClaim> {
+  return apiRequest<EmployerComplianceClaim>(
+    '/employer-compliance/claims',
+    {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }
+  );
+}
+
+export async function updateEmployerComplianceClaim(
+  claimId: string,
+  payload: EmployerComplianceUpdatePayload
+): Promise<EmployerComplianceClaim> {
+  return apiRequest<EmployerComplianceClaim>(
+    (
+      '/employer-compliance/claims/'
+      + encodeURIComponent(claimId)
+    ),
+    {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }
+  );
+}
+
+export async function uploadEmployerComplianceEvidence(
+  claimId: string,
+  expectedVersion: number,
+  file: {
+    uri: string;
+    name: string;
+    type?: string;
+  }
+): Promise<EmployerComplianceClaim> {
+  const formData = new FormData();
+
+  appendReactNativeFile(
+    formData,
+    'file',
+    {
+      uri: file.uri,
+      name: file.name,
+      type: file.type || 'application/pdf',
+    }
+  );
+
+  return apiRequest<EmployerComplianceClaim>(
+    (
+      '/employer-compliance/claims/'
+      + encodeURIComponent(claimId)
+      + '/evidence?expected_version='
+      + encodeURIComponent(
+        expectedVersion.toString()
+      )
+    ),
+    {
+      method: 'POST',
+      body: formData,
+    }
+  );
+}
+
+export async function getEmployerComplianceEvidenceAccess(
+  claimId: string,
+  evidenceId: string
+): Promise<EmployerComplianceEvidenceAccess> {
+  return apiRequest<EmployerComplianceEvidenceAccess>(
+    (
+      '/employer-compliance/claims/'
+      + encodeURIComponent(claimId)
+      + '/evidence/'
+      + encodeURIComponent(evidenceId)
+      + '/url'
+    ),
+    {
+      method: 'GET',
+    }
+  );
+}
+
+export async function submitEmployerComplianceClaim(
+  claimId: string,
+  expectedVersion: number
+): Promise<EmployerComplianceClaim> {
+  return apiRequest<EmployerComplianceClaim>(
+    (
+      '/employer-compliance/claims/'
+      + encodeURIComponent(claimId)
+      + '/submit'
+    ),
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        expected_version: expectedVersion,
+      }),
+    }
+  );
+}

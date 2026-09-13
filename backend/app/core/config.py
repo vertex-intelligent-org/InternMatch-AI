@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     )
     CV_STORAGE_BUCKET: str = "cvs"
     AVATAR_STORAGE_BUCKET: str = "avatars"
+    COMPLIANCE_STORAGE_BUCKET: str = "employer-compliance-evidence"
 
     # Redis Async Task Queue
     REDIS_URL: str = "redis://redis:6379/0"
@@ -157,6 +158,15 @@ def validate_production_config(cfg: Settings) -> None:
     avatar_bucket = (cfg.AVATAR_STORAGE_BUCKET or "").strip()
     if not avatar_bucket:
         errors.append("AVATAR_STORAGE_BUCKET (must be non-empty)")
+
+    # COMPLIANCE_STORAGE_BUCKET
+    compliance_bucket = (
+        cfg.COMPLIANCE_STORAGE_BUCKET or ""
+    ).strip()
+    if not compliance_bucket:
+        errors.append(
+            "COMPLIANCE_STORAGE_BUCKET (must be non-empty)"
+        )
 
     # ALLOWED_ORIGINS
     origins = cfg.cors_origins_list

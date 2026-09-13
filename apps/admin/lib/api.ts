@@ -8,6 +8,12 @@ import type {
   PublicationStatus,
   EmployerOrganization,
   VerificationStatus,
+  ComplianceClaimStatus,
+  EmployerComplianceClaim,
+  ComplianceEvidenceAccessResponse,
+  ComplianceAdminApprovalPayload,
+  ComplianceAdminRejectionPayload,
+  ComplianceAdminRevocationPayload,
 } from './types';
 
 type JsonRecord = Record<string, unknown>;
@@ -351,6 +357,103 @@ export async function reopenAdminInternship(
     ),
     {
       method: 'POST',
+    }
+  );
+}
+
+export async function listComplianceClaimsForReview(
+  claimStatus: ComplianceClaimStatus = 'pending'
+): Promise<EmployerComplianceClaim[]> {
+  return adminApiRequest<EmployerComplianceClaim[]>(
+    (
+      '/admin/employer-compliance/claims'
+      + `?status=${encodeURIComponent(claimStatus)}`
+    ),
+    {
+      method: 'GET',
+    }
+  );
+}
+
+export async function getComplianceClaimForReview(
+  claimId: string
+): Promise<EmployerComplianceClaim> {
+  return adminApiRequest<EmployerComplianceClaim>(
+    (
+      '/admin/employer-compliance/claims/'
+      + encodeURIComponent(claimId)
+    ),
+    {
+      method: 'GET',
+    }
+  );
+}
+
+export async function getComplianceEvidenceAccess(
+  claimId: string,
+  evidenceId: string
+): Promise<ComplianceEvidenceAccessResponse> {
+  return adminApiRequest<ComplianceEvidenceAccessResponse>(
+    (
+      '/admin/employer-compliance/claims/'
+      + encodeURIComponent(claimId)
+      + '/evidence/'
+      + encodeURIComponent(evidenceId)
+      + '/url'
+    ),
+    {
+      method: 'GET',
+    }
+  );
+}
+
+export async function approveComplianceClaim(
+  claimId: string,
+  payload: ComplianceAdminApprovalPayload
+): Promise<EmployerComplianceClaim> {
+  return adminApiRequest<EmployerComplianceClaim>(
+    (
+      '/admin/employer-compliance/claims/'
+      + encodeURIComponent(claimId)
+      + '/approve'
+    ),
+    {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }
+  );
+}
+
+export async function rejectComplianceClaim(
+  claimId: string,
+  payload: ComplianceAdminRejectionPayload
+): Promise<EmployerComplianceClaim> {
+  return adminApiRequest<EmployerComplianceClaim>(
+    (
+      '/admin/employer-compliance/claims/'
+      + encodeURIComponent(claimId)
+      + '/reject'
+    ),
+    {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }
+  );
+}
+
+export async function revokeComplianceClaim(
+  claimId: string,
+  payload: ComplianceAdminRevocationPayload
+): Promise<EmployerComplianceClaim> {
+  return adminApiRequest<EmployerComplianceClaim>(
+    (
+      '/admin/employer-compliance/claims/'
+      + encodeURIComponent(claimId)
+      + '/revoke'
+    ),
+    {
+      method: 'POST',
+      body: JSON.stringify(payload),
     }
   );
 }
