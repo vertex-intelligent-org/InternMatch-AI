@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   ActivityIndicator,
   View,
@@ -52,7 +52,62 @@ export default function SignUpScreen({ navigation }) {
   const [focusedField, setFocusedField] = useState(null);
   const [loading, setLoading] = useState(false);
   const [loadingSource, setLoadingSource] = useState(null);
+  const [fieldErrors, setFieldErrors] = useState({});
+
+  const scrollRef = useRef(null);
+  const fullNameRef = useRef(null);
+  const emailRef = useRef(null);
+  const passwordRef = useRef(null);
+  const fieldPositions = useRef({});
+
   const { refreshProfile, setProfile } = useProfile();
+
+  const clearFieldError = (field) => {
+    setFieldErrors((current) => {
+      if (!current[field]) return current;
+
+      const next = { ...current };
+      delete next[field];
+      return next;
+    });
+  };
+
+  const focusValidationField = (field) => {
+    const position = fieldPositions.current[field];
+
+    if (typeof position === 'number') {
+      scrollRef.current?.scrollTo({
+        y: Math.max(position - spacing.lg, 0),
+        animated: true,
+      });
+    }
+
+    const refs = {
+      fullName: fullNameRef,
+      email: emailRef,
+      password: passwordRef,
+    };
+
+    setTimeout(() => {
+      refs[field]?.current?.focus();
+    }, 180);
+  };
+
+  const showValidationErrors = (errors) => {
+    setFieldErrors(errors);
+
+    const firstInvalid = ['fullName', 'email', 'password'].find(
+      (field) => Boolean(errors[field])
+    );
+
+    if (firstInvalid) {
+      haptics.error();
+      focusValidationField(firstInvalid);
+      return false;
+    }
+
+    return true;
+  };
 
   const ensureAccountTypeSelected = () => {
     if (accountType === 'intern' || accountType === 'employer') {
@@ -77,14 +132,13 @@ export default function SignUpScreen({ navigation }) {
     }
 
     if (!fullName.trim()) {
-      haptics.error();
-      Alert.alert(
-        t('common.error'),
-        t('onboarding.enterFullName')
-      );
+      showValidationErrors({
+        fullName: t('onboarding.enterFullName'),
+      });
       return false;
     }
 
+    clearFieldError('fullName');
     return true;
   };
 
@@ -142,15 +196,25 @@ export default function SignUpScreen({ navigation }) {
       return;
     }
 
-    if (!normalizedName || !normalizedEmail || !password) {
-      haptics.error();
-      Alert.alert(t('common.error'), t('auth.enterSignUpFields'));
-      return;
+    const validationErrors = {};
+
+    if (!normalizedName) {
+      validationErrors.fullName = t('onboarding.enterFullName');
     }
 
-    if (password.length < 6) {
-      haptics.error();
-      Alert.alert(t('common.error'), t('auth.passwordMinLength'));
+    if (!normalizedEmail) {
+      validationErrors.email = t('auth.emailRequired');
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      validationErrors.email = t('errors.authInvalidEmail');
+    }
+
+    if (!password) {
+      validationErrors.password = t('auth.passwordRequired');
+    } else if (password.length < 6) {
+      validationErrors.password = t('auth.passwordMinLength');
+    }
+
+    if (!showValidationErrors(validationErrors)) {
       return;
     }
 
@@ -305,6 +369,7 @@ export default function SignUpScreen({ navigation }) {
         style={styles.flex}
       >
         <ScrollView
+          ref={scrollRef}
           contentContainerStyle={[
             styles.scrollContent,
             {
@@ -444,46 +509,93 @@ export default function SignUpScreen({ navigation }) {
             </View>
 
             {/* Full Name */}
-            <View style={styles.fieldGroup}>
+            <View
+              style={styles.fieldGroup}
+              onLayout={(event) => {
+                fieldPositions.current.fullName = event.nativeEvent.layout.y;
+              }}
+            >
               <Text style={styles.fieldLabel}>{t('auth.fullName')}</Text>
               <TextInput
                 style={[
                   styles.input,
                   focusedField === 'fullName' && styles.inputFocused,
+                  fieldErrors.fullName && styles.inputError,
                 ]}
                 placeholder={t('auth.fullNamePlaceholder')}
                 placeholderTextColor="rgba(22, 35, 46, 0.40)"
+                ref={fullNameRef}
                 value={fullName}
-                onChangeText={setFullName}
+                onChangeText={(value) => {
+                  setFullName(value);
+                  clearFieldError('fullName');
+                }}
                 onFocus={() => setFocusedField('fullName')}
                 onBlur={() => setFocusedField(null)}
                 accessibilityLabel={t('auth.fullName')}
               />
+              {fieldErrors.fullName ? (
+                <Text
+                  style={[
+                    styles.fieldErrorText,
+                    { textAlign: isRTL ? 'right' : 'left' },
+                  ]}
+                  accessibilityLiveRegion="polite"
+                >
+                  {fieldErrors.fullName}
+                </Text>
+              ) : null}
             </View>
 
             {/* Email Field */}
-            <View style={styles.fieldGroup}>
+            <View
+              style={styles.fieldGroup}
+              onLayout={(event) => {
+                fieldPositions.current.email = event.nativeEvent.layout.y;
+              }}
+            >
               <Text style={styles.fieldLabel}>{t('auth.email')}</Text>
               <TextInput
                 style={[
                   styles.input,
                   focusedField === 'email' && styles.inputFocused,
+                  fieldErrors.email && styles.inputError,
                 ]}
                 placeholder={t('auth.emailPlaceholder')}
                 placeholderTextColor="rgba(22, 35, 46, 0.40)"
                 autoCapitalize="none"
                 autoCorrect={false}
                 keyboardType="email-address"
+                ref={emailRef}
                 value={email}
-                onChangeText={setEmail}
+                onChangeText={(value) => {
+                  setEmail(value);
+                  clearFieldError('email');
+                }}
                 onFocus={() => setFocusedField('email')}
                 onBlur={() => setFocusedField(null)}
                 accessibilityLabel={t('auth.email')}
               />
+              {fieldErrors.email ? (
+                <Text
+                  style={[
+                    styles.fieldErrorText,
+                    { textAlign: isRTL ? 'right' : 'left' },
+                  ]}
+                  accessibilityLiveRegion="polite"
+                >
+                  {fieldErrors.email}
+                </Text>
+              ) : null}
             </View>
 
             {/* Password Field */}
-            <View style={styles.fieldGroup}>
+            <View
+              style={styles.fieldGroup}
+              onLayout={(event) => {
+                fieldPositions.current.password = event.nativeEvent.layout.y;
+              }}
+            >
               <Text style={styles.fieldLabel}>{t('auth.password')}</Text>
               <View style={styles.passwordInputWrap}>
                 <TextInput
@@ -491,13 +603,18 @@ export default function SignUpScreen({ navigation }) {
                     styles.input,
                     styles.passwordInput,
                     focusedField === 'password' && styles.inputFocused,
+                    fieldErrors.password && styles.inputError,
                     isRTL && styles.passwordInputRTL,
                   ]}
                   placeholder={t('auth.passwordMin')}
                   placeholderTextColor="rgba(22, 35, 46, 0.40)"
                   secureTextEntry={!passwordVisible}
+                  ref={passwordRef}
                   value={password}
-                  onChangeText={setPassword}
+                  onChangeText={(value) => {
+                    setPassword(value);
+                    clearFieldError('password');
+                  }}
                   onFocus={() => setFocusedField('password')}
                   onBlur={() => setFocusedField(null)}
                   accessibilityLabel={t('auth.password')}
@@ -520,6 +637,17 @@ export default function SignUpScreen({ navigation }) {
                   />
                 </TouchableOpacity>
               </View>
+              {fieldErrors.password ? (
+                <Text
+                  style={[
+                    styles.fieldErrorText,
+                    { textAlign: isRTL ? 'right' : 'left' },
+                  ]}
+                  accessibilityLiveRegion="polite"
+                >
+                  {fieldErrors.password}
+                </Text>
+              ) : null}
             </View>
 
             {/* Department Field */}
@@ -849,4 +977,15 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
   },
 
+  inputError: {
+    borderColor: colors.error || '#B42318',
+    borderWidth: 1.5,
+  },
+  fieldErrorText: {
+    ...typography.caption,
+    color: colors.error || '#B42318',
+    fontSize: 12,
+    lineHeight: 17,
+    marginTop: spacing.xs,
+  },
 });

@@ -157,6 +157,8 @@ export default {
     employerA11y: 'Hesap türü: İşveren',
     enterEmailPassword: 'Lütfen e-posta adresinizi ve şifrenizi girin.',
     enterSignUpFields: 'Lütfen adınızı soyadınızı, e-posta adresinizi ve şifrenizi girin.',
+    emailRequired: 'Lütfen e-posta adresinizi girin.',
+    passwordRequired: 'Lütfen şifrenizi girin.',
     forgotPassword: 'Şifremi unuttum',
     forgotPasswordA11y: 'Şifremi unuttum',
     forgotPasswordMessage: 'Şifre sıfırlama talimatları kayıtlı e-posta adresinize gönderilecektir.',

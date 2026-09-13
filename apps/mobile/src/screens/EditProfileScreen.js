@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -134,8 +134,48 @@ export default function EditProfileScreen({ navigation }) {
   const [avatarUri, setAvatarUri] = useState(profile?.avatar_url ?? null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState({});
+
+  const scrollRef = useRef(null);
+  const fullNameRef = useRef(null);
+  const linkedinRef = useRef(null);
+  const githubRef = useRef(null);
+  const portfolioRef = useRef(null);
+  const fieldPositions = useRef({});
 
   const currentAvatar = avatarUri || profile?.avatar_url || null;
+
+  const clearFieldError = (field) => {
+    setFieldErrors((current) => {
+      if (!current[field]) return current;
+
+      const next = { ...current };
+      delete next[field];
+      return next;
+    });
+  };
+
+  const focusValidationField = (field) => {
+    const position = fieldPositions.current[field];
+
+    if (typeof position === 'number') {
+      scrollRef.current?.scrollTo({
+        y: Math.max(position - spacing.lg, 0),
+        animated: true,
+      });
+    }
+
+    const refs = {
+      fullName: fullNameRef,
+      linkedin: linkedinRef,
+      github: githubRef,
+      portfolio: portfolioRef,
+    };
+
+    setTimeout(() => {
+      refs[field]?.current?.focus();
+    }, 180);
+  };
   const initials = getInitials(fullName || profile?.full_name);
 
   const handlePickImage = async () => {
@@ -349,35 +389,43 @@ export default function EditProfileScreen({ navigation }) {
   };
 
   const handleSave = async () => {
-    const trimmedName = fullName.trim();
-    if (!trimmedName) {
-      haptics.error();
-      Alert.alert(t('common.error'), t('editProfile.enterFullName'));
-      return;
-    }
-
     if (saving) return;
 
+    const trimmedName = fullName.trim();
     const normalizedLinkedin = normalizeUrl(linkedinUrl);
     const normalizedGithub = normalizeUrl(githubUrl);
     const normalizedPortfolio = normalizeUrl(portfolioUrl);
 
+    const validationErrors = {};
+
+    if (!trimmedName) {
+      validationErrors.fullName = t('editProfile.validation.nameRequiredMsg');
+    }
+
     if (linkedinUrl.trim() && !normalizedLinkedin) {
-      haptics.error();
-      Alert.alert(t('common.error'), t('editProfile.invalidUrl'));
-      return;
+      validationErrors.linkedin = t('editProfile.invalidUrl');
     }
+
     if (githubUrl.trim() && !normalizedGithub) {
-      haptics.error();
-      Alert.alert(t('common.error'), t('editProfile.invalidUrl'));
-      return;
+      validationErrors.github = t('editProfile.invalidUrl');
     }
+
     if (portfolioUrl.trim() && !normalizedPortfolio) {
+      validationErrors.portfolio = t('editProfile.invalidUrl');
+    }
+
+    const firstInvalid = ['fullName', 'linkedin', 'github', 'portfolio'].find(
+      (field) => Boolean(validationErrors[field])
+    );
+
+    if (firstInvalid) {
+      setFieldErrors(validationErrors);
       haptics.error();
-      Alert.alert(t('common.error'), t('editProfile.invalidUrl'));
+      focusValidationField(firstInvalid);
       return;
     }
 
+    setFieldErrors({});
     setSaving(true);
     try {
       const payload = isEmployer
@@ -450,6 +498,7 @@ export default function EditProfileScreen({ navigation }) {
         style={styles.flex}
       >
         <ScrollView
+          ref={scrollRef}
           style={styles.screen}
           contentContainerStyle={styles.content}
           keyboardShouldPersistTaps="handled"
@@ -500,7 +549,16 @@ export default function EditProfileScreen({ navigation }) {
             {isEmployer ? t('editProfile.employer.fullName') : t('editProfile.fullName')}
           </Text>
           <TextInput
-            style={[styles.input, styles.compactMultilineInput, isRTL && styles.inputRTL]}
+            ref={fullNameRef}
+            style={[
+              styles.input,
+              styles.compactMultilineInput,
+              fieldErrors.fullName && styles.inputError,
+              isRTL && styles.inputRTL,
+            ]}
+            onLayout={(event) => {
+              fieldPositions.current.fullName = event.nativeEvent.layout.y;
+            }}
             multiline
             numberOfLines={2}
             textAlignVertical="top"
@@ -508,8 +566,22 @@ export default function EditProfileScreen({ navigation }) {
             placeholder={isEmployer ? t('editProfile.employer.fullNamePlaceholder') : t('editProfile.fullName')}
             placeholderTextColor={colors.textTertiary || colors.textMuted}
             value={fullName}
-            onChangeText={setFullName}
+            onChangeText={(value) => {
+              setFullName(value);
+              clearFieldError('fullName');
+            }}
           />
+          {fieldErrors.fullName ? (
+            <Text
+              style={[
+                styles.fieldErrorText,
+                isRTL && styles.textRTL,
+              ]}
+              accessibilityLiveRegion="polite"
+            >
+              {fieldErrors.fullName}
+            </Text>
+          ) : null}
 
           <Text style={[styles.label, isRTL && styles.textRTL]}>{t('editProfile.headline')}</Text>
           <TextInput
@@ -689,39 +761,105 @@ export default function EditProfileScreen({ navigation }) {
 
           <Text style={[styles.label, isRTL && styles.textRTL]}>{t('editProfile.linkedin')}</Text>
           <TextInput
-            style={[styles.input, styles.urlInput]}
+            ref={linkedinRef}
+            style={[
+              styles.input,
+              styles.urlInput,
+              fieldErrors.linkedin && styles.inputError,
+            ]}
+            onLayout={(event) => {
+              fieldPositions.current.linkedin = event.nativeEvent.layout.y;
+            }}
             placeholder="https://linkedin.com/in/username"
             placeholderTextColor={colors.textTertiary || colors.textMuted}
             value={linkedinUrl}
-            onChangeText={setLinkedinUrl}
+            onChangeText={(value) => {
+              setLinkedinUrl(value);
+              clearFieldError('linkedin');
+            }}
             autoCapitalize="none"
             autoCorrect={false}
             keyboardType="url"
           />
+          {fieldErrors.linkedin ? (
+            <Text
+              style={[
+                styles.fieldErrorText,
+                isRTL && styles.textRTL,
+              ]}
+              accessibilityLiveRegion="polite"
+            >
+              {fieldErrors.linkedin}
+            </Text>
+          ) : null}
 
           <Text style={[styles.label, isRTL && styles.textRTL]}>{t('editProfile.github')}</Text>
           <TextInput
-            style={[styles.input, styles.urlInput]}
+            ref={githubRef}
+            style={[
+              styles.input,
+              styles.urlInput,
+              fieldErrors.github && styles.inputError,
+            ]}
+            onLayout={(event) => {
+              fieldPositions.current.github = event.nativeEvent.layout.y;
+            }}
             placeholder="https://github.com/username"
             placeholderTextColor={colors.textTertiary || colors.textMuted}
             value={githubUrl}
-            onChangeText={setGithubUrl}
+            onChangeText={(value) => {
+              setGithubUrl(value);
+              clearFieldError('github');
+            }}
             autoCapitalize="none"
             autoCorrect={false}
             keyboardType="url"
           />
+          {fieldErrors.github ? (
+            <Text
+              style={[
+                styles.fieldErrorText,
+                isRTL && styles.textRTL,
+              ]}
+              accessibilityLiveRegion="polite"
+            >
+              {fieldErrors.github}
+            </Text>
+          ) : null}
 
           <Text style={[styles.label, isRTL && styles.textRTL]}>{t('editProfile.portfolio')}</Text>
           <TextInput
-            style={[styles.input, styles.urlInput]}
+            ref={portfolioRef}
+            style={[
+              styles.input,
+              styles.urlInput,
+              fieldErrors.portfolio && styles.inputError,
+            ]}
+            onLayout={(event) => {
+              fieldPositions.current.portfolio = event.nativeEvent.layout.y;
+            }}
             placeholder="https://yourportfolio.com"
             placeholderTextColor={colors.textTertiary || colors.textMuted}
             value={portfolioUrl}
-            onChangeText={setPortfolioUrl}
+            onChangeText={(value) => {
+              setPortfolioUrl(value);
+              clearFieldError('portfolio');
+            }}
             autoCapitalize="none"
             autoCorrect={false}
             keyboardType="url"
           />
+          {fieldErrors.portfolio ? (
+            <Text
+              style={[
+                styles.fieldErrorText,
+                isRTL && styles.textRTL,
+              ]}
+              accessibilityLiveRegion="polite"
+            >
+              {fieldErrors.portfolio}
+            </Text>
+          ) : null}
 
           <GradientButton
             title={saving ? t('common.saving') : t('common.save')}
@@ -891,5 +1029,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: spacing.xxxl,
+  },
+  inputError: {
+    borderColor: colors.error || '#B42318',
+    borderWidth: 1.5,
+  },
+  fieldErrorText: {
+    ...typography.caption,
+    color: colors.error || '#B42318',
+    fontSize: 12,
+    lineHeight: 17,
+    marginTop: spacing.xs,
   },
 });

@@ -142,6 +142,8 @@ export default {
     employerA11y: 'نوع الحساب: صاحب عمل',
     enterEmailPassword: 'يرجى إدخال بريدك الإلكتروني وكلمة المرور.',
     enterSignUpFields: 'يرجى إدخال اسمك الكامل وبريدك الإلكتروني وكلمة المرور.',
+    emailRequired: 'يرجى إدخال عنوان بريدك الإلكتروني.',
+    passwordRequired: 'يرجى إدخال كلمة المرور.',
     forgotPassword: 'نسيت كلمة المرور',
     forgotPasswordA11y: 'نسيت كلمة المرور',
     forgotPasswordMessage: 'سيتم إرسال تعليمات إعادة تعيين كلمة المرور إلى بريدك المسجل.',

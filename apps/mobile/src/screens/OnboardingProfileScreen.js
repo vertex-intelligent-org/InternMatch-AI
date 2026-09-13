@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -51,8 +51,33 @@ export default function OnboardingProfileScreen({ navigation, route }) {
   const [headline, setHeadline] = useState('');
   const [focusedField, setFocusedField] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState({});
+
+  const scrollRef = useRef(null);
+  const fullNameRef = useRef(null);
 
   const { setProfile } = useProfile();
+
+  const clearFieldError = (field) => {
+    setFieldErrors((current) => {
+      if (!current[field]) return current;
+
+      const next = { ...current };
+      delete next[field];
+      return next;
+    });
+  };
+
+  const focusFullNameError = () => {
+    scrollRef.current?.scrollTo({
+      y: 0,
+      animated: true,
+    });
+
+    setTimeout(() => {
+      fullNameRef.current?.focus();
+    }, 180);
+  };
 
   const handleComplete = async () => {
     const trimmedName = fullName.trim();
@@ -60,13 +85,15 @@ export default function OnboardingProfileScreen({ navigation, route }) {
     const trimmedHeadline = headline.trim() || null;
 
     if (!trimmedName) {
+      setFieldErrors({
+        fullName: t('onboarding.nameRequiredMsg'),
+      });
       haptics.error();
-      Alert.alert(
-        t('common.error'),
-        t('onboarding.enterFullName')
-      );
+      focusFullNameError();
       return;
     }
+
+    setFieldErrors({});
 
     if (saving) return;
 
@@ -113,6 +140,7 @@ export default function OnboardingProfileScreen({ navigation, route }) {
         style={styles.flex}
       >
         <ScrollView
+          ref={scrollRef}
           contentContainerStyle={[
             styles.content,
             {
@@ -270,14 +298,19 @@ export default function OnboardingProfileScreen({ navigation, route }) {
                   styles.input,
                   focusedField === 'fullName' &&
                     styles.inputFocused,
+                  fieldErrors.fullName && styles.inputError,
                   isRTL && styles.inputRTL,
                 ]}
                 placeholder={t(
                   'onboarding.fullNamePlaceholder'
                 )}
                 placeholderTextColor="rgba(22, 35, 46, 0.40)"
+                ref={fullNameRef}
                 value={fullName}
-                onChangeText={setFullName}
+                onChangeText={(value) => {
+                  setFullName(value);
+                  clearFieldError('fullName');
+                }}
                 onFocus={() =>
                   setFocusedField('fullName')
                 }
@@ -287,6 +320,17 @@ export default function OnboardingProfileScreen({ navigation, route }) {
                   'onboarding.fullName'
                 )}
               />
+              {fieldErrors.fullName ? (
+                <Text
+                  style={[
+                    styles.fieldErrorText,
+                    { textAlign: isRTL ? 'right' : 'left' },
+                  ]}
+                  accessibilityLiveRegion="polite"
+                >
+                  {fieldErrors.fullName}
+                </Text>
+              ) : null}
             </View>
 
             <View style={styles.fieldGroup}>
@@ -526,5 +570,16 @@ const styles = StyleSheet.create({
 
   primaryCta: {
     marginTop: spacing.sm,
+  },
+  inputError: {
+    borderColor: colors.error || '#B42318',
+    borderWidth: 1.5,
+  },
+  fieldErrorText: {
+    ...typography.caption,
+    color: colors.error || '#B42318',
+    fontSize: 12,
+    lineHeight: 17,
+    marginTop: spacing.xs,
   },
 });

@@ -157,6 +157,8 @@ export default {
     employerA11y: 'Account type: Employer',
     enterEmailPassword: 'Please enter your email and password.',
     enterSignUpFields: 'Please enter your full name, email, and password.',
+    emailRequired: 'Please enter your email address.',
+    passwordRequired: 'Please enter your password.',
     forgotPassword: 'I forgot my password',
     forgotPasswordA11y: 'Forgot password',
     forgotPasswordMessage: 'Password reset instructions will be sent to your registered email address.',
