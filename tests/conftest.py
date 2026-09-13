@@ -171,6 +171,23 @@ def setup_test_database():
     app.dependency_overrides.pop(get_db, None)
 
 
+def _clear_shared_test_database() -> None:
+    """Delete all test rows in foreign-key-safe dependency order."""
+    with test_engine.begin() as connection:
+        for table in reversed(Base.metadata.sorted_tables):
+            connection.execute(table.delete())
+
+
+@pytest.fixture(autouse=True)
+def isolate_shared_test_database(setup_test_database):
+    """Prevent committed rows from leaking between tests in the shared SQLite database."""
+    _clear_shared_test_database()
+    try:
+        yield
+    finally:
+        _clear_shared_test_database()
+
+
 @pytest.fixture
 def client() -> TestClient:
     """Fixture providing FastAPI TestClient instance."""
