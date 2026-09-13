@@ -1,4 +1,4 @@
-﻿-- Gate 11 follow-up: explicit candidate skill provenance-known state
+-- Gate 11 follow-up: explicit candidate skill provenance-known state
 --
 -- Existing rows predate authoritative CV provenance tracking.
 -- Preserve them as provenance-unknown until a current accepted CV

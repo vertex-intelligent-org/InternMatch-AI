@@ -4,6 +4,14 @@
 -- Existing job types remain unchanged. This migration only broadens the
 -- allowed values of ck_processing_jobs_job_type.
 
+-- Migration 001 created the original job_type CHECK without an explicit
+-- constraint name. PostgreSQL therefore names it
+-- processing_jobs_job_type_check. Drop both that legacy generated name and
+-- the canonical name so this migration is safe for existing databases and
+-- fresh migration chains.
+ALTER TABLE public.processing_jobs
+    DROP CONSTRAINT IF EXISTS processing_jobs_job_type_check;
+
 ALTER TABLE public.processing_jobs
     DROP CONSTRAINT IF EXISTS ck_processing_jobs_job_type;
 

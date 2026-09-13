@@ -1,3 +1,4 @@
+from pathlib import Path
 from uuid import uuid4
 
 from app.db.models import ProcessingJob
@@ -157,3 +158,28 @@ def test_part_c_enqueue_rejects_invalid_locale(monkeypatch):
         raise AssertionError("Invalid interview-prep locale was accepted.")
 
     assert called == []
+
+def test_processing_job_migration_drops_legacy_and_canonical_constraints():
+    migration = Path(
+        "database/migrations/"
+        "018_expand_processing_job_ai_types.sql"
+    ).read_text(encoding="utf-8")
+
+    assert (
+        "DROP CONSTRAINT IF EXISTS "
+        "processing_jobs_job_type_check"
+        in migration
+    )
+    assert (
+        "DROP CONSTRAINT IF EXISTS "
+        "ck_processing_jobs_job_type"
+        in migration
+    )
+    assert (
+        "ADD CONSTRAINT "
+        "ck_processing_jobs_job_type"
+        in migration
+    )
+
+    assert "match_explanation" in migration
+    assert "interview_prep" in migration
