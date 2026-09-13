@@ -72,6 +72,10 @@ export default function SignUpScreen({ navigation }) {
       return false;
     }
 
+    if (accountType === 'employer') {
+      return false;
+    }
+
     if (!fullName.trim()) {
       haptics.error();
       Alert.alert(
@@ -550,6 +554,8 @@ export default function SignUpScreen({ navigation }) {
               style={styles.primaryCta}
             />
 
+            {accountType !== 'employer' && (
+              <>
             {/* Divider */}
             <View style={styles.dividerRow}>
               <View style={styles.divider} />
@@ -609,6 +615,9 @@ export default function SignUpScreen({ navigation }) {
                   onPress={handleApple}
                 />
               )
+            )}
+
+              </>
             )}
 
             {/* Legal Footer inside Panel */}

@@ -27,7 +27,7 @@ import PressableCard from '../components/PressableCard';
 import Chip from '../components/Chip';
 import GradientButton from '../components/GradientButton';
 import Reveal from '../components/motion/Reveal';
-import { getEmployerInternships, closeEmployerOpportunity } from '../services/api';
+import { ApiError, getEmployerInternships, closeEmployerOpportunity, getEmployerOrganization } from '../services/api';
 
 export default function EmployerOpportunitiesScreen({ navigation }) {
   const { t } = useTranslation();
@@ -45,6 +45,39 @@ export default function EmployerOpportunitiesScreen({ navigation }) {
   const [refreshing, setRefreshing] = useState(false);
   const [closingId, setClosingId] = useState(null);
   const [error, setError] = useState(null);
+  const [createGateLoading, setCreateGateLoading] = useState(false);
+
+  const handleCreateOpportunity = useCallback(async () => {
+    if (createGateLoading) return;
+
+    setCreateGateLoading(true);
+
+    try {
+      const organization = await getEmployerOrganization();
+
+      if (organization.verification_status === 'verified') {
+        navigation.navigate('CreateOpportunity');
+        return;
+      }
+
+      navigation.navigate('EmployerVerification');
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 404) {
+        navigation.navigate('EmployerVerification');
+        return;
+      }
+
+      console.warn('Failed to verify employer publication access:', err);
+
+      Alert.alert(
+        t('employerVerification.loadErrorTitle'),
+        t('employerVerification.loadError')
+      );
+    } finally {
+      setCreateGateLoading(false);
+    }
+  }, [createGateLoading, navigation, t]);
+
 
   const fetchOpportunities = useCallback(async (isRefresh = false) => {
     if (isRefresh) {
@@ -152,11 +185,27 @@ export default function EmployerOpportunitiesScreen({ navigation }) {
 
             <TouchableOpacity
               style={[styles.createHeaderBtn, isRTL && styles.rowRTL]}
-              onPress={() => navigation.navigate('CreateOpportunity')}
+              onPress={handleCreateOpportunity}
+              disabled={createGateLoading}
               accessibilityRole="button"
+              accessibilityState={{
+                disabled: createGateLoading,
+                busy: createGateLoading,
+              }}
               accessibilityLabel={t('employerOpportunities.createOpportunity')}
             >
-              <Ionicons name="add" size={18} color={colors.textInverse || colors.white} />
+              {createGateLoading ? (
+                <ActivityIndicator
+                  size="small"
+                  color={colors.textInverse || colors.white}
+                />
+              ) : (
+                <Ionicons
+                  name="add"
+                  size={18}
+                  color={colors.textInverse || colors.white}
+                />
+              )}
               <Text style={styles.createHeaderBtnText}>
                 {t('employerOpportunities.createBtn')}
               </Text>
@@ -210,7 +259,9 @@ export default function EmployerOpportunitiesScreen({ navigation }) {
             <GradientButton
               title={`+ ${t('employerOpportunities.createOpportunity')}`}
               color={colors.accent || colors.teal}
-              onPress={() => navigation.navigate('CreateOpportunity')}
+              onPress={handleCreateOpportunity}
+              disabled={createGateLoading}
+              loading={createGateLoading}
               style={styles.emptyCta}
             />
           </Card>

@@ -32,7 +32,9 @@ import { deleteAccount } from '../services/api';
 
 const appVersion = require('../../app.json').expo.version || '1.0.0';
 const DATA_DELETION_URL = 'https://internmatch.college/data-deletion';
-const SUPPORT_EMAIL_URL = 'mailto:internmatch@vertexintelligent.com';
+const SUPPORT_EMAIL = 'internmatch@vertexintelligent.com';
+const SUPPORT_EMAIL_URL =
+  `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent('InternMatch AI Support')}`;
 
 const LANGUAGE_OPTIONS = [
   { code: 'en', label: 'English' },
@@ -112,6 +114,7 @@ export default function SettingsScreen({ navigation }) {
   const { t } = useTranslation();
   const { locale, isRTL, setLocale } = useLocalization();
   const [languagePickerVisible, setLanguagePickerVisible] = useState(false);
+  const [supportFallbackVisible, setSupportFallbackVisible] = useState(false);
   const [changingLanguage, setChangingLanguage] = useState(false);
   const [resettingPassword, setResettingPassword] = useState(false);
   const passwordResetInFlightRef = useRef(false);
@@ -214,6 +217,21 @@ export default function SettingsScreen({ navigation }) {
       const msg = getLocalizedErrorMessage(err, t);
       Alert.alert(t('common.error'), msg);
     }
+  };
+
+  const handleSupportContact = async () => {
+    try {
+      const supported = await Linking.canOpenURL(SUPPORT_EMAIL_URL);
+
+      if (supported) {
+        await Linking.openURL(SUPPORT_EMAIL_URL);
+        return;
+      }
+    } catch (error) {
+      console.warn('Unable to open the device email application:', error);
+    }
+
+    setSupportFallbackVisible(true);
   };
 
   const handleOpenExternalUrl = async (url) => {
@@ -440,7 +458,7 @@ export default function SettingsScreen({ navigation }) {
           <SettingsRow
             icon="mail-outline"
             label={t('settings.supportContact')}
-            onPress={() => handleOpenExternalUrl(SUPPORT_EMAIL_URL)}
+            onPress={handleSupportContact}
             accessibilityLabel={t('settings.supportContact')}
           />
           <SettingsRow
@@ -495,6 +513,64 @@ export default function SettingsScreen({ navigation }) {
           </Text>
         </TouchableOpacity>
       </ScrollView>
+
+      <Modal
+        visible={supportFallbackVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setSupportFallbackVisible(false)}
+      >
+        <View style={styles.languageModalBackdrop}>
+          <GlassSurface variant="card" style={styles.languageSheet}>
+            <Text style={[styles.languageTitle, isRTL && styles.textRTL]}>
+              {t('settings.supportUnavailableTitle')}
+            </Text>
+
+            <Text style={[styles.languageMessage, isRTL && styles.textRTL]}>
+              {t('settings.supportUnavailableMessage')}
+            </Text>
+
+            <Text
+              style={[
+                styles.languageMessage,
+                isRTL && styles.textRTL,
+                { marginBottom: spacing.xs, fontWeight: '600' },
+              ]}
+            >
+              {t('settings.supportEmailLabel')}
+            </Text>
+
+            <View style={styles.languageOption}>
+              <Text
+                selectable
+                style={[
+                  styles.languageOptionText,
+                  isRTL && styles.textRTL,
+                  { flex: 1 },
+                ]}
+              >
+                {SUPPORT_EMAIL}
+              </Text>
+            </View>
+
+            <TouchableOpacity
+              onPress={() => setSupportFallbackVisible(false)}
+              accessibilityRole="button"
+              accessibilityLabel={t('settings.supportClose')}
+              style={{
+                minHeight: 48,
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginTop: spacing.md,
+              }}
+            >
+              <Text style={styles.languageCancelText}>
+                {t('settings.supportClose')}
+              </Text>
+            </TouchableOpacity>
+          </GlassSurface>
+        </View>
+      </Modal>
 
       <Modal
         visible={languagePickerVisible}

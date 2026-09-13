@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { Alert, useTranslation } from 'react-i18next';
+import { useTranslation } from 'react-i18next';
 import { getLocalizedErrorMessage } from '../localization/errorMessages';
 import { useLocalization } from '../localization/LocalizationContext';
 import {
@@ -10,6 +10,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useScrollToTop } from '@react-navigation/native';
@@ -33,7 +34,7 @@ import AuthenticatedAppChromeHeader from '../components/AuthenticatedAppChromeHe
 import { useProfile } from '../context/ProfileContext';
 import { useTabScroll, useTabScrollReporter } from '../context/TabScrollContext';
 import { normalizeAccountType } from '../services/subscriptionService';
-import { getMatches, getEmployerInternships } from '../services/api';
+import { ApiError, getMatches, getEmployerInternships, getEmployerOrganization } from '../services/api';
 import { useMatchCalculation } from '../hooks/useMatchCalculation';
 
 export default function HomeScreen({ navigation }) {
@@ -66,6 +67,39 @@ export default function HomeScreen({ navigation }) {
   const [employerTotal, setEmployerTotal] = useState(0);
   const [employerLoading, setEmployerLoading] = useState(false);
   const [employerError, setEmployerError] = useState(null);
+  const [createGateLoading, setCreateGateLoading] = useState(false);
+
+  const handleCreateOpportunity = useCallback(async () => {
+    if (createGateLoading) return;
+
+    setCreateGateLoading(true);
+
+    try {
+      const organization = await getEmployerOrganization();
+
+      if (organization.verification_status === 'verified') {
+        navigation.navigate('CreateOpportunity');
+        return;
+      }
+
+      navigation.navigate('EmployerVerification');
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 404) {
+        navigation.navigate('EmployerVerification');
+        return;
+      }
+
+      console.warn('Failed to verify employer publication access:', err);
+
+      Alert.alert(
+        t('employerVerification.loadErrorTitle'),
+        t('employerVerification.loadError')
+      );
+    } finally {
+      setCreateGateLoading(false);
+    }
+  }, [createGateLoading, navigation, t]);
+
 
   const {
     isCalculating,
@@ -275,7 +309,9 @@ export default function HomeScreen({ navigation }) {
                   <GradientButton
                     title={`+ ${t('home.employer.createOpportunity')}`}
                     color={colors.accent || colors.teal}
-                    onPress={() => navigation.navigate('CreateOpportunity')}
+                    onPress={handleCreateOpportunity}
+                    disabled={createGateLoading}
+                    loading={createGateLoading}
                     style={styles.employerActionBtn}
                   />
                   <TouchableOpacity
@@ -340,7 +376,9 @@ export default function HomeScreen({ navigation }) {
                   <GradientButton
                     title={`+ ${t('home.employer.createOpportunity')}`}
                     color={colors.accent || colors.teal}
-                    onPress={() => navigation.navigate('CreateOpportunity')}
+                    onPress={handleCreateOpportunity}
+                    disabled={createGateLoading}
+                    loading={createGateLoading}
                     style={{ marginTop: spacing.lg, width: '100%' }}
                   />
                 </Card>

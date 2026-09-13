@@ -759,6 +759,100 @@ export async function updateApplicationStatus(
   );
 }
 
+export type EmployerVerificationStatus =
+  | 'unverified'
+  | 'pending'
+  | 'verified'
+  | 'rejected'
+  | 'suspended';
+
+export type EmployerOrganizationType =
+  | 'company'
+  | 'university_lab'
+  | 'research_center';
+
+export type EmployerVerificationMethod =
+  | 'standard_company'
+  | 'manual_admin';
+
+export type EmployerOrganizationWritePayload = {
+  legal_name: string;
+  display_name: string;
+  website_url: string;
+  business_email: string;
+  country_code: string;
+  registration_number?: string | null;
+  tax_number?: string | null;
+  representative_name: string;
+  representative_role: string;
+};
+
+export type EmployerOrganizationResponse = {
+  id: string;
+  owner_user_id: string;
+  legal_name: string;
+  display_name: string;
+  website_url: string;
+  normalized_domain: string;
+  business_email: string;
+  email_domain_matches_website: boolean;
+  country_code: string;
+  registration_number: string | null;
+  tax_number: string | null;
+  representative_name: string;
+  representative_role: string;
+  organization_type: EmployerOrganizationType;
+  verification_method: EmployerVerificationMethod | null;
+  verification_status: EmployerVerificationStatus;
+  submitted_at: string | null;
+  reviewed_at: string | null;
+  rejection_reason_code: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export async function getEmployerOrganization(): Promise<EmployerOrganizationResponse> {
+  return apiRequest<EmployerOrganizationResponse>(
+    '/employer-organization',
+    {
+      method: 'GET',
+    }
+  );
+}
+
+export async function createEmployerOrganization(
+  payload: EmployerOrganizationWritePayload
+): Promise<EmployerOrganizationResponse> {
+  return apiRequest<EmployerOrganizationResponse>(
+    '/employer-organization',
+    {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }
+  );
+}
+
+export async function updateEmployerOrganization(
+  payload: EmployerOrganizationWritePayload
+): Promise<EmployerOrganizationResponse> {
+  return apiRequest<EmployerOrganizationResponse>(
+    '/employer-organization',
+    {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }
+  );
+}
+
+export async function submitEmployerOrganizationForReview(): Promise<EmployerOrganizationResponse> {
+  return apiRequest<EmployerOrganizationResponse>(
+    '/employer-organization/submit',
+    {
+      method: 'POST',
+    }
+  );
+}
+
 export type EmployerCreateInternshipPayload = {
   title: string;
   company: string;

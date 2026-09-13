@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -23,6 +24,7 @@ import GradientButton from '../components/GradientButton';
 import haptics from '../services/haptics';
 import {
   createEmployerInternship,
+  getEmployerOrganization,
   getInternshipDetail,
   updateEmployerInternship,
   ApiError,
@@ -76,8 +78,81 @@ export default function CreateOpportunityScreen({ navigation, route }) {
   const [loadingExisting, setLoadingExisting] = useState(Boolean(editingId));
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState(null);
+  const [fieldErrors, setFieldErrors] = useState({});
+  const [verificationChecking, setVerificationChecking] = useState(true);
+  const [verifiedOrganization, setVerifiedOrganization] = useState(null);
+
+  const scrollRef = useRef(null);
+  const titleRef = useRef(null);
+  const companyRef = useRef(null);
+  const locationRef = useRef(null);
+  const descriptionRef = useRef(null);
+  const fieldPositions = useRef({});
+
+  const rememberFieldPosition = (field) => (event) => {
+    fieldPositions.current[field] = event.nativeEvent.layout.y;
+  };
+
+  const clearFieldError = (field) => {
+    setFieldErrors((current) => {
+      if (!current[field]) return current;
+
+      const next = { ...current };
+      delete next[field];
+      return next;
+    });
+  };
+
 
   useEffect(() => {
+    let active = true;
+
+    const enforceVerifiedEmployer = async () => {
+      setVerificationChecking(true);
+
+      try {
+        const organization = await getEmployerOrganization();
+
+        if (!active) return;
+
+        if (organization.verification_status !== 'verified') {
+          navigation.replace('EmployerVerification');
+          return;
+        }
+
+        setVerifiedOrganization(organization);
+        setCompany(
+          organization.display_name ||
+          organization.legal_name
+        );
+      } catch (err) {
+        if (!active) return;
+
+        console.warn(
+          'Failed to verify employer before opening opportunity editor:',
+          err
+        );
+
+        navigation.replace('EmployerVerification');
+      } finally {
+        if (active) {
+          setVerificationChecking(false);
+        }
+      }
+    };
+
+    enforceVerifiedEmployer();
+
+    return () => {
+      active = false;
+    };
+  }, [navigation]);
+
+  useEffect(() => {
+    if (!verifiedOrganization) {
+      return undefined;
+    }
+
     if (!editingId) {
       setLoadingExisting(false);
       return undefined;
@@ -95,7 +170,10 @@ export default function CreateOpportunityScreen({ navigation, route }) {
         if (!active) return;
 
         setTitle(detail.title || '');
-        setCompany(detail.company || '');
+        setCompany(
+          verifiedOrganization.display_name ||
+          verifiedOrganization.legal_name
+        );
         setLocation(detail.location || '');
         setWorkType(detail.work_type || 'hybrid');
         setDescription(detail.description || '');
@@ -127,7 +205,7 @@ export default function CreateOpportunityScreen({ navigation, route }) {
     return () => {
       active = false;
     };
-  }, [editingId, t]);
+  }, [editingId, t, verifiedOrganization]);
 
   const handleSubmit = async () => {
     setErrorMessage(null);
@@ -137,11 +215,81 @@ export default function CreateOpportunityScreen({ navigation, route }) {
     const trimmedLocation = location.trim();
     const trimmedDescription = description.trim();
 
-    if (!trimmedTitle || !trimmedCompany || !trimmedLocation || !trimmedDescription) {
-      setErrorMessage(t('createOpportunity.validationError'));
-      haptics.selection();
+    const missing = {};
+
+    if (!trimmedTitle) {
+      missing.title = t(
+        'createOpportunity.requiredField',
+        'This field is required.'
+      );
+    }
+
+    if (!trimmedCompany) {
+      missing.company = t(
+        'createOpportunity.requiredField',
+        'This field is required.'
+      );
+    }
+
+    if (!trimmedLocation) {
+      missing.location = t(
+        'createOpportunity.requiredField',
+        'This field is required.'
+      );
+    }
+
+    if (!workType) {
+      missing.workType = t(
+        'createOpportunity.requiredField',
+        'This field is required.'
+      );
+    }
+
+    if (!trimmedDescription) {
+      missing.description = t(
+        'createOpportunity.requiredField',
+        'This field is required.'
+      );
+    }
+
+    const missingFields = Object.keys(missing);
+
+    if (missingFields.length > 0) {
+      setFieldErrors(missing);
+      setErrorMessage(
+        t(
+          'createOpportunity.validationError',
+          'Please complete the highlighted required fields.'
+        )
+      );
+      haptics.error();
+
+      const firstField = missingFields[0];
+
+      requestAnimationFrame(() => {
+        const position = fieldPositions.current[firstField];
+
+        if (typeof position === 'number') {
+          scrollRef.current?.scrollTo({
+            y: Math.max(0, position - 24),
+            animated: true,
+          });
+        }
+
+        const inputRefs = {
+          title: titleRef,
+          company: companyRef,
+          location: locationRef,
+          description: descriptionRef,
+        };
+
+        inputRefs[firstField]?.current?.focus();
+      });
+
       return;
     }
+
+    setFieldErrors({});
 
     const payload = {
       title: trimmedTitle,
@@ -196,7 +344,15 @@ export default function CreateOpportunityScreen({ navigation, route }) {
           : 'Failed to publish employer opportunity:',
         err
       );
-      if (err instanceof ApiError && err.status === 503) {
+      if (err instanceof ApiError && err.status === 403) {
+        setErrorMessage(
+          t(
+            'createOpportunity.verificationRequired',
+            'Your company must be verified before you can publish opportunities. Complete company verification or wait for administrator approval.'
+          )
+        );
+        haptics.error();
+      } else if (err instanceof ApiError && err.status === 503) {
         setErrorMessage(t('createOpportunity.error503'));
       } else {
         setErrorMessage(t('createOpportunity.errorGeneric'));
@@ -205,6 +361,35 @@ export default function CreateOpportunityScreen({ navigation, route }) {
       setSubmitting(false);
     }
   };
+
+  if (verificationChecking || !verifiedOrganization) {
+    return (
+      <ScreenContainer edges={['top', 'bottom']}>
+        <ScreenHeader
+          title={t('createOpportunity.title')}
+          showBack
+          navigation={navigation}
+          alignment="center"
+          bordered
+        />
+
+        <View style={styles.verificationLoading}>
+          <ActivityIndicator
+            size="large"
+            color={colors.accent || colors.teal}
+          />
+          <Text
+            style={[
+              styles.verificationLoadingText,
+              isRTL && styles.rtlText,
+            ]}
+          >
+            {t('employerVerification.loading')}
+          </Text>
+        </View>
+      </ScreenContainer>
+    );
+  }
 
   return (
     <ScreenContainer edges={['top', 'bottom']}>
@@ -234,6 +419,7 @@ export default function CreateOpportunityScreen({ navigation, route }) {
         keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : 0}
       >
         <ScrollView
+          ref={scrollRef}
           style={styles.screen}
           contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 48 }]}
           showsVerticalScrollIndicator={false}
@@ -256,45 +442,94 @@ export default function CreateOpportunityScreen({ navigation, route }) {
             {t('createOpportunity.jobTitle')} <Text style={styles.requiredStar}>*</Text>
           </Text>
           <TextInput
-            style={[styles.input, isRTL && styles.rtlWriting]}
+            ref={titleRef}
+            onLayout={rememberFieldPosition('title')}
+            style={[
+              styles.input,
+              fieldErrors.title && styles.inputError,
+              isRTL && styles.rtlWriting,
+            ]}
             placeholder={t('createOpportunity.jobTitlePlaceholder')}
             placeholderTextColor={colors.textTertiary || colors.textMuted}
             value={title}
-            onChangeText={setTitle}
+            onChangeText={(value) => {
+              setTitle(value);
+              clearFieldError('title');
+            }}
             maxLength={200}
             editable={!submitting && !loadingExisting}
           />
+          {fieldErrors.title ? (
+            <Text style={[styles.fieldErrorText, isRTL && styles.rtlText]}>
+              {fieldErrors.title}
+            </Text>
+          ) : null}
 
           <Text style={[styles.label, isRTL && styles.rtlText]}>
             {t('createOpportunity.company')} <Text style={styles.requiredStar}>*</Text>
           </Text>
           <TextInput
-            style={[styles.input, isRTL && styles.rtlWriting]}
+            ref={companyRef}
+            onLayout={rememberFieldPosition('company')}
+            style={[
+              styles.input,
+              styles.readOnlyInput,
+              fieldErrors.company && styles.inputError,
+              isRTL && styles.rtlWriting,
+            ]}
             placeholder={t('createOpportunity.companyPlaceholder')}
             placeholderTextColor={colors.textTertiary || colors.textMuted}
             value={company}
-            onChangeText={setCompany}
             maxLength={200}
-            editable={!submitting && !loadingExisting}
+            editable={false}
           />
+          {fieldErrors.company ? (
+            <Text style={[styles.fieldErrorText, isRTL && styles.rtlText]}>
+              {fieldErrors.company}
+            </Text>
+          ) : null}
+          <Text style={[styles.identityNotice, isRTL && styles.rtlText]}>
+            {t('employerVerification.verifiedCompanyNotice')}
+          </Text>
 
           <Text style={[styles.label, isRTL && styles.rtlText]}>
             {t('createOpportunity.location')} <Text style={styles.requiredStar}>*</Text>
           </Text>
           <TextInput
-            style={[styles.input, isRTL && styles.rtlWriting]}
+            ref={locationRef}
+            onLayout={rememberFieldPosition('location')}
+            style={[
+              styles.input,
+              fieldErrors.location && styles.inputError,
+              isRTL && styles.rtlWriting,
+            ]}
             placeholder={t('createOpportunity.locationPlaceholder')}
             placeholderTextColor={colors.textTertiary || colors.textMuted}
             value={location}
-            onChangeText={setLocation}
+            onChangeText={(value) => {
+              setLocation(value);
+              clearFieldError('location');
+            }}
             maxLength={200}
             editable={!submitting && !loadingExisting}
           />
+          {fieldErrors.location ? (
+            <Text style={[styles.fieldErrorText, isRTL && styles.rtlText]}>
+              {fieldErrors.location}
+            </Text>
+          ) : null}
 
           <Text style={[styles.label, isRTL && styles.rtlText]}>
             {t('createOpportunity.workType')} <Text style={styles.requiredStar}>*</Text>
           </Text>
-          <View style={[styles.workTypeRow, isRTL && styles.rowRTL]}>
+          <View
+            onLayout={rememberFieldPosition('workType')}
+            style={[
+              styles.workTypeRow,
+              fieldErrors.workType && styles.workTypeError,
+              isRTL && styles.rowRTL,
+            ]}
+          >
             {WORK_TYPES.map((typeObj) => {
               const isSelected = workType === typeObj.id;
               const label = t(`createOpportunity.workTypes.${typeObj.id}`, { defaultValue: typeObj.id });
@@ -304,26 +539,51 @@ export default function CreateOpportunityScreen({ navigation, route }) {
                   label={label}
                   variant={isSelected ? 'skill' : 'neutral'}
                   selected={isSelected}
-                  onPress={() => !submitting && !loadingExisting && setWorkType(typeObj.id)}
+                  onPress={() => {
+                    if (!submitting && !loadingExisting) {
+                      setWorkType(typeObj.id);
+                      clearFieldError('workType');
+                    }
+                  }}
                 />
               );
             })}
           </View>
+          {fieldErrors.workType ? (
+            <Text style={[styles.fieldErrorText, isRTL && styles.rtlText]}>
+              {fieldErrors.workType}
+            </Text>
+          ) : null}
 
           <Text style={[styles.label, isRTL && styles.rtlText]}>
             {t('createOpportunity.description')} <Text style={styles.requiredStar}>*</Text>
           </Text>
           <TextInput
-            style={[styles.input, styles.multilineInput, isRTL && styles.rtlWriting]}
+            ref={descriptionRef}
+            onLayout={rememberFieldPosition('description')}
+            style={[
+              styles.input,
+              styles.multilineInput,
+              fieldErrors.description && styles.inputError,
+              isRTL && styles.rtlWriting,
+            ]}
             placeholder={t('createOpportunity.descriptionPlaceholder')}
             placeholderTextColor={colors.textTertiary || colors.textMuted}
             value={description}
-            onChangeText={setDescription}
+            onChangeText={(value) => {
+              setDescription(value);
+              clearFieldError('description');
+            }}
             multiline
             numberOfLines={5}
             textAlignVertical="top"
             editable={!submitting && !loadingExisting}
           />
+          {fieldErrors.description ? (
+            <Text style={[styles.fieldErrorText, isRTL && styles.rtlText]}>
+              {fieldErrors.description}
+            </Text>
+          ) : null}
 
           {/* Section 2: Skills & Requirements (Optional) */}
           <Text style={[styles.sectionHeading, styles.sectionHeadingSpaced, isRTL && styles.rtlText]}>
@@ -467,6 +727,43 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.textPrimary || colors.textDark,
     minHeight: spacing.minimumTouchTarget,
+  },
+  readOnlyInput: {
+    opacity: 0.82,
+  },
+  identityNotice: {
+    ...typography.caption,
+    color: colors.textSecondary || colors.textMuted,
+    marginTop: spacing.xxs,
+    marginBottom: spacing.xs,
+  },
+  verificationLoading: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.xl,
+  },
+  verificationLoadingText: {
+    ...typography.body,
+    color: colors.textSecondary || colors.textMuted,
+    marginTop: spacing.md,
+    textAlign: 'center',
+  },
+  inputError: {
+    borderColor: colors.danger || '#EF4444',
+    borderWidth: 2,
+  },
+  fieldErrorText: {
+    ...typography.caption,
+    color: colors.danger || '#EF4444',
+    marginTop: spacing.xxs,
+    marginBottom: spacing.xs,
+  },
+  workTypeError: {
+    borderWidth: 1,
+    borderColor: colors.danger || '#EF4444',
+    borderRadius: spacing.radii.sm,
+    padding: spacing.xs,
   },
   multilineInput: {
     minHeight: 110,
