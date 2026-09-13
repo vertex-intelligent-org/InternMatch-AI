@@ -12,6 +12,7 @@ from app.core.config import settings
 from app.core.logging import get_logger
 from app.core.security import AuthenticatedUser, require_employer_user
 from app.db.session import get_db
+from app.db.models import ProcessingJob
 from app.repositories.application import ApplicationRepository
 from app.repositories.employer_organization import EmployerOrganizationRepository
 from app.repositories.internship import InternshipRepository
@@ -44,6 +45,40 @@ from app.services.cv_storage import (
 )
 
 router = APIRouter()
+
+_ACTIVE_MATCH_JOB_STATUSES = ("queued", "processing")
+
+
+def _active_match_calculation_user_ids(db: Session, user_ids) -> set:
+    """
+    Return candidate auth user IDs with an authoritative active match job.
+
+    Employer-facing ranking must fail closed while recalculation is queued
+    or processing so a previously persisted score is never presented as fresh.
+    """
+    normalized_user_ids = {
+        user_id
+        for user_id in user_ids
+        if user_id is not None
+    }
+
+    if not normalized_user_ids:
+        return set()
+
+    rows = (
+        db.query(ProcessingJob.user_id)
+        .filter(
+            ProcessingJob.user_id.in_(normalized_user_ids),
+            ProcessingJob.job_type == "match_calculation",
+            ProcessingJob.status.in_(_ACTIVE_MATCH_JOB_STATUSES),
+        )
+        .distinct()
+        .all()
+    )
+
+    return {row[0] for row in rows}
+
+
 
 
 def format_not_found_error(message: str) -> Dict[str, Any]:
@@ -351,11 +386,28 @@ def list_internship_applicants(
         employer_user_id=current_user.user_id,
     )
 
+    active_match_user_ids = _active_match_calculation_user_ids(
+        db,
+        (profile.user_id for _, profile, _ in records),
+    )
+
+    # Fail closed for recruiter ranking while a candidate recalculation is
+    # queued or processing. Persisted rows may belong to the previous
+    # calculation and must not be presented as current during that window.
+    freshness_safe_records = [
+        (
+            application,
+            profile,
+            None if profile.user_id in active_match_user_ids else match,
+        )
+        for application, profile, match in records
+    ]
+
     # Employer AI ranking uses the canonical persisted hybrid match score.
     # Candidates without a calculated Match are placed after scored candidates.
     # Stable application timestamps provide deterministic tie-breaking.
     ranked_records = sorted(
-        records,
+        freshness_safe_records,
         key=lambda record: (
             record[2] is None,
             -(record[2].overall_score if record[2] is not None else -1),
@@ -530,6 +582,12 @@ def get_internship_applicant_detail(
         )
 
     app, profile, match = record
+
+    if profile.user_id in _active_match_calculation_user_ids(
+        db,
+        (profile.user_id,),
+    ):
+        match = None
     skills = MatchingDataRepository.get_skill_names_for_student(db, profile.id)
     skill_evidence = MatchingDataRepository.get_skill_evidence_for_student(
         db,
@@ -587,6 +645,12 @@ def schedule_employer_applicant_interview(
         )
 
     app, profile, match = record
+
+    if profile.user_id in _active_match_calculation_user_ids(
+        db,
+        (profile.user_id,),
+    ):
+        match = None
 
     if app.status == "saved":
         raise HTTPException(
@@ -708,6 +772,12 @@ def update_employer_applicant_status(
         )
 
     app, profile, match = record
+
+    if profile.user_id in _active_match_calculation_user_ids(
+        db,
+        (profile.user_id,),
+    ):
+        match = None
     current_status = app.status
     target_status = payload.status
 
