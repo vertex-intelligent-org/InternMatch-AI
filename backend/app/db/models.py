@@ -368,6 +368,327 @@ class EmployerVerificationEvent(Base):
     )
 
 
+
+
+class EmployerComplianceClaim(Base):
+    """
+    Jurisdiction-scoped employer compliance assertion.
+
+    This model is deliberately independent from EmployerOrganization
+    verification. An approved claim means only that its specific supporting
+    evidence was reviewed for the recorded jurisdiction and scope.
+    """
+
+    __tablename__ = "employer_compliance_claims"
+
+    __table_args__ = (
+        CheckConstraint(
+            "claim_type IN "
+            "('insurance_arrangement', "
+            "'completion_certificate', "
+            "'university_agreement', "
+            "'legal_internship_eligibility')",
+            name="ck_employer_compliance_claim_type",
+        ),
+        CheckConstraint(
+            "status IN "
+            "('draft', 'pending', 'approved', "
+            "'rejected', 'revoked', 'expired')",
+            name="ck_employer_compliance_claim_status",
+        ),
+        CheckConstraint(
+            "length(jurisdiction_country_code) = 2",
+            name="ck_employer_compliance_country_code",
+        ),
+        CheckConstraint(
+            "length(trim(scope_key)) > 0",
+            name="ck_employer_compliance_scope_key",
+        ),
+        CheckConstraint(
+            "version > 0",
+            name="ck_employer_compliance_version",
+        ),
+        CheckConstraint(
+            "valid_from IS NULL OR "
+            "valid_until IS NULL OR "
+            "valid_until >= valid_from",
+            name="ck_employer_compliance_validity",
+        ),
+        UniqueConstraint(
+            "organization_id",
+            "claim_type",
+            "jurisdiction_country_code",
+            "scope_key",
+            name="uq_employer_compliance_claim_scope",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid4,
+    )
+
+    organization_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey(
+            "employer_organizations.id",
+            ondelete="CASCADE",
+        ),
+        nullable=False,
+        index=True,
+    )
+
+    claim_type: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+    )
+
+    jurisdiction_country_code: Mapped[str] = mapped_column(
+        String(2),
+        nullable=False,
+    )
+
+    scope_key: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+        default="organization",
+    )
+
+    scope_label: Mapped[Optional[str]] = mapped_column(
+        String,
+        nullable=True,
+    )
+
+    statement: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+    )
+
+    status: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+        default="draft",
+        index=True,
+    )
+
+    version: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=1,
+    )
+
+    submitted_at: Mapped[Optional[datetime]] = mapped_column(
+        nullable=True,
+    )
+
+    reviewed_at: Mapped[Optional[datetime]] = mapped_column(
+        nullable=True,
+    )
+
+    reviewed_by: Mapped[Optional[UUID]] = mapped_column(
+        PG_UUID(as_uuid=True),
+        nullable=True,
+    )
+
+    rejection_reason_code: Mapped[Optional[str]] = mapped_column(
+        String,
+        nullable=True,
+    )
+
+    valid_from: Mapped[Optional[date]] = mapped_column(
+        nullable=True,
+    )
+
+    valid_until: Mapped[Optional[date]] = mapped_column(
+        nullable=True,
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+    updated_at: Mapped[datetime] = mapped_column(
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+
+class EmployerComplianceEvidence(Base):
+    """
+    Metadata for one private document supporting a compliance claim.
+
+    Organization ownership is authoritative through claim_id. It is not
+    duplicated here, preventing claim/organization mismatch states.
+    """
+
+    __tablename__ = "employer_compliance_evidence"
+
+    __table_args__ = (
+        UniqueConstraint(
+            "storage_path",
+            name=(
+                "uq_employer_compliance_"
+                "evidence_storage_path"
+            ),
+        ),
+        CheckConstraint(
+            "content_type = 'application/pdf'",
+            name=(
+                "ck_employer_compliance_"
+                "evidence_content_type"
+            ),
+        ),
+        CheckConstraint(
+            "size_bytes > 0 AND size_bytes <= 10485760",
+            name="ck_employer_compliance_evidence_size",
+        ),
+        CheckConstraint(
+            "length(sha256_hex) = 64",
+            name="ck_employer_compliance_evidence_sha256",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid4,
+    )
+
+    claim_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey(
+            "employer_compliance_claims.id",
+            ondelete="CASCADE",
+        ),
+        nullable=False,
+        index=True,
+    )
+
+    storage_path: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+    )
+
+    original_filename: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+    )
+
+    content_type: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+    )
+
+    size_bytes: Mapped[int] = mapped_column(
+        BigInteger,
+        nullable=False,
+    )
+
+    sha256_hex: Mapped[str] = mapped_column(
+        String(64),
+        nullable=False,
+    )
+
+    uploaded_by_user_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        nullable=False,
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+
+class EmployerComplianceEvent(Base):
+    """
+    Append-only audit history for employer compliance claim actions.
+
+    Organization ownership is authoritative through claim_id.
+    """
+
+    __tablename__ = "employer_compliance_events"
+
+    __table_args__ = (
+        CheckConstraint(
+            "actor_role IN ('employer', 'admin', 'system')",
+            name="ck_employer_compliance_event_actor_role",
+        ),
+        CheckConstraint(
+            "action IN "
+            "('created', 'updated', 'evidence_attached', "
+            "'submitted', 'approved', 'rejected', "
+            "'revoked', 'expired')",
+            name="ck_employer_compliance_event_action",
+        ),
+        CheckConstraint(
+            "new_status IN "
+            "('draft', 'pending', 'approved', "
+            "'rejected', 'revoked', 'expired')",
+            name="ck_employer_compliance_event_status",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid4,
+    )
+
+    claim_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey(
+            "employer_compliance_claims.id",
+            ondelete="CASCADE",
+        ),
+        nullable=False,
+        index=True,
+    )
+
+    actor_user_id: Mapped[Optional[UUID]] = mapped_column(
+        PG_UUID(as_uuid=True),
+        nullable=True,
+    )
+
+    actor_role: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+    )
+
+    action: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+    )
+
+    previous_status: Mapped[Optional[str]] = mapped_column(
+        String,
+        nullable=True,
+    )
+
+    new_status: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+    )
+
+    reason_code: Mapped[Optional[str]] = mapped_column(
+        String,
+        nullable=True,
+    )
+
+    internal_note: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+
 class InternshipListing(Base):
     """ORM Model mapping public.internship_listings table."""
 
