@@ -284,6 +284,61 @@ class InternshipRepository:
         return listing
 
     @staticmethod
+    def list_for_admin(
+        db: Session,
+        publication_status: Optional[str] = None,
+        limit: int = 20,
+        offset: int = 0,
+    ) -> Tuple[List[InternshipListing], int]:
+        """List all internship listings for server-authorized admin review."""
+        stmt = select(InternshipListing)
+
+        if publication_status:
+            stmt = stmt.where(
+                InternshipListing.publication_status == publication_status
+            )
+
+        count_stmt = select(func.count()).select_from(stmt.subquery())
+        total = db.scalar(count_stmt) or 0
+
+        safe_limit = max(1, min(limit, 50))
+        safe_offset = max(0, offset)
+
+        paged_stmt = (
+            stmt.order_by(InternshipListing.created_at.desc())
+            .offset(safe_offset)
+            .limit(safe_limit)
+        )
+
+        items = list(db.scalars(paged_stmt).all())
+        return items, total
+
+    @staticmethod
+    def get_by_id_for_update(
+        db: Session,
+        internship_id: UUID,
+    ) -> Optional[InternshipListing]:
+        """Fetch and lock one listing for an authoritative admin mutation."""
+        stmt = (
+            select(InternshipListing)
+            .where(InternshipListing.id == internship_id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
+        return db.scalar(stmt)
+
+    @staticmethod
+    def reopen_listing(
+        db: Session,
+        listing: InternshipListing,
+    ) -> InternshipListing:
+        """Republish a closed listing and keep the legacy activity mirror aligned."""
+        listing.publication_status = "published"
+        listing.is_active = True
+        db.flush()
+        return listing
+
+    @staticmethod
     def close_listing(
         db: Session,
         listing: InternshipListing,

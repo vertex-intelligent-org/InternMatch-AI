@@ -4,6 +4,7 @@ Includes all sub-routers for version 1 of the REST API.
 """
 
 from app.api.v1.endpoints import (
+    admin_internships,
     applications,
     auth,
     health,
@@ -87,4 +88,10 @@ api_v1_router.include_router(
     employer_organizations_endpoints.admin_router,
     prefix="/admin/employer-organizations",
     tags=["Admin Employer Verification"],
+)
+
+api_v1_router.include_router(
+    admin_internships.router,
+    prefix="/admin/internships",
+    tags=["Admin Internship Listings"],
 )
