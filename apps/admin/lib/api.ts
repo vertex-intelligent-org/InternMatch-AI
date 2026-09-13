@@ -300,17 +300,24 @@ export async function suspendOrganization(
   );
 }
 export async function listAdminInternships(
-  publicationStatus?: PublicationStatus
+  publicationStatus?: PublicationStatus,
+  limit = 20,
+  offset = 0
 ): Promise<AdminInternshipListResponse> {
-  const query = publicationStatus
-    ? (
-        '?publication_status='
-        + encodeURIComponent(publicationStatus)
-      )
-    : '';
+  const params = new URLSearchParams();
+
+  if (publicationStatus) {
+    params.set(
+      'publication_status',
+      publicationStatus
+    );
+  }
+
+  params.set('limit', String(limit));
+  params.set('offset', String(offset));
 
   return adminApiRequest<AdminInternshipListResponse>(
-    '/admin/internships' + query,
+    '/admin/internships?' + params.toString(),
     {
       method: 'GET',
     }

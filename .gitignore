@@ -61,3 +61,5 @@ Thumbs.db
 .playwright-mcp/
 tmp/
 scratch/
+
+*.tsbuildinfo

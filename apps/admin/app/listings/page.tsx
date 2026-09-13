@@ -126,6 +126,12 @@ export default function AdminListingsPage() {
   const [listings, setListings] =
     useState<AdminInternshipSummary[]>([]);
 
+  const [totalListings, setTotalListings] =
+    useState(0);
+
+  const [listOffset, setListOffset] =
+    useState(0);
+
   const [selectedId, setSelectedId] =
     useState<string | null>(null);
 
@@ -222,7 +228,8 @@ export default function AdminListingsPage() {
     useCallback(
       async (
         statusFilter: StatusFilter,
-        preferredId: string | null
+        preferredId: string | null,
+        offset = 0
       ): Promise<void> => {
         setLoadingList(true);
         setPageError(null);
@@ -232,10 +239,14 @@ export default function AdminListingsPage() {
             await listAdminInternships(
               statusFilter === 'all'
                 ? undefined
-                : statusFilter
+                : statusFilter,
+              20,
+              offset
             );
 
           setListings(response.items);
+          setTotalListings(response.total);
+          setListOffset(response.offset);
           setPageState('ready');
 
           const preferredExists =
@@ -489,6 +500,53 @@ export default function AdminListingsPage() {
           </div>
         </div>
 
+        <details className="mobileNav">
+          <summary
+            className="mobileNavSummary"
+            aria-label="Open administration menu"
+          >
+            <span
+              className="mobileNavIcon"
+              aria-hidden="true"
+            >
+              &#9776;
+            </span>
+            <span className="mobileNavText">
+              Menu
+            </span>
+          </summary>
+
+          <nav
+            className="mobileNavPanel"
+            aria-label="Mobile administration"
+          >
+            <p className="mobileNavHeading">
+              Trust & Safety
+            </p>
+
+            <Link
+              className="sidebarLink"
+              href="/"
+            >
+              Organization reviews
+            </Link>
+
+            <Link
+              className="sidebarLink sidebarLinkActive"
+              href="/listings"
+            >
+              Internship listings
+            </Link>
+
+            <Link
+              className="sidebarLink"
+              href="/compliance"
+            >
+              Compliance reviews
+            </Link>
+          </nav>
+        </details>
+
         <nav
           className="sidebarSection"
           aria-label="Administration"
@@ -666,10 +724,75 @@ export default function AdminListingsPage() {
                       )}
                 </h2>
                 <p>
+                  {totalListings}
+                  {' '}
+                  total
+                  {' / '}
                   {listings.length}
                   {' '}
-                  visible in this view
+                  visible on this page
                 </p>
+              </div>
+
+              <div
+                className="paginationControls"
+                aria-label="Internship listing pages"
+              >
+                <button
+                  type="button"
+                  className="paginationButton"
+                  disabled={
+                    loadingList
+                    || listOffset === 0
+                  }
+                  onClick={() => {
+                    void loadListings(
+                      selectedStatus,
+                      null,
+                      Math.max(
+                        0,
+                        listOffset - 20
+                      )
+                    );
+                  }}
+                >
+                  Previous
+                </button>
+
+                <span className="paginationMeta">
+                  Page
+                  {' '}
+                  {Math.floor(listOffset / 20) + 1}
+                  {' '}
+                  of
+                  {' '}
+                  {Math.max(
+                    1,
+                    Math.ceil(totalListings / 20)
+                  )}
+                </span>
+
+                <button
+                  type="button"
+                  className="paginationButton"
+                  disabled={
+                    loadingList
+                    || (
+                      listOffset
+                      + listings.length
+                      >= totalListings
+                    )
+                  }
+                  onClick={() => {
+                    void loadListings(
+                      selectedStatus,
+                      null,
+                      listOffset + 20
+                    );
+                  }}
+                >
+                  Next
+                </button>
               </div>
             </div>
 

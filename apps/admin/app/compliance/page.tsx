@@ -578,6 +578,53 @@ export default function AdminCompliancePage() {
           </div>
         </div>
 
+        <details className="mobileNav">
+          <summary
+            className="mobileNavSummary"
+            aria-label="Open administration menu"
+          >
+            <span
+              className="mobileNavIcon"
+              aria-hidden="true"
+            >
+              &#9776;
+            </span>
+            <span className="mobileNavText">
+              Menu
+            </span>
+          </summary>
+
+          <nav
+            className="mobileNavPanel"
+            aria-label="Mobile administration"
+          >
+            <p className="mobileNavHeading">
+              Trust & Safety
+            </p>
+
+            <Link
+              className="sidebarLink"
+              href="/"
+            >
+              Organization reviews
+            </Link>
+
+            <Link
+              className="sidebarLink"
+              href="/listings"
+            >
+              Internship listings
+            </Link>
+
+            <Link
+              className="sidebarLink sidebarLinkActive"
+              href="/compliance"
+            >
+              Compliance reviews
+            </Link>
+          </nav>
+        </details>
+
         <nav
           className="sidebarSection"
           aria-label="Administration"
