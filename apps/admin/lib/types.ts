@@ -62,3 +62,36 @@ export type AdminSuspensionPayload = {
   reason_code: string;
   internal_note?: string | null;
 };
+export type PublicationStatus =
+  | 'draft'
+  | 'under_review'
+  | 'published'
+  | 'closed';
+
+export type AdminInternshipSummary = {
+  id: string;
+  title: string;
+  company: string;
+  location: string;
+  work_type: string;
+  required_skills: string[];
+  preferred_skills: string[];
+  publication_status: PublicationStatus;
+  is_active: boolean;
+  posted_at: string;
+};
+
+export type AdminInternshipDetail =
+  AdminInternshipSummary & {
+    description: string;
+    languages: string[];
+    min_education: string | null;
+    experience_requirements: string | null;
+  };
+
+export type AdminInternshipListResponse = {
+  items: AdminInternshipSummary[];
+  total: number;
+  limit: number;
+  offset: number;
+};

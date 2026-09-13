@@ -4,6 +4,7 @@ import {
   useEffect,
   useState,
 } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
 import {
@@ -824,14 +825,24 @@ export default function AdminDashboardPage() {
             Trust & Safety
           </p>
 
-          <span className="sidebarLink sidebarLinkActive">
+          <Link
+            className="sidebarLink sidebarLinkActive"
+            href="/"
+          >
             <span>
               Organization reviews
             </span>
             <span className="navCount">
               {organizations.length}
             </span>
-          </span>
+          </Link>
+
+          <Link
+            className="sidebarLink"
+            href="/listings"
+          >
+            Internship listings
+          </Link>
         </nav>
 
         <div className="sidebarFooter">

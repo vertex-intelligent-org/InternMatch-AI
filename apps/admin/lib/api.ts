@@ -3,6 +3,9 @@ import type {
   AdminApprovalPayload,
   AdminRejectionPayload,
   AdminSuspensionPayload,
+  AdminInternshipDetail,
+  AdminInternshipListResponse,
+  PublicationStatus,
   EmployerOrganization,
   VerificationStatus,
 } from './types';
@@ -287,6 +290,67 @@ export async function suspendOrganization(
     {
       method: 'POST',
       body: JSON.stringify(payload),
+    }
+  );
+}
+export async function listAdminInternships(
+  publicationStatus?: PublicationStatus
+): Promise<AdminInternshipListResponse> {
+  const query = publicationStatus
+    ? (
+        '?publication_status='
+        + encodeURIComponent(publicationStatus)
+      )
+    : '';
+
+  return adminApiRequest<AdminInternshipListResponse>(
+    '/admin/internships' + query,
+    {
+      method: 'GET',
+    }
+  );
+}
+
+export async function getAdminInternship(
+  internshipId: string
+): Promise<AdminInternshipDetail> {
+  return adminApiRequest<AdminInternshipDetail>(
+    (
+      '/admin/internships/'
+      + encodeURIComponent(internshipId)
+    ),
+    {
+      method: 'GET',
+    }
+  );
+}
+
+export async function closeAdminInternship(
+  internshipId: string
+): Promise<AdminInternshipDetail> {
+  return adminApiRequest<AdminInternshipDetail>(
+    (
+      '/admin/internships/'
+      + encodeURIComponent(internshipId)
+      + '/close'
+    ),
+    {
+      method: 'POST',
+    }
+  );
+}
+
+export async function reopenAdminInternship(
+  internshipId: string
+): Promise<AdminInternshipDetail> {
+  return adminApiRequest<AdminInternshipDetail>(
+    (
+      '/admin/internships/'
+      + encodeURIComponent(internshipId)
+      + '/reopen'
+    ),
+    {
+      method: 'POST',
     }
   );
 }
