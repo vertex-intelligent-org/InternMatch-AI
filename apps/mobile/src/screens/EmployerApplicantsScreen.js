@@ -23,6 +23,7 @@ import PressableCard from '../components/PressableCard';
 import MatchBadge from '../components/MatchBadge';
 import Reveal from '../components/motion/Reveal';
 import { getEmployerApplicants } from '../services/api';
+import EmployerShortlistComparison from '../components/EmployerShortlistComparison';
 
 function getStatusBadgeStyle(status) {
   switch (status) {
@@ -168,6 +169,15 @@ export default function EmployerApplicantsScreen({ route, navigation }) {
               <Text style={styles.retryBtnText}>{t('employerApplicants.retry')}</Text>
             </TouchableOpacity>
           </Card>
+        )}
+
+        {!loading && !error && applicants.length >= 2 && (
+          <EmployerShortlistComparison
+            internshipId={internshipId}
+            applicants={applicants}
+            navigation={navigation}
+            isRTL={isRTL}
+          />
         )}
 
         {/* Empty State */}

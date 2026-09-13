@@ -480,7 +480,20 @@ export default function PlansScreen({ navigation }) {
               pricingLabel = t('plans.employer.standard.pricingLabel', {
                 defaultValue: t(plan.pricingKey),
               });
-            } else if (!isEmployer && plan.id === 'pro_student' && dynamicPriceString) {
+            } else if (
+              isEmployer &&
+              plan.id === 'employer_pro' &&
+              dynamicPriceString
+            ) {
+              pricingLabel = t('plans.employer.pro.pricingDynamic', {
+                price: dynamicPriceString,
+                defaultValue: `${dynamicPriceString} ${t('plans.perMonth')}`,
+              });
+            } else if (
+              !isEmployer &&
+              plan.id === 'pro_student' &&
+              dynamicPriceString
+            ) {
               pricingLabel = t('plans.candidate.pro.pricingDynamic', {
                 price: dynamicPriceString,
                 defaultValue: `${dynamicPriceString} ${t('plans.perMonth')}`,

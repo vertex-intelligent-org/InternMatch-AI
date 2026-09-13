@@ -917,6 +917,47 @@ export type EmployerApplicantListResponse = {
   internship_id: string;
 };
 
+
+export type EmployerInternshipDescriptionRequest = {
+  title: string;
+  raw_description: string;
+  location?: string | null;
+  work_type?: string | null;
+  required_skills?: string[];
+  preferred_skills?: string[];
+  languages?: string[];
+  min_education?: string | null;
+};
+
+export type EmployerInternshipDescriptionResponse = {
+  suggested_description: string;
+  responsibilities: string[];
+  requirements_summary: string[];
+  preferred_qualifications: string[];
+  draft_only: true;
+  requires_employer_review: true;
+  auto_published: false;
+};
+
+export async function generateEmployerInternshipDescription(
+  payload: EmployerInternshipDescriptionRequest,
+  idempotencyKey: string,
+  locale?: string
+): Promise<EmployerInternshipDescriptionResponse> {
+  const contentLocale = normalizeLocale(locale) || DEFAULT_LOCALE;
+
+  return apiRequest<EmployerInternshipDescriptionResponse>(
+    `/internships/employer-tools/description-assistant?content_locale=${encodeURIComponent(contentLocale)}`,
+    {
+      method: 'POST',
+      headers: {
+        'Idempotency-Key': idempotencyKey,
+      },
+      body: JSON.stringify(payload),
+    }
+  );
+}
+
 export async function createEmployerInternship(
   payload: EmployerCreateInternshipPayload
 ): Promise<InternshipDetail> {
@@ -935,6 +976,64 @@ export async function updateEmployerInternship(
     {
       method: 'PATCH',
       body: JSON.stringify(payload),
+    }
+  );
+}
+
+
+export type EmployerProductPolicyResponse = {
+  plan: 'free' | 'employer_pro';
+  is_pro: boolean;
+  active_listing_limit: number | null;
+  candidate_insight_available: boolean;
+  interview_kit_available: boolean;
+  shortlist_comparison_available: boolean;
+  internship_description_available: boolean;
+  pipeline_analytics_available: boolean;
+};
+
+export type EmployerPipelineListingCounts = {
+  total: number;
+  draft: number;
+  under_review: number;
+  published: number;
+  closed: number;
+};
+
+export type EmployerPipelineApplicationCounts = {
+  total_submitted: number;
+  applied: number;
+  interviewing: number;
+  accepted: number;
+  rejected: number;
+};
+
+export type EmployerPipelinePercentages = {
+  interviewing_share_percent: number | null;
+  decision_share_percent: number | null;
+  acceptance_share_percent: number | null;
+};
+
+export type EmployerPipelineAnalyticsResponse = {
+  listing_counts: EmployerPipelineListingCounts;
+  application_counts: EmployerPipelineApplicationCounts;
+  percentages: EmployerPipelinePercentages;
+};
+
+export async function getEmployerProductPolicy(): Promise<EmployerProductPolicyResponse> {
+  return apiRequest<EmployerProductPolicyResponse>(
+    '/internships/employer-tools/product-policy',
+    {
+      method: 'GET',
+    }
+  );
+}
+
+export async function getEmployerPipelineAnalytics(): Promise<EmployerPipelineAnalyticsResponse> {
+  return apiRequest<EmployerPipelineAnalyticsResponse>(
+    '/internships/employer-tools/pipeline-analytics',
+    {
+      method: 'GET',
     }
   );
 }
@@ -961,6 +1060,53 @@ export async function getEmployerInternships(
   });
 }
 
+
+export type EmployerShortlistComparisonRequest = {
+  application_ids: string[];
+};
+
+export type EmployerShortlistCandidate = {
+  application_id: string;
+  match_score: number;
+  evidence_highlights: string[];
+  gaps_to_validate: string[];
+  interview_focus: string[];
+  matching_skills: string[];
+  missing_skills: string[];
+};
+
+export type EmployerShortlistComparisonResponse = {
+  internship_id: string;
+  comparison_summary: string;
+  shared_role_requirements: string[];
+  candidates: EmployerShortlistCandidate[];
+  ranked: false;
+  recommendation_provided: false;
+  human_decision_required: true;
+};
+
+export async function compareEmployerShortlist(
+  internshipId: string,
+  applicationIds: string[],
+  idempotencyKey: string,
+  locale?: string
+): Promise<EmployerShortlistComparisonResponse> {
+  const contentLocale = normalizeLocale(locale) || DEFAULT_LOCALE;
+
+  return apiRequest<EmployerShortlistComparisonResponse>(
+    `/internships/${encodeURIComponent(internshipId)}/shortlist-comparison?content_locale=${encodeURIComponent(contentLocale)}`,
+    {
+      method: 'POST',
+      headers: {
+        'Idempotency-Key': idempotencyKey,
+      },
+      body: JSON.stringify({
+        application_ids: applicationIds,
+      }),
+    }
+  );
+}
+
 export async function getEmployerApplicants(
   internshipId: string
 ): Promise<EmployerApplicantListResponse> {
@@ -984,6 +1130,71 @@ export async function getEmployerApplicantCV(
 ): Promise<EmployerCVAccessResponse> {
   return apiRequest<EmployerCVAccessResponse>(
     `/internships/${encodeURIComponent(internshipId)}/applicants/${encodeURIComponent(applicationId)}/cv`
+  );
+}
+
+
+export type EmployerCandidateInsightResponse = {
+  executive_summary: string;
+  strengths: string[];
+  gaps_to_validate: string[];
+  interview_focus: string[];
+  match_score: number | null;
+  matching_skills: string[];
+  missing_skills: string[];
+  human_decision_required: boolean;
+};
+
+export type EmployerInterviewKitQuestion = {
+  category:
+    | 'technical'
+    | 'experience'
+    | 'project'
+    | 'gap_validation'
+    | 'role_context';
+  question: string;
+};
+
+export type EmployerInterviewKitResponse = {
+  questions: EmployerInterviewKitQuestion[];
+  human_decision_required: boolean;
+};
+
+export async function getEmployerCandidateInsight(
+  internshipId: string,
+  applicationId: string,
+  idempotencyKey: string,
+  locale?: string
+): Promise<EmployerCandidateInsightResponse> {
+  const contentLocale = normalizeLocale(locale) || DEFAULT_LOCALE;
+
+  return apiRequest<EmployerCandidateInsightResponse>(
+    `/internships/${encodeURIComponent(internshipId)}/applicants/${encodeURIComponent(applicationId)}/insight?content_locale=${encodeURIComponent(contentLocale)}`,
+    {
+      method: 'POST',
+      headers: {
+        'Idempotency-Key': idempotencyKey,
+      },
+    }
+  );
+}
+
+export async function getEmployerInterviewKit(
+  internshipId: string,
+  applicationId: string,
+  idempotencyKey: string,
+  locale?: string
+): Promise<EmployerInterviewKitResponse> {
+  const contentLocale = normalizeLocale(locale) || DEFAULT_LOCALE;
+
+  return apiRequest<EmployerInterviewKitResponse>(
+    `/internships/${encodeURIComponent(internshipId)}/applicants/${encodeURIComponent(applicationId)}/interview-kit?content_locale=${encodeURIComponent(contentLocale)}`,
+    {
+      method: 'POST',
+      headers: {
+        'Idempotency-Key': idempotencyKey,
+      },
+    }
   );
 }
 

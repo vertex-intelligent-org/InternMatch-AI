@@ -36,6 +36,7 @@ import { useTabScroll, useTabScrollReporter } from '../context/TabScrollContext'
 import { normalizeAccountType } from '../services/subscriptionService';
 import { ApiError, getMatches, getEmployerInternships, getEmployerOrganization } from '../services/api';
 import { useMatchCalculation } from '../hooks/useMatchCalculation';
+import EmployerWorkspaceSummary from '../components/EmployerWorkspaceSummary';
 
 export default function HomeScreen({ navigation }) {
   const { profile, refreshProfile } = useProfile();
@@ -332,6 +333,14 @@ export default function HomeScreen({ navigation }) {
                   </TouchableOpacity>
                 </View>
               </GlassSurface>
+            </Reveal>
+
+            <Reveal delay={motionTokens.stagger.normal}>
+              <EmployerWorkspaceSummary
+                navigation={navigation}
+                refreshKey={refreshing}
+                isRTL={isRTL}
+              />
             </Reveal>
 
             {/* Sequence 3: Employer Opportunities Overview */}

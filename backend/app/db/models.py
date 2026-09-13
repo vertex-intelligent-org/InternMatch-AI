@@ -1090,12 +1090,16 @@ class AIQuotaPeriod(Base):
             "'cv_analysis', "
             "'match_explanation', "
             "'application_support', "
-            "'interview_prep'"
+            "'interview_prep', "
+            "'employer_candidate_insight', "
+            "'employer_interview_kit', "
+            "'employer_shortlist_comparison', "
+            "'employer_internship_description'"
             ")",
             name="ck_ai_quota_periods_feature_key",
         ),
         CheckConstraint(
-            "plan_key IN ('free', 'pro_student')",
+            "plan_key IN ('free', 'pro_student', 'employer_pro')",
             name="ck_ai_quota_periods_plan_key",
         ),
         CheckConstraint(
@@ -1178,12 +1182,16 @@ class AIQuotaOperation(Base):
             "'cv_analysis', "
             "'match_explanation', "
             "'application_support', "
-            "'interview_prep'"
+            "'interview_prep', "
+            "'employer_candidate_insight', "
+            "'employer_interview_kit', "
+            "'employer_shortlist_comparison', "
+            "'employer_internship_description'"
             ")",
             name="ck_ai_quota_operations_feature_key",
         ),
         CheckConstraint(
-            "plan_key IN ('free', 'pro_student')",
+            "plan_key IN ('free', 'pro_student', 'employer_pro')",
             name="ck_ai_quota_operations_plan_key",
         ),
         CheckConstraint(

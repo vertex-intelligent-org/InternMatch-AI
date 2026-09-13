@@ -7,6 +7,10 @@ from app.core.security import AuthenticatedUser, require_admin_user
 from app.db.session import get_db
 from app.repositories.employer_organization import EmployerOrganizationRepository
 from app.repositories.internship import InternshipRepository
+from app.services.employer_product_policy import (
+    EmployerListingLimitError,
+    require_employer_listing_capacity,
+)
 from app.schemas.internship import (
     InternshipDetailResponse,
     InternshipListResponse,
@@ -176,6 +180,32 @@ def reopen_admin_internship(
                     "before reopening."
                 ),
             )
+
+        employer_user_id = snapshot.employer_user_id
+
+        if employer_user_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    "Employer-owned listing has no "
+                    "authoritative employer owner."
+                ),
+            )
+
+        try:
+            require_employer_listing_capacity(
+                db,
+                user_id=employer_user_id,
+                exclude_internship_id=snapshot.id,
+            )
+        except EmployerListingLimitError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    "The employer's current plan has no "
+                    "capacity for another published internship."
+                ),
+            ) from exc
 
     listing = InternshipRepository.get_by_id_for_update(
         db=db,

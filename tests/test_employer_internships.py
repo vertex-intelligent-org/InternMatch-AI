@@ -321,7 +321,10 @@ def test_create_internship_input_validation(client: TestClient):
 # ==============================================================================
 
 
-def test_list_my_internships_tenant_isolation_and_ordering(client: TestClient):
+def test_list_my_internships_tenant_isolation_and_ordering(
+    client: TestClient,
+    monkeypatch,
+):
     """
     Verify GET /api/v1/internships/mine:
     - Returns only opportunities owned by the authenticated employer
@@ -334,6 +337,43 @@ def test_list_my_internships_tenant_isolation_and_ordering(client: TestClient):
     employer_b = uuid4()
     _create_profile(employer_a, "Employer A", account_type="employer")
     _create_profile(employer_b, "Employer B", account_type="employer")
+
+    # This test verifies /mine tenant isolation and ordering, not Free-plan
+    # capacity. Employer A needs two published listings, so model that user
+    # as Employer Pro while Employer B remains Free.
+    from app.services import employer_product_policy
+
+    original_get_policy = (
+        employer_product_policy.get_employer_product_policy
+    )
+
+    def get_policy_for_listing_test(
+        db,
+        *,
+        user_id,
+    ):
+        if user_id == employer_a:
+            return employer_product_policy.EmployerProductPolicyResponse(
+                plan="employer_pro",
+                is_pro=True,
+                active_listing_limit=None,
+                candidate_insight_available=True,
+                interview_kit_available=True,
+                shortlist_comparison_available=True,
+                internship_description_available=True,
+                pipeline_analytics_available=True,
+            )
+
+        return original_get_policy(
+            db,
+            user_id=user_id,
+        )
+
+    monkeypatch.setattr(
+        employer_product_policy,
+        "get_employer_product_policy",
+        get_policy_for_listing_test,
+    )
 
     headers_a = {"Authorization": f"Bearer valid-user-{employer_a}"}
     headers_b = {"Authorization": f"Bearer valid-user-{employer_b}"}

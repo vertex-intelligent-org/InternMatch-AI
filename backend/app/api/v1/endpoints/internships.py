@@ -1,3 +1,4 @@
+from fastapi import Header
 """
 Public Read-Only and Authenticated Employer Internship Catalog Endpoints
 Provides endpoints for browsing, fetching, creating, and retrieving
@@ -44,7 +45,144 @@ from app.services.cv_storage import (
     generate_candidate_cv_signed_url,
 )
 
+from app.services.employer_candidate_insight import (
+    EmployerCandidateInsightResponse,
+    generate_employer_candidate_insight,
+)
+
+from app.services.employer_interview_kit import (
+    EmployerInterviewKitResponse,
+    generate_employer_interview_kit,
+)
+
+from app.services.employer_shortlist_comparison import (
+    EmployerShortlistComparisonRequest,
+    EmployerShortlistComparisonResponse,
+    generate_employer_shortlist_comparison,
+)
+
+from app.services.employer_internship_description import (
+    EmployerInternshipDescriptionRequest,
+    EmployerInternshipDescriptionResponse,
+    generate_employer_internship_description,
+)
+
+from app.services.employer_pipeline_analytics import (
+    EmployerPipelineAnalyticsResponse,
+    get_employer_pipeline_analytics,
+)
+from app.services.employer_product_policy import (
+    FEATURE_INTERNSHIP_DESCRIPTION,
+    FEATURE_INTERVIEW_KIT,
+    FEATURE_PIPELINE_ANALYTICS,
+    FEATURE_SHORTLIST_COMPARISON,
+    EmployerFeatureAccessError,
+    EmployerListingLimitError,
+    EmployerProductPolicyResponse,
+    get_employer_product_policy,
+    require_employer_feature,
+    require_employer_listing_capacity,
+)
+
+from app.services.ai_quota import (
+    AIQuotaExceededError,
+    AIQuotaIdempotencyConflictError,
+)
+from app.services.ai_quota_integration import (
+    build_ai_request_fingerprint,
+    format_ai_idempotency_conflict_payload,
+    format_ai_quota_exceeded_payload,
+)
+from app.services.employer_ai_quota import (
+    EMPLOYER_CANDIDATE_INSIGHT,
+    EMPLOYER_INTERNSHIP_DESCRIPTION,
+    EMPLOYER_INTERVIEW_KIT,
+    EMPLOYER_SHORTLIST_COMPARISON,
+    EmployerAIQuotaAccessError,
+    EmployerAIQuotaConfigurationError,
+    execute_employer_ai_with_quota,
+)
+
 router = APIRouter()
+
+
+def _execute_employer_ai_with_quota_response(
+    db: Session,
+    *,
+    user_id: UUID,
+    feature_key: str,
+    idempotency_key: str | None,
+    request_fingerprint: str,
+    callback,
+):
+    """Run one Employer AI request through durable product-unit quota."""
+
+    if idempotency_key is None or not idempotency_key.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "Idempotency-Key header is required "
+                "for Employer AI requests."
+            ),
+        )
+
+    try:
+        return execute_employer_ai_with_quota(
+            db,
+            user_id=user_id,
+            feature_key=feature_key,
+            idempotency_key=idempotency_key,
+            request_fingerprint=request_fingerprint,
+            callback=callback,
+        )
+    except AIQuotaExceededError as exc:
+        return JSONResponse(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            content=format_ai_quota_exceeded_payload(exc),
+        )
+    except AIQuotaIdempotencyConflictError:
+        return JSONResponse(
+            status_code=status.HTTP_409_CONFLICT,
+            content=format_ai_idempotency_conflict_payload(),
+        )
+    except EmployerAIQuotaAccessError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(exc),
+        ) from exc
+    except EmployerAIQuotaConfigurationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=(
+                "Employer AI usage policy is "
+                "not configured."
+            ),
+        ) from exc
+
+
+def _require_employer_feature(
+    db: Session,
+    *,
+    user_id: UUID,
+    feature_key: str,
+) -> None:
+    """Translate backend product-policy denial to an API 403."""
+
+    try:
+        require_employer_feature(
+            db,
+            user_id=user_id,
+            feature_key=feature_key,
+        )
+    except EmployerFeatureAccessError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=(
+                "Employer Pro is required "
+                "for this feature."
+            ),
+        ) from exc
+
 
 _ACTIVE_MATCH_JOB_STATUSES = ("queued", "processing")
 
@@ -189,6 +327,22 @@ def create_internship(
             current_user.user_id,
             lock_for_update=True,
         )
+
+        try:
+            require_employer_listing_capacity(
+                db,
+                user_id=current_user.user_id,
+            )
+        except EmployerListingLimitError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=(
+                    "Employer Free supports one "
+                    "published internship at a time. "
+                    "Close the current internship or "
+                    "upgrade to Employer Pro."
+                ),
+            ) from exc
 
         listing = InternshipRepository.create_employer_listing(
             db=db,
@@ -732,6 +886,371 @@ def schedule_employer_applicant_interview(
         profile=profile,
         match=match,
         skills=skills,
+    )
+
+
+
+@router.post(
+    "/{id}/applicants/{application_id}/insight",
+    response_model=EmployerCandidateInsightResponse,
+)
+def generate_employer_applicant_insight(
+    id: UUID,
+    application_id: UUID,
+    content_locale: str = "en",
+    current_user: AuthenticatedUser = Depends(require_employer_user),
+    db: Session = Depends(get_db),
+    idempotency_key: str | None = Header(
+        default=None,
+        alias="Idempotency-Key",
+    ),
+):
+    """Generate grounded professional candidate insight for an owned applicant.
+
+    This endpoint is intentionally decision support only. Employer Pro
+    entitlement/quota enforcement is added in the product-policy gate before
+    production enablement.
+    """
+
+    record = ApplicationRepository.get_applicant_detail_for_employer(
+        db=db,
+        internship_id=id,
+        application_id=application_id,
+        employer_user_id=current_user.user_id,
+    )
+
+    if not record:
+        return JSONResponse(
+            status_code=status.HTTP_404_NOT_FOUND,
+            content=format_not_found_error(
+                "Applicant record not found."
+            ),
+        )
+
+    application, profile, match = record
+
+    if match is None or match.overall_score is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Candidate insight requires a calculated match."
+            ),
+        )
+
+    fingerprint = build_ai_request_fingerprint(
+        {
+            "operation": "employer_candidate_insight",
+            "internship_id": str(id),
+            "application_id": str(application_id),
+            "content_locale": content_locale,
+        }
+    )
+
+    return _execute_employer_ai_with_quota_response(
+        db,
+        user_id=current_user.user_id,
+        feature_key=EMPLOYER_CANDIDATE_INSIGHT,
+        idempotency_key=idempotency_key,
+        request_fingerprint=fingerprint,
+        callback=lambda: generate_employer_candidate_insight(
+            db,
+            employer_user_id=current_user.user_id,
+            application=application,
+            profile=profile,
+            match=match,
+            internship_id=id,
+            content_locale=content_locale,
+        ),
+    )
+
+
+
+@router.post(
+    "/{id}/applicants/{application_id}/interview-kit",
+    response_model=EmployerInterviewKitResponse,
+)
+def generate_employer_applicant_interview_kit(
+    id: UUID,
+    application_id: UUID,
+    content_locale: str = "en",
+    current_user: AuthenticatedUser = Depends(require_employer_user),
+    db: Session = Depends(get_db),
+    idempotency_key: str | None = Header(
+        default=None,
+        alias="Idempotency-Key",
+    ),
+):
+    """Generate a grounded, human-led employer interview kit.
+
+    Employer Pro entitlement/quota enforcement is intentionally deferred to
+    the product-policy gate before production enablement.
+    """
+
+    record = ApplicationRepository.get_applicant_detail_for_employer(
+        db=db,
+        internship_id=id,
+        application_id=application_id,
+        employer_user_id=current_user.user_id,
+    )
+
+    if not record:
+        return JSONResponse(
+            status_code=status.HTTP_404_NOT_FOUND,
+            content=format_not_found_error(
+                "Applicant record not found."
+            ),
+        )
+
+    application, profile, match = record
+
+    if match is None or match.overall_score is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Employer interview kit requires a calculated match."
+            ),
+        )
+
+    _require_employer_feature(
+        db,
+        user_id=current_user.user_id,
+        feature_key=FEATURE_INTERVIEW_KIT,
+    )
+
+    fingerprint = build_ai_request_fingerprint(
+        {
+            "operation": "employer_interview_kit",
+            "internship_id": str(id),
+            "application_id": str(application_id),
+            "content_locale": content_locale,
+        }
+    )
+
+    return _execute_employer_ai_with_quota_response(
+        db,
+        user_id=current_user.user_id,
+        feature_key=EMPLOYER_INTERVIEW_KIT,
+        idempotency_key=idempotency_key,
+        request_fingerprint=fingerprint,
+        callback=lambda: generate_employer_interview_kit(
+            db,
+            employer_user_id=current_user.user_id,
+            application=application,
+            profile=profile,
+            match=match,
+            internship_id=id,
+            content_locale=content_locale,
+        ),
+    )
+
+
+
+@router.post(
+    "/{id}/shortlist-comparison",
+    response_model=EmployerShortlistComparisonResponse,
+)
+def compare_employer_shortlist(
+    id: UUID,
+    payload: EmployerShortlistComparisonRequest,
+    content_locale: str = "en",
+    current_user: AuthenticatedUser = Depends(require_employer_user),
+    db: Session = Depends(get_db),
+    idempotency_key: str | None = Header(
+        default=None,
+        alias="Idempotency-Key",
+    ),
+):
+    """Compare 2-5 owned applicants without ranking.
+
+    Employer Pro entitlement/quota enforcement is intentionally
+    added later in the product-policy gate before production.
+    """
+
+    if len(set(payload.application_ids)) != len(
+        payload.application_ids
+    ):
+        raise HTTPException(
+            status_code=(
+                status.HTTP_422_UNPROCESSABLE_ENTITY
+            ),
+            detail=(
+                "Duplicate application IDs "
+                "are not allowed."
+            ),
+        )
+
+    records = []
+
+    for application_id in payload.application_ids:
+        record = (
+            ApplicationRepository
+            .get_applicant_detail_for_employer(
+                db=db,
+                internship_id=id,
+                application_id=application_id,
+                employer_user_id=(
+                    current_user.user_id
+                ),
+            )
+        )
+
+        if not record:
+            return JSONResponse(
+                status_code=(
+                    status.HTTP_404_NOT_FOUND
+                ),
+                content=format_not_found_error(
+                    "Applicant record not found."
+                ),
+            )
+
+        application, profile, match = record
+
+        if (
+            match is None
+            or match.overall_score is None
+        ):
+            raise HTTPException(
+                status_code=(
+                    status.HTTP_409_CONFLICT
+                ),
+                detail=(
+                    "Shortlist comparison requires "
+                    "calculated matches for every "
+                    "applicant."
+                ),
+            )
+
+        records.append(
+            (
+                application,
+                profile,
+                match,
+            )
+        )
+
+    _require_employer_feature(
+        db,
+        user_id=current_user.user_id,
+        feature_key=FEATURE_SHORTLIST_COMPARISON,
+    )
+
+    fingerprint = build_ai_request_fingerprint(
+        {
+            "operation": "employer_shortlist_comparison",
+            "internship_id": str(id),
+            "application_ids": [
+                str(value)
+                for value in payload.application_ids
+            ],
+            "content_locale": content_locale,
+        }
+    )
+
+    return _execute_employer_ai_with_quota_response(
+        db,
+        user_id=current_user.user_id,
+        feature_key=EMPLOYER_SHORTLIST_COMPARISON,
+        idempotency_key=idempotency_key,
+        request_fingerprint=fingerprint,
+        callback=lambda: generate_employer_shortlist_comparison(
+            db,
+            employer_user_id=current_user.user_id,
+            internship_id=id,
+            records=records,
+            content_locale=content_locale,
+        ),
+    )
+
+
+
+@router.post(
+    "/employer-tools/description-assistant",
+    response_model=EmployerInternshipDescriptionResponse,
+)
+def generate_employer_internship_description_draft(
+    payload: EmployerInternshipDescriptionRequest,
+    content_locale: str = "en",
+    current_user: AuthenticatedUser = Depends(require_employer_user),
+    db: Session = Depends(get_db),
+    idempotency_key: str | None = Header(
+        default=None,
+        alias="Idempotency-Key",
+    ),
+):
+    """Generate an editable internship-description draft only.
+
+    This endpoint does not create, publish, activate, or update an
+    internship listing. Employer Pro entitlement and quota policy
+    are added later before production enablement.
+    """
+
+    _require_employer_feature(
+        db,
+        user_id=current_user.user_id,
+        feature_key=FEATURE_INTERNSHIP_DESCRIPTION,
+    )
+
+    fingerprint = build_ai_request_fingerprint(
+        {
+            "operation": "employer_internship_description",
+            "payload": payload.model_dump(
+                mode="json"
+            ),
+            "content_locale": content_locale,
+        }
+    )
+
+    return _execute_employer_ai_with_quota_response(
+        db,
+        user_id=current_user.user_id,
+        feature_key=EMPLOYER_INTERNSHIP_DESCRIPTION,
+        idempotency_key=idempotency_key,
+        request_fingerprint=fingerprint,
+        callback=lambda: generate_employer_internship_description(
+            employer_user_id=current_user.user_id,
+            payload=payload,
+            content_locale=content_locale,
+        ),
+    )
+
+
+
+@router.get(
+    "/employer-tools/product-policy",
+    response_model=EmployerProductPolicyResponse,
+)
+def get_employer_product_policy_endpoint(
+    current_user: AuthenticatedUser = Depends(require_employer_user),
+    db: Session = Depends(get_db),
+):
+    """Return backend-authoritative Employer Free/Pro capabilities."""
+
+    return get_employer_product_policy(
+        db,
+        user_id=current_user.user_id,
+    )
+
+
+@router.get(
+    "/employer-tools/pipeline-analytics",
+    response_model=EmployerPipelineAnalyticsResponse,
+)
+def get_employer_pipeline_analytics_endpoint(
+    current_user: AuthenticatedUser = Depends(require_employer_user),
+    db: Session = Depends(get_db),
+):
+    """Return a deterministic current hiring-pipeline snapshot."""
+
+    _require_employer_feature(
+        db,
+        user_id=current_user.user_id,
+        feature_key=FEATURE_PIPELINE_ANALYTICS,
+    )
+
+    return get_employer_pipeline_analytics(
+        db,
+        employer_user_id=current_user.user_id,
     )
 
 

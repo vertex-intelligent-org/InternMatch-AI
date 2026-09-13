@@ -22,6 +22,7 @@ import Chip from '../components/Chip';
 import Card from '../components/Card';
 import GradientButton from '../components/GradientButton';
 import haptics from '../services/haptics';
+import EmployerDescriptionAssistant from '../components/EmployerDescriptionAssistant';
 import {
   createEmployerInternship,
   getEmployerOrganization,
@@ -668,7 +669,16 @@ export default function CreateOpportunityScreen({ navigation, route }) {
             loading={submitting || loadingExisting}
             style={styles.publishBtn}
           />
-        </ScrollView>
+
+        <EmployerDescriptionAssistant
+          title={title}
+          rawDescription={description}
+          onApplyDescription={setDescription}
+          navigation={navigation}
+          isRTL={typeof isRTL !== 'undefined' ? isRTL : false}
+        />
+
+</ScrollView>
       </KeyboardAvoidingView>
     </ScreenContainer>
   );

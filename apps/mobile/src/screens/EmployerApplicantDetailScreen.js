@@ -26,6 +26,7 @@ import Card from '../components/Card';
 import Chip from '../components/Chip';
 import MatchBadge from '../components/MatchBadge';
 import Reveal from '../components/motion/Reveal';
+import EmployerCandidateIntelligence from '../components/EmployerCandidateIntelligence';
 import {
   getEmployerApplicantCV,
   getEmployerApplicantDetail,
@@ -1289,7 +1290,15 @@ export default function EmployerApplicantDetailScreen({ route, navigation }) {
             </Reveal>
           </>
         )}
-      </ScrollView>
+
+        <EmployerCandidateIntelligence
+          internshipId={internshipId}
+          applicationId={applicationId}
+          navigation={navigation}
+          isRTL={isRTL}
+        />
+
+</ScrollView>
     </ScreenContainer>
   );
 }

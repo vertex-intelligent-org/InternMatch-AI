@@ -199,6 +199,36 @@ class InternshipRepository:
         return listing
 
     @staticmethod
+    def count_published_by_employer(
+        db: Session,
+        employer_user_id: UUID,
+        *,
+        exclude_internship_id: Optional[UUID] = None,
+    ) -> int:
+        """Count authoritative published employer-owned listings."""
+
+        stmt = (
+            select(func.count())
+            .select_from(InternshipListing)
+            .where(
+                InternshipListing.employer_user_id
+                == employer_user_id,
+                InternshipListing.listing_source
+                == "employer",
+                InternshipListing.publication_status
+                == "published",
+            )
+        )
+
+        if exclude_internship_id is not None:
+            stmt = stmt.where(
+                InternshipListing.id
+                != exclude_internship_id
+            )
+
+        return int(db.scalar(stmt) or 0)
+
+    @staticmethod
     def list_by_employer(
         db: Session,
         employer_user_id: UUID,
