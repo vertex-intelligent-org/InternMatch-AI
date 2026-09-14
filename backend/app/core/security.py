@@ -14,7 +14,6 @@ from app.db.session import get_db
 from fastapi import Depends, Header, HTTPException, Request, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
-
 from supabase import create_client
 
 logger = get_logger(__name__)

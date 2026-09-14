@@ -16,8 +16,9 @@ import hashlib
 from dataclasses import dataclass
 from uuid import UUID, uuid4
 
-from app.core.config import settings
 from supabase import create_client
+
+from app.core.config import settings
 
 MAX_COMPLIANCE_EVIDENCE_SIZE_BYTES = (
     10 * 1024 * 1024

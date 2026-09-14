@@ -26,3 +26,5 @@ venvPath = "."
 venv = ".venv"
 extraPaths = ["backend", "worker"]
 
+[tool.ruff.lint.isort]
+known-third-party = ["supabase"]
