@@ -11,7 +11,7 @@ using a content-derived context hash.
 
 import hashlib
 import json
-from typing import Callable,  Literal, Optional
+from typing import Callable, Literal, Optional
 from uuid import UUID
 
 from google import genai
@@ -24,12 +24,12 @@ from app.core.config import settings
 from app.repositories.match import MatchRepository
 from app.repositories.matching_data import MatchingDataRepository
 from app.schemas.interview_prep import InterviewPrepResponse
-from app.services.ai_quota import FEATURE_INTERVIEW_PREP
 from app.services.ai_generation_quota import (
     release_generation_ai_quota,
     reserve_generation_ai_quota,
     settle_generation_ai_quota,
 )
+from app.services.ai_quota import FEATURE_INTERVIEW_PREP
 from app.services.ai_telemetry import (
     ai_telemetry_context,
     create_tracked_gemini_client,

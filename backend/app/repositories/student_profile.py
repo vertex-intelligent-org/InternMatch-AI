@@ -9,8 +9,7 @@ from typing import Any, Dict, List, Optional, Sequence, Set
 from uuid import UUID
 
 from app.db.models import Skill, StudentProfile, StudentSkill
-from app.repositories.matching_data import MatchingDataRepository
-from sqlalchemy import delete, func, select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 

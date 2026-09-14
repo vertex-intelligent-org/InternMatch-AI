@@ -16,7 +16,6 @@ from datetime import datetime, timezone
 from uuid import UUID
 
 from sqlalchemy.orm import Session
-from supabase import create_client
 
 from app.core.config import settings
 from app.db.models import (
@@ -31,7 +30,7 @@ from app.db.models import (
 )
 from app.services.avatar_storage import delete_candidate_avatar
 from app.services.cv_storage import delete_candidate_cv
-
+from supabase import create_client
 
 DELETED_ACCOUNT_EVENT_PREFIX = "account-deleted:"
 

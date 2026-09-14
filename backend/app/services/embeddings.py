@@ -9,7 +9,6 @@ from typing import List
 
 from google import genai
 from google.genai import types
-
 from openai import OpenAI
 
 from app.core.config import settings

@@ -5,7 +5,7 @@ from uuid import uuid4
 import pytest
 from app.core.config import settings
 from app.core.security import AuthenticatedUser, require_admin_user
-from app.db.models import EmployerOrganization, EmployerVerificationEvent
+from app.db.models import EmployerOrganization
 from app.repositories.employer_organization import EmployerOrganizationRepository
 from fastapi import HTTPException
 from sqlalchemy.exc import IntegrityError

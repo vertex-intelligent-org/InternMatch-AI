@@ -11,7 +11,6 @@ from sqlalchemy import String, and_, cast, func, or_, select
 from sqlalchemy.orm import Session
 
 
-
 def public_internship_visibility_condition():
     """
     Canonical public/candidate visibility rule.

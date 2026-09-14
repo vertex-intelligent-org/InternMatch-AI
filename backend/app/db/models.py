@@ -772,7 +772,10 @@ class ProcessingJob(Base):
     __tablename__ = "processing_jobs"
     __table_args__ = (
         CheckConstraint(
-            "job_type IN ('cv_extraction', 'match_calculation', 'application_generation', 'match_explanation', 'interview_prep')",
+            (
+                "job_type IN ('cv_extraction', 'match_calculation', "
+                "'application_generation', 'match_explanation', 'interview_prep')"
+            ),
             name="ck_processing_jobs_job_type",
         ),
         CheckConstraint(

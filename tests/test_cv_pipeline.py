@@ -12,8 +12,8 @@ from uuid import uuid4
 
 import pytest
 from app.db.models import (
-    StudentProfile,
     Skill,
+    StudentProfile,
     StudentSkill,
 )
 from app.repositories.candidate_profile_write import (

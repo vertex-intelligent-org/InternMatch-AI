@@ -10,13 +10,13 @@ from uuid import UUID
 from app.core.security import AuthenticatedUser, get_current_user
 from app.db.session import get_db
 from app.repositories.processing_job import ProcessingJobRepository
+from app.schemas.job import ProcessingJobResponse
 from app.services.processing_job_cancellation import (
     ProcessingJobCancellationNotFound,
     ProcessingJobCancellationTerminal,
     ProcessingJobCancellationUnsupported,
     cancel_user_processing_job,
 )
-from app.schemas.job import ProcessingJobResponse
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session

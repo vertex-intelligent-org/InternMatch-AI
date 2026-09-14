@@ -152,6 +152,8 @@ def test_orm_vector_retrieval_repository_executes_real_sql(pg_session):
 
     listing = InternshipListing(
         id=uuid4(),
+        listing_source="curated",
+        publication_status="published",
         title="AI Engineering Intern",
         company="TechCorp",
         location="Remote",
@@ -190,6 +192,8 @@ def test_cosine_ordering_is_correct(pg_session):
 
     int_closest = InternshipListing(
         id=uuid4(),
+        listing_source="curated",
+        publication_status="published",
         title="Closest Internship",
         company="Alpha",
         location="Remote",
@@ -199,6 +203,8 @@ def test_cosine_ordering_is_correct(pg_session):
     )
     int_medium = InternshipListing(
         id=uuid4(),
+        listing_source="curated",
+        publication_status="published",
         title="Medium Internship",
         company="Beta",
         location="Remote",
@@ -208,6 +214,8 @@ def test_cosine_ordering_is_correct(pg_session):
     )
     int_orthogonal = InternshipListing(
         id=uuid4(),
+        listing_source="curated",
+        publication_status="published",
         title="Orthogonal Internship",
         company="Gamma",
         location="Remote",
@@ -241,6 +249,8 @@ def test_null_internship_embeddings_are_excluded(pg_session):
 
     listing_valid = InternshipListing(
         id=uuid4(),
+        listing_source="curated",
+        publication_status="published",
         title="Valid Embedding Internship",
         company="Valid Co",
         location="Remote",
@@ -250,6 +260,8 @@ def test_null_internship_embeddings_are_excluded(pg_session):
     )
     listing_null = InternshipListing(
         id=uuid4(),
+        listing_source="curated",
+        publication_status="published",
         title="Null Embedding Internship",
         company="Null Co",
         location="Remote",
@@ -281,6 +293,8 @@ def test_candidate_embedding_drives_retrieval(pg_session):
 
     int_a = InternshipListing(
         id=uuid4(),
+        listing_source="curated",
+        publication_status="published",
         title="Domain A Listing",
         company="Company A",
         location="Remote",
@@ -290,6 +304,8 @@ def test_candidate_embedding_drives_retrieval(pg_session):
     )
     int_b = InternshipListing(
         id=uuid4(),
+        listing_source="curated",
+        publication_status="published",
         title="Domain B Listing",
         company="Company B",
         location="Remote",
@@ -363,6 +379,8 @@ def test_deterministic_hybrid_scoring_and_persistence(pg_session):
     # Strongest match: 100% skill match, 100% vector match, 100% preference match
     int_strong = InternshipListing(
         id=uuid4(),
+        listing_source="curated",
+        publication_status="published",
         title="Lead AI Engineer Intern",
         company="Nexus Corp",
         location="Remote",
@@ -375,6 +393,8 @@ def test_deterministic_hybrid_scoring_and_persistence(pg_session):
     # Weaker match: partial skill match, orthogonal vector
     int_weak = InternshipListing(
         id=uuid4(),
+        listing_source="curated",
+        publication_status="published",
         title="Hardware Intern",
         company="Hardware Corp",
         location="Tokyo",
@@ -441,6 +461,8 @@ def test_stale_previous_student_matches_replaced_on_rerun(pg_session):
 
     int_1 = InternshipListing(
         id=uuid4(),
+        listing_source="curated",
+        publication_status="published",
         title="Job 1",
         company="Co 1",
         location="Remote",
@@ -450,6 +472,8 @@ def test_stale_previous_student_matches_replaced_on_rerun(pg_session):
     )
     int_2 = InternshipListing(
         id=uuid4(),
+        listing_source="curated",
+        publication_status="published",
         title="Job 2",
         company="Co 2",
         location="Remote",
@@ -516,6 +540,8 @@ def test_tenant_isolation_user_a_never_mutates_user_b(pg_session):
 
     int_listing = InternshipListing(
         id=uuid4(),
+        listing_source="curated",
+        publication_status="published",
         title="Shared Listing",
         company="Shared Co",
         location="Remote",
@@ -571,6 +597,8 @@ def test_transaction_rollback_leaves_no_partial_matching_state(pg_session):
 
     int_listing = InternshipListing(
         id=uuid4(),
+        listing_source="curated",
+        publication_status="published",
         title="Rollback Listing",
         company="Rollback Co",
         location="Remote",

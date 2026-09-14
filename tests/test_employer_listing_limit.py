@@ -5,9 +5,8 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock
 from uuid import uuid4
 
-import pytest
-
 import app.services.employer_product_policy as policy_module
+import pytest
 from app.repositories.internship import InternshipRepository
 from app.services.employer_product_policy import (
     EmployerListingLimitError,

@@ -12,8 +12,8 @@ from uuid import UUID
 
 from app.db.models import (
     EmployerComplianceClaim,
-    EmployerComplianceEvidence,
     EmployerComplianceEvent,
+    EmployerComplianceEvidence,
 )
 from sqlalchemy import select
 from sqlalchemy.orm import Session

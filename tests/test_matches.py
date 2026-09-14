@@ -9,7 +9,6 @@ from unittest.mock import MagicMock
 from uuid import uuid4
 
 import pytest
-from app.core.config import settings
 from app.db.models import InternshipListing, Match, ProcessingJob, StudentProfile
 from app.repositories.match import MatchRepository
 from app.services.match_enqueue import enqueue_match_calculation

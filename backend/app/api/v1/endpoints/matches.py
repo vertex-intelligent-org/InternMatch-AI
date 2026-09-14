@@ -18,7 +18,6 @@ from app.schemas.match import (
     MatchItemResponse,
     MatchListResponse,
 )
-from app.services.ai_quota import AIQuotaExceededError
 from app.services.match_enqueue import enqueue_match_calculation
 from app.services.match_explanation_enqueue import enqueue_match_explanation_generation
 from fastapi import APIRouter, Depends, HTTPException, Query, status

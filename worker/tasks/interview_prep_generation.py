@@ -9,14 +9,15 @@ from app.db.session import SessionLocal
 from app.repositories.application import ApplicationRepository
 from app.repositories.processing_job import ProcessingJobRepository
 from app.services.ai_quota import (
-    AIQuotaExceededError,
     FEATURE_INTERVIEW_PREP,
+    AIQuotaExceededError,
 )
 from app.services.ai_quota_integration import (
     format_ai_quota_exceeded_payload,
     release_job_ai_quota_if_present,
 )
 from app.services.interview_prep import get_or_create_interview_prep
+
 from tasks.durable_ai_generation import (
     DurableAIGenerationCancelled,
     job_cancel_requested,

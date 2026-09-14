@@ -7,12 +7,13 @@ jurisdiction-scoped compliance claims.
 Raw storage paths and private administrative notes are never returned.
 """
 
+import re
 from collections import defaultdict
 from datetime import date, datetime, timezone
-import re
 from typing import Literal, Optional
 from uuid import UUID
 
+from app.core.rate_limit import enforce_rate_limit
 from app.core.security import (
     AuthenticatedUser,
     require_admin_user,
@@ -37,7 +38,6 @@ from app.services.employer_compliance_storage import (
     generate_compliance_evidence_signed_url,
     store_compliance_evidence,
 )
-from app.core.rate_limit import enforce_rate_limit
 from fastapi import (
     APIRouter,
     Depends,
@@ -50,7 +50,6 @@ from fastapi import (
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
-
 
 employer_router = APIRouter()
 admin_router = APIRouter()

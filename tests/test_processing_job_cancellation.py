@@ -1,7 +1,6 @@
 from uuid import uuid4
 
 import pytest
-
 from app.db.models import ProcessingJob
 from app.services import processing_job_cancellation as cancellation
 from app.services.processing_job_cancellation import (
@@ -9,6 +8,7 @@ from app.services.processing_job_cancellation import (
     ProcessingJobCancellationTerminal,
     cancel_user_processing_job,
 )
+
 from tests.db import TestingSessionLocal
 
 

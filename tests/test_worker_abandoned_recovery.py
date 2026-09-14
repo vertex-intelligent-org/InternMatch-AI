@@ -1,7 +1,8 @@
 from uuid import uuid4
 
-import worker as worker_module
 from rq.exceptions import AbandonedJobError
+
+import worker as worker_module
 
 
 class _FakeRQJob:

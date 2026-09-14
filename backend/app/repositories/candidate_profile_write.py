@@ -7,7 +7,7 @@ Preserves manual skills and reconciles CV-evidenced skill provenance.
 """
 
 import re
-from typing import Any, Dict, Set
+from typing import Any, Dict
 from uuid import UUID
 
 from app.db.models import (

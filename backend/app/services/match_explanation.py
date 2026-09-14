@@ -26,12 +26,12 @@ from app.schemas.match import (
     MatchExplanationResponse,
     SkillGapAnalysisResponse,
 )
-from app.services.ai_quota import FEATURE_MATCH_EXPLANATION
 from app.services.ai_generation_quota import (
     release_generation_ai_quota,
     reserve_generation_ai_quota,
     settle_generation_ai_quota,
 )
+from app.services.ai_quota import FEATURE_MATCH_EXPLANATION
 from app.services.ai_telemetry import (
     ai_telemetry_context,
     create_tracked_gemini_client,

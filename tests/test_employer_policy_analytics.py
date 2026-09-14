@@ -1,12 +1,9 @@
 """Employer product-policy and pipeline-analytics tests."""
 
-from types import SimpleNamespace
 from unittest.mock import MagicMock
 from uuid import uuid4
 
 import pytest
-from fastapi.testclient import TestClient
-
 from app.services.employer_pipeline_analytics import (
     EmployerPipelineAnalyticsResponse,
     get_employer_pipeline_analytics,
@@ -17,6 +14,8 @@ from app.services.employer_product_policy import (
     get_employer_product_policy,
     require_employer_feature,
 )
+from fastapi.testclient import TestClient
+
 from tests.test_employer_internships import (
     _create_profile,
 )

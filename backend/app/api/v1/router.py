@@ -16,6 +16,12 @@ from app.api.v1.endpoints import (
     subscriptions,
     webhooks,
 )
+from app.api.v1.endpoints import (
+    employer_compliance as employer_compliance_endpoints,
+)
+from app.api.v1.endpoints import (
+    employer_organizations as employer_organizations_endpoints,
+)
 from fastapi import APIRouter
 
 api_v1_router = APIRouter()
@@ -76,8 +82,6 @@ api_v1_router.include_router(
 )
 
 # Gate 2 employer organization verification routes
-from app.api.v1.endpoints import employer_organizations as employer_organizations_endpoints
-
 api_v1_router.include_router(
     employer_organizations_endpoints.employer_router,
     prefix="/employer-organization",
@@ -92,8 +96,6 @@ api_v1_router.include_router(
 
 # Employer compliance claims are a separate trust domain from
 # organization identity verification.
-from app.api.v1.endpoints import employer_compliance as employer_compliance_endpoints
-
 api_v1_router.include_router(
     employer_compliance_endpoints.employer_router,
     prefix="/employer-compliance",

@@ -5,9 +5,8 @@ from uuid import UUID, uuid4
 
 from app.core.config import settings
 from app.db.models import (
-    EmployerComplianceClaim,
-    EmployerComplianceEvidence,
     EmployerComplianceEvent,
+    EmployerComplianceEvidence,
     EmployerOrganization,
     StudentProfile,
 )
@@ -622,7 +621,7 @@ def test_regular_responses_never_expose_raw_storage_path(
         mock_supabase_auth
     )
 
-    claim = _create_claim(
+    _create_claim(
         client,
         token,
     )

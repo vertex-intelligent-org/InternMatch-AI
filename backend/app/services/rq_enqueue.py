@@ -10,7 +10,6 @@ from rq import Queue
 
 from app.core.config import settings
 
-
 DEFAULT_MAX_PENDING_JOBS = 120
 MIN_MAX_PENDING_JOBS = 1
 MAX_MAX_PENDING_JOBS = 10_000

@@ -1,9 +1,10 @@
 from uuid import uuid4
 
-from app.db.models import ProcessingJob
-from tests.db import TestingSessionLocal
 import tasks.application_generation as application_task
 import tasks.match_calculation as match_task
+from app.db.models import ProcessingJob
+
+from tests.db import TestingSessionLocal
 
 
 def _create_cancelled_job(*, user_id, job_type):

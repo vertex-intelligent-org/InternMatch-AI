@@ -5,9 +5,6 @@ from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
-from sqlalchemy import select
-from sqlalchemy.orm import Session
-
 from app.db.models import (
     AIQuotaOperation,
     AIQuotaPeriod,
@@ -19,10 +16,13 @@ from app.services.ai_quota import (
 from app.services.employer_ai_quota import (
     EMPLOYER_CANDIDATE_INSIGHT,
     EMPLOYER_INTERVIEW_KIT,
-    reserve_employer_ai_quota,
     release_employer_ai_quota_operation,
+    reserve_employer_ai_quota,
     settle_employer_ai_quota_operation,
 )
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
 from tests.conftest import test_engine
 
 

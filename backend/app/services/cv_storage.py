@@ -9,9 +9,8 @@ import zipfile
 from dataclasses import dataclass
 from uuid import UUID, uuid4
 
-from supabase import create_client
-
 from app.core.config import settings
+from supabase import create_client
 
 MAX_CV_SIZE_BYTES: int = 10 * 1024 * 1024  # 10 MiB
 CV_SIGNED_URL_EXPIRY_SECONDS: int = 300  # 5 minutes

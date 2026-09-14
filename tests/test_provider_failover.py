@@ -3,7 +3,6 @@
 from types import SimpleNamespace
 
 import pytest
-
 from app.core.config import settings
 from app.services import ai_telemetry
 

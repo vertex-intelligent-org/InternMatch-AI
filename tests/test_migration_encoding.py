@@ -1,6 +1,5 @@
 from pathlib import Path
 
-
 MIGRATION_DIR = Path("database/migrations")
 
 

@@ -7,8 +7,8 @@ from uuid import uuid4
 import pytest
 from app.db.models import (
     EmployerComplianceClaim,
-    EmployerComplianceEvidence,
     EmployerComplianceEvent,
+    EmployerComplianceEvidence,
     EmployerOrganization,
 )
 from app.repositories.employer_compliance import (

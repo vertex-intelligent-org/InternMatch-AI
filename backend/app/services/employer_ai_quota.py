@@ -9,8 +9,8 @@ Product limits must be chosen from real cost/usage evidence before launch.
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
 import os
+from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, TypeVar
 from uuid import UUID
 
@@ -31,7 +31,6 @@ from app.services.subscription import (
     PRO_EMPLOYER_ENTITLEMENT_ID,
     get_employer_subscription_snapshot,
 )
-
 
 EMPLOYER_CANDIDATE_INSIGHT = (
     "employer_candidate_insight"

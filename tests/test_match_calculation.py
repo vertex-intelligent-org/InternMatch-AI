@@ -284,7 +284,11 @@ def test_8_student_skills_loaded_once_per_calculation(db, monkeypatch):
         calls.append(student_id)
         return original_get_skills(d, student_id)
 
-    monkeypatch.setattr(MatchingDataRepository, "get_ranking_skill_names_for_student", spy_get_skills)
+    monkeypatch.setattr(
+        MatchingDataRepository,
+        "get_ranking_skill_names_for_student",
+        spy_get_skills,
+    )
 
     calculate_and_persist_matches(db, user_id, candidate_limit=5)
     assert len(calls) == 1

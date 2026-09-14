@@ -8,9 +8,8 @@ from dataclasses import dataclass
 from typing import Optional
 from uuid import UUID, uuid4
 
-from supabase import create_client
-
 from app.core.config import settings
+from supabase import create_client
 
 MAX_AVATAR_SIZE_BYTES: int = 5 * 1024 * 1024  # 5 MiB
 AVATAR_SIGNED_URL_EXPIRY_SECONDS: int = 3600  # 1 hour

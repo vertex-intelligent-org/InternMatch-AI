@@ -18,7 +18,6 @@ from app.services.subscription import (
     get_employer_subscription_snapshot,
 )
 
-
 FEATURE_CANDIDATE_INSIGHT = "candidate_insight"
 FEATURE_INTERVIEW_KIT = "interview_kit"
 FEATURE_SHORTLIST_COMPARISON = "shortlist_comparison"

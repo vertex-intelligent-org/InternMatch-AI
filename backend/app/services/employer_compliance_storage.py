@@ -12,14 +12,12 @@ Security contract:
 - service-role storage access only
 """
 
-from dataclasses import dataclass
 import hashlib
+from dataclasses import dataclass
 from uuid import UUID, uuid4
 
-from supabase import create_client
-
 from app.core.config import settings
-
+from supabase import create_client
 
 MAX_COMPLIANCE_EVIDENCE_SIZE_BYTES = (
     10 * 1024 * 1024

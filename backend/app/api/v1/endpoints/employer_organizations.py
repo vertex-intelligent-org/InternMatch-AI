@@ -32,7 +32,6 @@ from pydantic import BaseModel, ConfigDict
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-
 employer_router = APIRouter()
 admin_router = APIRouter()
 

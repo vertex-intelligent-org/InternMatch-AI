@@ -3,7 +3,6 @@ from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
-
 from app.services import ai_generation_quota
 from tasks import durable_ai_generation
 

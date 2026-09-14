@@ -1,4 +1,3 @@
-from fastapi import Header
 """
 Public Read-Only and Authenticated Employer Internship Catalog Endpoints
 Provides endpoints for browsing, fetching, creating, and retrieving
@@ -12,17 +11,17 @@ from uuid import UUID
 from app.core.config import settings
 from app.core.logging import get_logger
 from app.core.security import AuthenticatedUser, require_employer_user
-from app.db.session import get_db
 from app.db.models import ProcessingJob
+from app.db.session import get_db
 from app.repositories.application import ApplicationRepository
 from app.repositories.employer_organization import EmployerOrganizationRepository
 from app.repositories.internship import InternshipRepository
 from app.repositories.matching_data import MatchingDataRepository
 from app.schemas.application import (
-    EmployerCVAccessResponse,
     EmployerApplicantListResponse,
     EmployerApplicantResponse,
     EmployerApplicantStatusUpdateRequest,
+    EmployerCVAccessResponse,
     EmployerInterviewScheduleRequest,
 )
 from app.schemas.internship import (
@@ -32,41 +31,44 @@ from app.schemas.internship import (
     InternshipSummaryResponse,
     InternshipUpdateRequest,
 )
+from app.services.ai_quota import (
+    AIQuotaExceededError,
+    AIQuotaIdempotencyConflictError,
+)
+from app.services.ai_quota_integration import (
+    build_ai_request_fingerprint,
+    format_ai_idempotency_conflict_payload,
+    format_ai_quota_exceeded_payload,
+)
 from app.services.content_translation import translate_internship_content
-from app.services.embeddings import generate_embedding
-from fastapi import APIRouter, Depends, HTTPException, Query, status
-from fastapi.responses import JSONResponse
-from sqlalchemy.orm import Session
-
-logger = get_logger(__name__)
 from app.services.cv_storage import (
     CV_SIGNED_URL_EXPIRY_SECONDS,
     CVStorageValidationError,
     generate_candidate_cv_signed_url,
 )
-
+from app.services.embeddings import generate_embedding
+from app.services.employer_ai_quota import (
+    EMPLOYER_CANDIDATE_INSIGHT,
+    EMPLOYER_INTERNSHIP_DESCRIPTION,
+    EMPLOYER_INTERVIEW_KIT,
+    EMPLOYER_SHORTLIST_COMPARISON,
+    EmployerAIQuotaAccessError,
+    EmployerAIQuotaConfigurationError,
+    execute_employer_ai_with_quota,
+)
 from app.services.employer_candidate_insight import (
     EmployerCandidateInsightResponse,
     generate_employer_candidate_insight,
 )
-
-from app.services.employer_interview_kit import (
-    EmployerInterviewKitResponse,
-    generate_employer_interview_kit,
-)
-
-from app.services.employer_shortlist_comparison import (
-    EmployerShortlistComparisonRequest,
-    EmployerShortlistComparisonResponse,
-    generate_employer_shortlist_comparison,
-)
-
 from app.services.employer_internship_description import (
     EmployerInternshipDescriptionRequest,
     EmployerInternshipDescriptionResponse,
     generate_employer_internship_description,
 )
-
+from app.services.employer_interview_kit import (
+    EmployerInterviewKitResponse,
+    generate_employer_interview_kit,
+)
 from app.services.employer_pipeline_analytics import (
     EmployerPipelineAnalyticsResponse,
     get_employer_pipeline_analytics,
@@ -83,25 +85,16 @@ from app.services.employer_product_policy import (
     require_employer_feature,
     require_employer_listing_capacity,
 )
+from app.services.employer_shortlist_comparison import (
+    EmployerShortlistComparisonRequest,
+    EmployerShortlistComparisonResponse,
+    generate_employer_shortlist_comparison,
+)
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
+from fastapi.responses import JSONResponse
+from sqlalchemy.orm import Session
 
-from app.services.ai_quota import (
-    AIQuotaExceededError,
-    AIQuotaIdempotencyConflictError,
-)
-from app.services.ai_quota_integration import (
-    build_ai_request_fingerprint,
-    format_ai_idempotency_conflict_payload,
-    format_ai_quota_exceeded_payload,
-)
-from app.services.employer_ai_quota import (
-    EMPLOYER_CANDIDATE_INSIGHT,
-    EMPLOYER_INTERNSHIP_DESCRIPTION,
-    EMPLOYER_INTERVIEW_KIT,
-    EMPLOYER_SHORTLIST_COMPARISON,
-    EmployerAIQuotaAccessError,
-    EmployerAIQuotaConfigurationError,
-    execute_employer_ai_with_quota,
-)
+logger = get_logger(__name__)
 
 router = APIRouter()
 

@@ -2,8 +2,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from app.db.models import ProcessingJob
-from app.services import interview_prep_enqueue
-from app.services import match_explanation_enqueue
+from app.services import interview_prep_enqueue, match_explanation_enqueue
 
 
 def _processing_job_type_constraint_text() -> str:

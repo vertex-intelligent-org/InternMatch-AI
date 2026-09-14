@@ -23,11 +23,13 @@ from app.services.ai_quota import FEATURE_CV_ANALYSIS
 from app.services.ai_quota_integration import (
     acquire_job_ai_quota_lock,
     build_cv_request_fingerprint,
+    ensure_job_ai_quota_reserved_if_present,
     get_http_idempotent_job_ai_quota,
     is_retryable_released_job_ai_quota,
     release_job_ai_quota_if_present,
     reserve_http_idempotent_job_ai_quota,
     reserve_job_ai_quota,
+    settle_job_ai_quota_if_present,
 )
 from app.services.avatar_storage import (
     MAX_AVATAR_SIZE_BYTES,
@@ -37,7 +39,7 @@ from app.services.avatar_storage import (
     store_candidate_avatar,
 )
 from app.services.candidate_embedding import (
-    generate_and_persist_candidate_embedding,
+    generate_and_persist_candidate_embedding,  # noqa: F401
 )
 from app.services.cv_enqueue import enqueue_cv_extraction
 from app.services.cv_profile_extraction import ExtractedCandidateProfile
@@ -53,8 +55,6 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy.orm import Session
 
 logger = get_logger(__name__)
-from app.services.ai_quota_integration import ensure_job_ai_quota_reserved_if_present
-from app.services.ai_quota_integration import settle_job_ai_quota_if_present
 
 router = APIRouter()
 

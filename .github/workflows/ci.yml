@@ -171,6 +171,17 @@ jobs:
           psql -h localhost -U internmatch -d internmatch -v ON_ERROR_STOP=1 <<'SQL'
           CREATE SCHEMA IF NOT EXISTS auth;
           CREATE TABLE IF NOT EXISTS auth.users (id UUID PRIMARY KEY);
+
+          -- Supabase Storage compatibility for migration 025.
+          -- CI runs plain PostgreSQL; Production runs Supabase Storage.
+          CREATE SCHEMA IF NOT EXISTS storage;
+          CREATE TABLE IF NOT EXISTS storage.buckets (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            public BOOLEAN NOT NULL DEFAULT false,
+            file_size_limit BIGINT,
+            allowed_mime_types TEXT[]
+          );
           DO $$
           BEGIN
             IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = 'anon') THEN

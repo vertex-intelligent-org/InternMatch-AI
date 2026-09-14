@@ -7,18 +7,17 @@ from app.core.security import AuthenticatedUser, require_admin_user
 from app.db.session import get_db
 from app.repositories.employer_organization import EmployerOrganizationRepository
 from app.repositories.internship import InternshipRepository
-from app.services.employer_product_policy import (
-    EmployerListingLimitError,
-    require_employer_listing_capacity,
-)
 from app.schemas.internship import (
     InternshipDetailResponse,
     InternshipListResponse,
     InternshipSummaryResponse,
 )
+from app.services.employer_product_policy import (
+    EmployerListingLimitError,
+    require_employer_listing_capacity,
+)
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
-
 
 router = APIRouter()
 

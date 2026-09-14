@@ -305,7 +305,8 @@ def test_confirm_endpoint_executes_replacement_and_enqueues_matches(monkeypatch)
         db.add(job)
         db.commit()
 
-        # Embedding is deferred to the match worker; mock the endpoint symbol to prove confirmation does not call it.
+        # Embedding is deferred to the match worker; mock the endpoint symbol
+        # to prove confirmation does not call it.
         mock_embed = MagicMock()
         monkeypatch.setattr(
             "app.api.v1.endpoints.profile.generate_and_persist_candidate_embedding",

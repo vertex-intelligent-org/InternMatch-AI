@@ -9,7 +9,6 @@ from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
 import pytest
-
 from app.db.models import (
     AIQuotaPeriod,
     InternshipListing,
