@@ -274,6 +274,7 @@ def test_valid_production_config_passes():
         ),
         REDIS_URL="rediss://default:prodredispass@eu-redis.upstash.io:6379",
         GEMINI_API_KEY="gemini-prod-key-1234567890abcdef",
+        OPENAI_API_KEY="openai-prod-key-for-config-validation-test",
         CV_STORAGE_BUCKET="internmatch-cv-production",
         ALLOWED_ORIGINS="https://internmatch.ai,https://admin.internmatch.ai",
     )
