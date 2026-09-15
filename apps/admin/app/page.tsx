@@ -861,6 +861,13 @@ export default function AdminDashboardPage() {
             >
               Compliance reviews
             </Link>
+
+            <Link
+              className="sidebarLink"
+              href="/users"
+            >
+              Users
+            </Link>
           </nav>
         </details>
 
@@ -896,6 +903,13 @@ export default function AdminDashboardPage() {
             href="/compliance"
           >
             Compliance reviews
+          </Link>
+
+          <Link
+            className="sidebarLink"
+            href="/users"
+          >
+            Users
           </Link>
         </nav>
 

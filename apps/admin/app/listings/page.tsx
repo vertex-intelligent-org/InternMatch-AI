@@ -544,6 +544,13 @@ export default function AdminListingsPage() {
             >
               Compliance reviews
             </Link>
+
+            <Link
+              className="sidebarLink"
+              href="/users"
+            >
+              Users
+            </Link>
           </nav>
         </details>
 
@@ -574,6 +581,13 @@ export default function AdminListingsPage() {
             href="/compliance"
           >
             Compliance reviews
+          </Link>
+
+          <Link
+            className="sidebarLink"
+            href="/users"
+          >
+            Users
           </Link>
         </nav>
 

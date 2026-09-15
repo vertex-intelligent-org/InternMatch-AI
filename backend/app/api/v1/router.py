@@ -5,6 +5,7 @@ Includes all sub-routers for version 1 of the REST API.
 
 from app.api.v1.endpoints import (
     admin_internships,
+    admin_users,
     applications,
     auth,
     health,
@@ -112,4 +113,12 @@ api_v1_router.include_router(
     admin_internships.router,
     prefix="/admin/internships",
     tags=["Admin Internship Listings"],
+)
+
+
+# Gate 4B administrative user directory and audit surface.
+api_v1_router.include_router(
+    admin_users.router,
+    prefix="/admin/users",
+    tags=["Admin Users"],
 )

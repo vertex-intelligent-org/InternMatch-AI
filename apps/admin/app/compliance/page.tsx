@@ -650,6 +650,13 @@ export default function AdminCompliancePage() {
             >
               Compliance reviews
             </Link>
+
+            <Link
+              className="sidebarLink"
+              href="/users"
+            >
+              Users
+            </Link>
           </nav>
         </details>
 
@@ -680,6 +687,13 @@ export default function AdminCompliancePage() {
             href="/compliance"
           >
             Compliance reviews
+          </Link>
+
+          <Link
+            className="sidebarLink"
+            href="/users"
+          >
+            Users
           </Link>
         </nav>
 

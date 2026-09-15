@@ -96,6 +96,53 @@ export type AdminInternshipListResponse = {
   offset: number;
 };
 
+export type AdminUserRole =
+  | 'student'
+  | 'employer';
+
+export type AdminAuditSource =
+  | 'employer_verification'
+  | 'employer_compliance';
+
+export type AdminUserSummary = {
+  user_id: string;
+  roles: AdminUserRole[];
+  display_name: string;
+  headline: string | null;
+  business_email: string | null;
+  organization_id: string | null;
+  verification_status: string | null;
+  organization_type: string | null;
+  country_code: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+};
+
+export type AdminUserListResponse = {
+  items: AdminUserSummary[];
+  total: number;
+  offset: number;
+  limit: number;
+};
+
+export type AdminUserAuditEvent = {
+  source: AdminAuditSource;
+  related_id: string;
+  actor_user_id: string | null;
+  action: string;
+  previous_status: string | null;
+  new_status: string | null;
+  reason_code: string | null;
+  internal_note: string | null;
+  created_at: string;
+};
+
+export type AdminUserDetail =
+  AdminUserSummary & {
+    audit_events: AdminUserAuditEvent[];
+  };
+
+
 // Employer compliance evidence is intentionally independent from
 // organization identity verification.
 export type ComplianceClaimStatus =

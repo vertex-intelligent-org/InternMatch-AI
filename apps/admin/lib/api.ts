@@ -13,6 +13,9 @@ import type {
   ComplianceAdminApprovalPayload,
   ComplianceAdminRejectionPayload,
   ComplianceAdminRevocationPayload,
+  AdminUserRole,
+  AdminUserListResponse,
+  AdminUserDetail,
 } from './types';
 
 type JsonRecord = Record<string, unknown>;
@@ -536,5 +539,55 @@ export async function revokeComplianceClaim(
       method: 'POST',
       body: JSON.stringify(payload),
     }
+  );
+}
+
+export type ListAdminUsersParams = {
+  query?: string;
+  role?: AdminUserRole;
+  offset?: number;
+  limit?: number;
+};
+
+export async function listAdminUsers(
+  params: ListAdminUsersParams = {}
+): Promise<AdminUserListResponse> {
+  const search = new URLSearchParams();
+
+  if (params.query?.trim()) {
+    search.set(
+      'query',
+      params.query.trim()
+    );
+  }
+
+  if (params.role) {
+    search.set(
+      'role',
+      params.role
+    );
+  }
+
+  search.set(
+    'offset',
+    String(params.offset ?? 0)
+  );
+
+  search.set(
+    'limit',
+    String(params.limit ?? 50)
+  );
+
+  return adminApiRequest<AdminUserListResponse>(
+    '/admin/users?' + search.toString()
+  );
+}
+
+export async function getAdminUser(
+  userId: string
+): Promise<AdminUserDetail> {
+  return adminApiRequest<AdminUserDetail>(
+    '/admin/users/'
+    + encodeURIComponent(userId)
   );
 }
