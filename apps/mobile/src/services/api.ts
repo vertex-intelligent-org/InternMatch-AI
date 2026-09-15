@@ -1536,9 +1536,19 @@ export type AccountDeletionResponse = {
   message: string;
 };
 
-export async function deleteAccount(): Promise<AccountDeletionResponse> {
+export async function deleteAccount(
+  appleAuthorizationCode?: string | null
+): Promise<AccountDeletionResponse> {
+  const headers: Record<string, string> = {};
+
+  if (appleAuthorizationCode) {
+    headers['X-Apple-Authorization-Code'] =
+      appleAuthorizationCode;
+  }
+
   return apiRequest<AccountDeletionResponse>('/auth/account', {
     method: 'DELETE',
+    headers,
   });
 }
 

@@ -25,9 +25,11 @@ from app.db.models import (
     AIUsageEvent,
     InternshipListing,
     ProcessingJob,
+    PushDevice,
     RevenueCatWebhookEvent,
     StudentProfile,
     SubscriptionEntitlement,
+    UserNotification,
 )
 from app.services.avatar_storage import delete_candidate_avatar
 from app.services.cv_storage import delete_candidate_cv
@@ -147,6 +149,14 @@ def delete_authenticated_account(
         raise AccountDeletionError(
             "Authenticated user identity is invalid."
         )
+
+    db.query(UserNotification).filter(
+        UserNotification.recipient_user_id == user_id
+    ).delete(synchronize_session=False)
+
+    db.query(PushDevice).filter(
+        PushDevice.user_id == user_id
+    ).delete(synchronize_session=False)
 
     profile = (
         db.query(StudentProfile)

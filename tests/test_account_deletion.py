@@ -506,3 +506,25 @@ def test_auth_delete_failure_never_returns_false_success_and_keeps_retry_barrier
         assert tombstone is not None
         assert tombstone.user_id == user_id
         assert tombstone.outcome == "account_deleted"
+
+
+
+@pytest.fixture(autouse=True)
+def _gate7_allow_legacy_account_purge_tests(
+    monkeypatch,
+):
+    """
+    Existing account-deletion tests cover purge/storage/tombstone behavior.
+    Gate 7 recent-session enforcement has dedicated tests of its own.
+    """
+    monkeypatch.setattr(
+        "app.api.v1.endpoints.auth."
+        "require_recent_account_reauthentication",
+        lambda **_kwargs: None,
+    )
+
+    monkeypatch.setattr(
+        "app.api.v1.endpoints.auth."
+        "revoke_apple_authorization_for_account",
+        lambda **_kwargs: False,
+    )

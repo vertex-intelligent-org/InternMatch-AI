@@ -250,8 +250,6 @@ export default function SettingsScreen({ navigation }) {
   };
 
   const handleDeleteAccount = () => {
-    if (deletingAccount) return;
-
     Alert.alert(
       t('settings.deleteAccountTitle'),
       t('settings.deleteAccountMessage'),
@@ -275,32 +273,10 @@ export default function SettingsScreen({ navigation }) {
                 {
                   text: t('settings.deleteAccountConfirm'),
                   style: 'destructive',
-                  onPress: async () => {
-                    if (deletingAccount) return;
-
-                    setDeletingAccount(true);
-
-                    try {
-                      await deleteAccount();
-
-                      await clearLocalSessionAfterAccountDeletion();
-
-                      clearProfile();
-                      haptics.success();
-
-                      navigation.reset({
-                        index: 0,
-                        routes: [{ name: 'SignIn' }],
-                      });
-                    } catch (error) {
-                      const message = getLocalizedErrorMessage(error, t);
-                      Alert.alert(
-                        t('settings.deleteAccountFailedTitle'),
-                        message
-                      );
-                    } finally {
-                      setDeletingAccount(false);
-                    }
+                  onPress: () => {
+                    navigation.navigate(
+                      'AccountDeletionReauth'
+                    );
                   },
                 },
               ]

@@ -56,6 +56,7 @@ export async function signInWithApple(metadata = {}) {
       cancelled: false,
       unavailable: true,
       session: null,
+      authorizationCode: null,
     };
   }
 
@@ -67,6 +68,7 @@ export async function signInWithApple(metadata = {}) {
       cancelled: false,
       unavailable: true,
       session: null,
+      authorizationCode: null,
     };
   }
 
@@ -95,6 +97,7 @@ export async function signInWithApple(metadata = {}) {
         cancelled: true,
         unavailable: false,
         session: null,
+      authorizationCode: null,
       };
     }
 
@@ -170,5 +173,7 @@ export async function signInWithApple(metadata = {}) {
     cancelled: false,
     unavailable: false,
     session: data.session,
+    authorizationCode:
+      credential.authorizationCode || null,
   };
 }

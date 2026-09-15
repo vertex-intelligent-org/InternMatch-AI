@@ -40,6 +40,8 @@ import {
 } from '../services/auth';
 import { useProfile } from '../context/ProfileContext';
 
+import AccountDeletionReauthScreen from '../screens/AccountDeletionReauthScreen';
+
 const Stack = createNativeStackNavigator();
 
 export const navigationRef = createNavigationContainerRef();
@@ -285,6 +287,10 @@ export default function RootNavigator() {
         {/* Auth flow */}
         <Stack.Screen name="Splash" component={SplashScreen} />
         <Stack.Screen name="SignIn" component={SignInScreen} />
+        <Stack.Screen
+          name="AccountDeletionReauth"
+          component={AccountDeletionReauthScreen}
+        />
         <Stack.Screen name="SignUp" component={SignUpScreen} />
         <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
         <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} initialParams={initialRecoveryParams || undefined} />
