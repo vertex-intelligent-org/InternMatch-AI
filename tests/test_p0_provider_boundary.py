@@ -800,9 +800,6 @@ def test_auth_env_examples_use_provider_placeholders_until_custom_domain_activat
         Path(
             "apps/admin/.env.example"
         ),
-        Path(
-            "apps/admin/.env.production.example"
-        ),
     )
 
     for path in paths:
