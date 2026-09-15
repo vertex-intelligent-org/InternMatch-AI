@@ -24,7 +24,7 @@ import { formatLocalizedDate } from '../localization/formatters';
 
 export default function InternshipDetailScreen({ route, navigation }) {
   const { t } = useTranslation();
-  const { locale } = useLocalization();
+  const { locale, isRTL } = useLocalization();
   const internshipId =
     route?.params?.internshipId ||
     route?.params?.internship?.id ||
@@ -119,7 +119,7 @@ export default function InternshipDetailScreen({ route, navigation }) {
         {loading && (
           <View style={styles.centerContainer}>
             <ActivityIndicator size="large" color={colors.accent || colors.teal} />
-            <Text style={styles.loadingText}>{t('internshipDetail.loading')}</Text>
+            <Text style={[styles.loadingText, isRTL && styles.rtlText]}>{t('internshipDetail.loading')}</Text>
           </View>
         )}
 
@@ -127,7 +127,7 @@ export default function InternshipDetailScreen({ route, navigation }) {
         {!loading && isNotFound && (
           <Card style={styles.statusCard} padding="lg">
             <Ionicons name="document-text-outline" size={48} color={colors.textTertiary || colors.textMuted} />
-            <Text style={styles.cardTitle}>{t('internshipDetail.notFoundTitle')}</Text>
+            <Text style={[styles.cardTitle, isRTL && styles.rtlText]}>{t('internshipDetail.notFoundTitle')}</Text>
             <Text style={styles.cardSubtitle}>
               {t('internshipDetail.notFoundMessage')}
             </Text>
@@ -137,7 +137,7 @@ export default function InternshipDetailScreen({ route, navigation }) {
               accessibilityRole="button"
               accessibilityLabel={t('internshipDetail.backToInternships')}
             >
-              <Text style={styles.primaryButtonText}>{t('internshipDetail.backToInternships')}</Text>
+              <Text style={[styles.primaryButtonText, isRTL && styles.rtlText]}>{t('internshipDetail.backToInternships')}</Text>
             </TouchableOpacity>
           </Card>
         )}
@@ -146,7 +146,7 @@ export default function InternshipDetailScreen({ route, navigation }) {
         {!loading && !isNotFound && error && (
           <Card style={styles.errorCard} padding="lg">
             <Ionicons name="alert-circle-outline" size={48} color={colors.danger || '#EF4444'} />
-            <Text style={styles.cardTitle}>{t('internshipDetail.errorTitle')}</Text>
+            <Text style={[styles.cardTitle, isRTL && styles.rtlText]}>{t('internshipDetail.errorTitle')}</Text>
             <Text style={styles.cardSubtitle}>
               {t('errors.internshipLoadFailed', { defaultValue: t('internshipDetail.errorSubtitle', { defaultValue: t('internshipDetail.errorTitle') }) })}
             </Text>
@@ -156,7 +156,7 @@ export default function InternshipDetailScreen({ route, navigation }) {
               accessibilityRole="button"
               accessibilityLabel={t('common.tryAgain')}
             >
-              <Text style={styles.primaryButtonText}>{t('common.tryAgain')}</Text>
+              <Text style={[styles.primaryButtonText, isRTL && styles.rtlText]}>{t('common.tryAgain')}</Text>
             </TouchableOpacity>
           </Card>
         )}
@@ -166,7 +166,7 @@ export default function InternshipDetailScreen({ route, navigation }) {
           <>
             {/* Role Header Card */}
             <Card style={styles.heroCard} padding="md">
-              <View style={styles.headerRow}>
+              <View style={[styles.headerRow, isRTL && styles.rowRTL]}>
                 <Text style={styles.companyLocation}>
                   {internship.company} - {internship.location}
                 </Text>
@@ -187,7 +187,7 @@ export default function InternshipDetailScreen({ route, navigation }) {
             </Card>
 
             {/* Description Section */}
-            <Text style={styles.sectionTitle}>{t('internshipDetail.aboutRole')}</Text>
+            <Text style={[styles.sectionTitle, isRTL && styles.rtlText]}>{t('internshipDetail.aboutRole')}</Text>
             <Card style={styles.descriptionCard} padding="md">
               <Text style={styles.descriptionText}>{internship.description}</Text>
             </Card>
@@ -195,8 +195,8 @@ export default function InternshipDetailScreen({ route, navigation }) {
             {/* Required Skills */}
             {internship.required_skills && internship.required_skills.length > 0 && (
               <>
-                <Text style={styles.sectionTitle}>{t('internshipDetail.requiredSkills')}</Text>
-                <View style={styles.chipRow}>
+                <Text style={[styles.sectionTitle, isRTL && styles.rtlText]}>{t('internshipDetail.requiredSkills')}</Text>
+                <View style={[styles.chipRow, isRTL && styles.rowRTL]}>
                   {internship.required_skills.map((skill) => (
                     <Chip key={skill} label={skill} variant="skill" />
                   ))}
@@ -207,8 +207,8 @@ export default function InternshipDetailScreen({ route, navigation }) {
             {/* Preferred Skills */}
             {internship.preferred_skills && internship.preferred_skills.length > 0 && (
               <>
-                <Text style={styles.sectionTitle}>{t('internshipDetail.preferredSkills')}</Text>
-                <View style={styles.chipRow}>
+                <Text style={[styles.sectionTitle, isRTL && styles.rtlText]}>{t('internshipDetail.preferredSkills')}</Text>
+                <View style={[styles.chipRow, isRTL && styles.rowRTL]}>
                   {internship.preferred_skills.map((skill) => (
                     <Chip key={skill} label={skill} variant="neutral" />
                   ))}
@@ -219,10 +219,10 @@ export default function InternshipDetailScreen({ route, navigation }) {
             {/* Languages & Education */}
             {(internship.languages?.length > 0 || internship.min_education) && (
               <>
-                <Text style={styles.sectionTitle}>{t('internshipDetail.requirementsAndBackground')}</Text>
+                <Text style={[styles.sectionTitle, isRTL && styles.rtlText]}>{t('internshipDetail.requirementsAndBackground')}</Text>
                 <Card style={styles.detailsCard} padding="md">
                   {internship.languages && internship.languages.length > 0 && (
-                    <View style={styles.detailItem}>
+                    <View style={[styles.detailItem, isRTL && styles.rowRTL]}>
                       <Ionicons
                         name="language-outline"
                         size={18}
@@ -230,14 +230,14 @@ export default function InternshipDetailScreen({ route, navigation }) {
                         style={styles.detailIcon}
                       />
                       <View style={styles.detailTextContainer}>
-                        <Text style={styles.detailLabel}>{t('internshipDetail.workingLanguages')}</Text>
+                        <Text style={[styles.detailLabel, isRTL && styles.rtlText]}>{t('internshipDetail.workingLanguages')}</Text>
                         <Text style={styles.detailValue}>{internship.languages.join(', ')}</Text>
                       </View>
                     </View>
                   )}
 
                   {internship.min_education && (
-                    <View style={[styles.detailItem, internship.languages?.length > 0 && { marginTop: spacing.md }]}>
+                    <View style={[styles.detailItem, isRTL && styles.rowRTL, internship.languages?.length > 0 && { marginTop: spacing.md }]}>
                       <Ionicons
                         name="school-outline"
                         size={18}
@@ -245,7 +245,7 @@ export default function InternshipDetailScreen({ route, navigation }) {
                         style={styles.detailIcon}
                       />
                       <View style={styles.detailTextContainer}>
-                        <Text style={styles.detailLabel}>{t('internshipDetail.educationLevel')}</Text>
+                        <Text style={[styles.detailLabel, isRTL && styles.rtlText]}>{t('internshipDetail.educationLevel')}</Text>
                         <Text style={styles.detailValue}>{internship.min_education}</Text>
                       </View>
                     </View>
@@ -394,5 +394,12 @@ const styles = StyleSheet.create({
     ...typography.bodyEmphasis,
     color: colors.textPrimary || colors.textDark,
     marginTop: spacing.xxs,
+  },
+  rowRTL: {
+    flexDirection: 'row-reverse',
+  },
+  rtlText: {
+    writingDirection: 'rtl',
+    textAlign: 'right',
   },
 });

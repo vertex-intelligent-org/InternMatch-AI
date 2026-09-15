@@ -72,10 +72,11 @@ const STATUS_CONFIG = {
 
 function StatusPill({ status }) {
   const { t } = useTranslation();
+  const { isRTL } = useLocalization();
   const config = STATUS_CONFIG[status] || STATUS_CONFIG.saved;
   const label = t(`applications.statuses.${status}`, { defaultValue: status });
   return (
-    <View style={[styles.statusPill, { backgroundColor: config.bg }]}>
+    <View style={[styles.statusPill, isRTL && styles.rowRTL, { backgroundColor: config.bg }]}>
       <Ionicons
         name={config.icon}
         size={12}
@@ -94,7 +95,7 @@ export default function ApplicationDetailScreen({ route, navigation }) {
   const {
     refreshAIUsage,
   } = useSubscription();
-  const { locale } = useLocalization();
+  const { locale, isRTL } = useLocalization();
   const applicationId =
     route?.params?.applicationId ||
     route?.params?.id ||
@@ -627,7 +628,7 @@ export default function ApplicationDetailScreen({ route, navigation }) {
               'aiCancellation.cancel'
             )}
           >
-            <Text style={styles.interviewPrepCancelText}>
+            <Text style={[styles.interviewPrepCancelText, isRTL && styles.rtlText]}>
               {interviewPrepCancelling
                 ? t('aiCancellation.cancelling')
                 : t('aiCancellation.cancel')}
@@ -660,7 +661,7 @@ export default function ApplicationDetailScreen({ route, navigation }) {
                 size="large"
                 color={colors.accent || colors.teal}
               />
-              <Text style={styles.loadingText}>{t('applicationDetail.loading')}</Text>
+              <Text style={[styles.loadingText, isRTL && styles.rtlText]}>{t('applicationDetail.loading')}</Text>
             </View>
           )}
 
@@ -682,7 +683,7 @@ export default function ApplicationDetailScreen({ route, navigation }) {
                 accessibilityRole="button"
                 accessibilityLabel={t('applicationDetail.backToApplications')}
               >
-                <Text style={styles.backBtnText}>{t('applicationDetail.backToApplications')}</Text>
+                <Text style={[styles.backBtnText, isRTL && styles.rtlText]}>{t('applicationDetail.backToApplications')}</Text>
               </TouchableOpacity>
             </Card>
           )}
@@ -705,7 +706,7 @@ export default function ApplicationDetailScreen({ route, navigation }) {
                 accessibilityRole="button"
                 accessibilityLabel={t('common.tryAgain')}
               >
-                <Text style={styles.retryBtnText}>{t('common.tryAgain')}</Text>
+                <Text style={[styles.retryBtnText, isRTL && styles.rtlText]}>{t('common.tryAgain')}</Text>
               </TouchableOpacity>
             </Card>
           )}
@@ -715,13 +716,13 @@ export default function ApplicationDetailScreen({ route, navigation }) {
             <>
               {/* Hero Information Card */}
               <Card style={styles.heroCard} padding="lg">
-                <View style={styles.heroHeader}>
+                <View style={[styles.heroHeader, isRTL && styles.rowRTL]}>
                   <View style={styles.heroTitleWrap}>
-                    <Text style={styles.jobTitle}>
+                    <Text style={[styles.jobTitle, isRTL && styles.rtlText]}>
                       {detail.job_title || t('applications.defaultJobTitle')}
                     </Text>
                     {detail.company_name ? (
-                      <View style={styles.companyRow}>
+                      <View style={[styles.companyRow, isRTL && styles.rowRTL]}>
                         <Ionicons
                           name="business-outline"
                           size={14}
@@ -739,24 +740,24 @@ export default function ApplicationDetailScreen({ route, navigation }) {
 
                 {/* Applied Date Banner if present */}
                 {detail.applied_date ? (
-                  <View style={styles.appliedDateBanner}>
+                  <View style={[styles.appliedDateBanner, isRTL && styles.rowRTL]}>
                     <Ionicons
                       name="calendar"
                       size={14}
                       color={colors.info || '#0284C7'}
                       style={styles.appliedIcon}
                     />
-                    <Text style={styles.appliedDateText}>
+                    <Text style={[styles.appliedDateText, isRTL && styles.rtlText]}>
                       {t('applications.appliedDate', { date: formatAppliedDate(detail.applied_date) })}
                     </Text>
                   </View>
                 ) : null}
 
                 {/* Shortcut Actions Row */}
-                <View style={styles.shortcutsRow}>
+                <View style={[styles.shortcutsRow, isRTL && styles.rowRTL]}>
                   {detail.generated_cover_letter ? (
                     <PressableScale
-                      style={styles.shortcutBtnPrimary}
+                      style={[styles.shortcutBtnPrimary, isRTL && styles.rowRTL]}
                       onPress={() =>
                         navigation.navigate('CoverLetter', {
                           applicationId: detail.id,
@@ -776,7 +777,7 @@ export default function ApplicationDetailScreen({ route, navigation }) {
                         color={colors.accentStrong || colors.tealDark}
                         style={styles.shortcutIcon}
                       />
-                      <Text style={styles.shortcutBtnTextPrimary}>
+                      <Text style={[styles.shortcutBtnTextPrimary, isRTL && styles.rtlText]}>
                         {t('applications.coverLetterBtn')}
                       </Text>
                     </PressableScale>
@@ -784,7 +785,7 @@ export default function ApplicationDetailScreen({ route, navigation }) {
 
                   {detail.internship_id ? (
                     <PressableScale
-                      style={styles.shortcutBtnSecondary}
+                      style={[styles.shortcutBtnSecondary, isRTL && styles.rowRTL]}
                       onPress={() =>
                         navigation.navigate('InternshipDetail', {
                           internshipId: detail.internship_id,
@@ -799,7 +800,7 @@ export default function ApplicationDetailScreen({ route, navigation }) {
                         color={colors.textPrimary || colors.textDark}
                         style={styles.shortcutIcon}
                       />
-                      <Text style={styles.shortcutBtnTextSecondary}>
+                      <Text style={[styles.shortcutBtnTextSecondary, isRTL && styles.rtlText]}>
                         {t('applications.listingBtn')}
                       </Text>
                     </PressableScale>
@@ -810,7 +811,7 @@ export default function ApplicationDetailScreen({ route, navigation }) {
               {/* Draft Application or Canonical Status Card */}
               {detail.status === 'saved' ? (
                 <Card style={styles.draftNoticeCard} padding="md">
-                  <View style={styles.draftNoticeHeader}>
+                  <View style={[styles.draftNoticeHeader, isRTL && styles.rowRTL]}>
                     <View style={styles.draftIconCircle}>
                       <Ionicons
                         name="document-text-outline"
@@ -819,10 +820,10 @@ export default function ApplicationDetailScreen({ route, navigation }) {
                       />
                     </View>
                     <View style={styles.draftNoticeTitleCol}>
-                      <Text style={styles.draftNoticeTitle}>
+                      <Text style={[styles.draftNoticeTitle, isRTL && styles.rtlText]}>
                         {t('applicationDetail.draftTitle', 'Draft Application')}
                       </Text>
-                      <Text style={styles.draftNoticeSubtitle}>
+                      <Text style={[styles.draftNoticeSubtitle, isRTL && styles.rtlText]}>
                         {t(
                           'applicationDetail.draftSubtitle',
                           'This application is saved as a draft. Review your cover letter before submitting to the employer.'
@@ -832,7 +833,7 @@ export default function ApplicationDetailScreen({ route, navigation }) {
                   </View>
 
                   <PressableScale
-                    style={styles.submitDraftBtn}
+                    style={[styles.submitDraftBtn, isRTL && styles.rowRTL]}
                     onPress={() =>
                       navigation.navigate('CoverLetter', {
                         applicationId: detail.id,
@@ -847,20 +848,20 @@ export default function ApplicationDetailScreen({ route, navigation }) {
                     accessibilityLabel={t('applicationDetail.reviewAndSubmit', 'Review & Submit Application')}
                   >
                     <Ionicons name="paper-plane-outline" size={16} color={colors.textInverse || colors.white} />
-                    <Text style={styles.submitDraftBtnText}>
+                    <Text style={[styles.submitDraftBtnText, isRTL && styles.rtlText]}>
                       {t('applicationDetail.reviewAndSubmit', 'Review & Submit Application')}
                     </Text>
                   </PressableScale>
                 </Card>
               ) : (
                 <Card style={styles.sectionCard} padding="md">
-                  <View style={styles.sectionHeaderRow}>
-                    <Text style={styles.sectionTitle}>
+                  <View style={[styles.sectionHeaderRow, isRTL && styles.rowRTL]}>
+                    <Text style={[styles.sectionTitle, isRTL && styles.rtlText]}>
                       {t('applicationDetail.canonicalStatusTitle', 'Application Status')}
                     </Text>
                     <StatusPill status={detail.status} />
                   </View>
-                  <Text style={styles.canonicalStatusExplanation}>
+                  <Text style={[styles.canonicalStatusExplanation, isRTL && styles.rtlText]}>
                     {detail.status === 'applied' &&
                       t(
                         'applicationDetail.statusExplanationApplied',
@@ -887,7 +888,7 @@ export default function ApplicationDetailScreen({ route, navigation }) {
 
               {detail.interview_scheduled_at && (
                 <Card style={styles.sectionCard} padding="md">
-                  <View style={styles.interviewDetailHeader}>
+                  <View style={[styles.interviewDetailHeader, isRTL && styles.rowRTL]}>
                     <View style={styles.interviewDetailIconWrap}>
                       <Ionicons
                         name="calendar-outline"
@@ -896,13 +897,13 @@ export default function ApplicationDetailScreen({ route, navigation }) {
                       />
                     </View>
                     <View style={styles.interviewDetailHeaderText}>
-                      <Text style={styles.sectionTitle}>
+                      <Text style={[styles.sectionTitle, isRTL && styles.rtlText]}>
                         {t(
                           'interviewScheduling.candidateCardTitle',
                           'Interview Details'
                         )}
                       </Text>
-                      <Text style={styles.sectionSubtitle}>
+                      <Text style={[styles.sectionSubtitle, isRTL && styles.rtlText]}>
                         {t(
                           'interviewScheduling.candidateCardSubtitle',
                           'Your employer has scheduled an interview.'
@@ -912,14 +913,14 @@ export default function ApplicationDetailScreen({ route, navigation }) {
                   </View>
 
                   <View style={styles.interviewDetailRows}>
-                    <View style={styles.interviewDetailRow}>
+                    <View style={[styles.interviewDetailRow, isRTL && styles.rowRTL]}>
                       <Ionicons
                         name="time-outline"
                         size={17}
                         color={colors.textSecondary || colors.textMuted}
                       />
                       <View style={styles.interviewDetailRowText}>
-                        <Text style={styles.interviewDetailLabel}>
+                        <Text style={[styles.interviewDetailLabel, isRTL && styles.rtlText]}>
                           {t('interviewScheduling.dateTimeLabel', 'Date & Time')}
                         </Text>
                         <Text style={styles.interviewDetailValue}>
@@ -928,7 +929,7 @@ export default function ApplicationDetailScreen({ route, navigation }) {
                       </View>
                     </View>
 
-                    <View style={styles.interviewDetailRow}>
+                    <View style={[styles.interviewDetailRow, isRTL && styles.rowRTL]}>
                       <Ionicons
                         name={
                           detail.interview_mode === 'online'
@@ -939,10 +940,10 @@ export default function ApplicationDetailScreen({ route, navigation }) {
                         color={colors.textSecondary || colors.textMuted}
                       />
                       <View style={styles.interviewDetailRowText}>
-                        <Text style={styles.interviewDetailLabel}>
+                        <Text style={[styles.interviewDetailLabel, isRTL && styles.rtlText]}>
                           {t('interviewScheduling.modeLabel', 'Interview Type')}
                         </Text>
-                        <Text style={styles.interviewDetailValue}>
+                        <Text style={[styles.interviewDetailValue, isRTL && styles.rtlText]}>
                           {detail.interview_mode === 'online'
                             ? t('interviewScheduling.online', 'Online')
                             : t('interviewScheduling.onsite', 'On-site')}
@@ -951,7 +952,7 @@ export default function ApplicationDetailScreen({ route, navigation }) {
                     </View>
 
                     {detail.interview_location ? (
-                      <View style={styles.interviewDetailRow}>
+                      <View style={[styles.interviewDetailRow, isRTL && styles.rowRTL]}>
                         <Ionicons
                           name={
                             detail.interview_mode === 'online'
@@ -962,7 +963,7 @@ export default function ApplicationDetailScreen({ route, navigation }) {
                           color={colors.textSecondary || colors.textMuted}
                         />
                         <View style={styles.interviewDetailRowText}>
-                          <Text style={styles.interviewDetailLabel}>
+                          <Text style={[styles.interviewDetailLabel, isRTL && styles.rtlText]}>
                             {detail.interview_mode === 'online'
                               ? t('interviewScheduling.linkLabel', 'Meeting Link')
                               : t('interviewScheduling.locationLabel', 'Interview Location')}
@@ -979,7 +980,7 @@ export default function ApplicationDetailScreen({ route, navigation }) {
 
                     {detail.interview_message ? (
                       <View style={styles.interviewMessageBox}>
-                        <Text style={styles.interviewDetailLabel}>
+                        <Text style={[styles.interviewDetailLabel, isRTL && styles.rtlText]}>
                           {t(
                             'interviewScheduling.employerMessageTitle',
                             'Message from Employer'
@@ -997,7 +998,7 @@ export default function ApplicationDetailScreen({ route, navigation }) {
               {detail.status === 'interviewing' &&
                 detail.interview_scheduled_at ? (
                 <Card style={styles.interviewPrepCard} padding="md">
-                  <View style={styles.interviewPrepHeader}>
+                  <View style={[styles.interviewPrepHeader, isRTL && styles.rowRTL]}>
                     <View style={styles.interviewPrepIconWrap}>
                       <Ionicons
                         name="sparkles"
@@ -1007,10 +1008,10 @@ export default function ApplicationDetailScreen({ route, navigation }) {
                     </View>
 
                     <View style={styles.interviewPrepHeaderText}>
-                      <Text style={styles.sectionTitle}>
+                      <Text style={[styles.sectionTitle, isRTL && styles.rtlText]}>
                         {t('interviewPrep.title', 'AI Interview Prep')}
                       </Text>
-                      <Text style={styles.sectionSubtitle}>
+                      <Text style={[styles.sectionSubtitle, isRTL && styles.rtlText]}>
                         {t(
                           'interviewPrep.subtitle',
                           'Personalized preparation grounded in your profile and this opportunity.'
@@ -1021,7 +1022,7 @@ export default function ApplicationDetailScreen({ route, navigation }) {
 
                   {!interviewPrep ? (
                     <>
-                      <Text style={styles.interviewPrepIntro}>
+                      <Text style={[styles.interviewPrepIntro, isRTL && styles.rtlText]}>
                         {t(
                           'interviewPrep.intro',
                           'Get likely practice questions, focus areas, strengths to highlight, and useful questions to ask.'
@@ -1029,7 +1030,7 @@ export default function ApplicationDetailScreen({ route, navigation }) {
                       </Text>
 
                       {interviewPrepError ? (
-                        <Text style={styles.interviewPrepError}>
+                        <Text style={[styles.interviewPrepError, isRTL && styles.rtlText]}>
                           {t(
                             'interviewPrep.error',
                             'Interview preparation could not be generated. Please try again.'
@@ -1038,7 +1039,7 @@ export default function ApplicationDetailScreen({ route, navigation }) {
                       ) : null}
 
                       <TouchableOpacity
-                        style={styles.interviewPrepGenerateBtn}
+                        style={[styles.interviewPrepGenerateBtn, isRTL && styles.rowRTL]}
                         onPress={handleGenerateInterviewPrep}
                         disabled={interviewPrepLoading}
                         accessibilityRole="button"
@@ -1084,7 +1085,7 @@ export default function ApplicationDetailScreen({ route, navigation }) {
                               size={17}
                               color={colors.textInverse || colors.white}
                             />
-                            <Text style={styles.interviewPrepGenerateText}>
+                            <Text style={[styles.interviewPrepGenerateText, isRTL && styles.rtlText]}>
                               {t(
                                 'interviewPrep.generate',
                                 'Generate AI Interview Prep'
@@ -1102,13 +1103,13 @@ export default function ApplicationDetailScreen({ route, navigation }) {
 
                       {interviewPrep.likely_questions?.length > 0 ? (
                         <View style={styles.interviewPrepSection}>
-                          <Text style={styles.interviewPrepSectionTitle}>
+                          <Text style={[styles.interviewPrepSectionTitle, isRTL && styles.rtlText]}>
                             {t('interviewPrep.likelyQuestions', 'Practice Questions')}
                           </Text>
                           {interviewPrep.likely_questions.map((item, index) => (
                             <View
                               key={`question-${index}`}
-                              style={styles.interviewPrepBulletRow}
+                              style={[styles.interviewPrepBulletRow, isRTL && styles.rowRTL]}
                             >
                               <Text style={styles.interviewPrepBullet}>
                                 {index + 1}.
@@ -1123,13 +1124,13 @@ export default function ApplicationDetailScreen({ route, navigation }) {
 
                       {interviewPrep.focus_areas?.length > 0 ? (
                         <View style={styles.interviewPrepSection}>
-                          <Text style={styles.interviewPrepSectionTitle}>
+                          <Text style={[styles.interviewPrepSectionTitle, isRTL && styles.rtlText]}>
                             {t('interviewPrep.focusAreas', 'Focus Areas')}
                           </Text>
                           {interviewPrep.focus_areas.map((item, index) => (
                             <View
                               key={`focus-${index}`}
-                              style={styles.interviewPrepBulletRow}
+                              style={[styles.interviewPrepBulletRow, isRTL && styles.rowRTL]}
                             >
                               <Ionicons
                                 name="flag-outline"
@@ -1146,7 +1147,7 @@ export default function ApplicationDetailScreen({ route, navigation }) {
 
                       {interviewPrep.strengths_to_highlight?.length > 0 ? (
                         <View style={styles.interviewPrepSection}>
-                          <Text style={styles.interviewPrepSectionTitle}>
+                          <Text style={[styles.interviewPrepSectionTitle, isRTL && styles.rtlText]}>
                             {t(
                               'interviewPrep.strengths',
                               'Strengths to Highlight'
@@ -1156,7 +1157,7 @@ export default function ApplicationDetailScreen({ route, navigation }) {
                             (item, index) => (
                               <View
                                 key={`strength-${index}`}
-                                style={styles.interviewPrepBulletRow}
+                                style={[styles.interviewPrepBulletRow, isRTL && styles.rowRTL]}
                               >
                                 <Ionicons
                                   name="checkmark-circle-outline"
@@ -1174,7 +1175,7 @@ export default function ApplicationDetailScreen({ route, navigation }) {
 
                       {interviewPrep.questions_to_ask?.length > 0 ? (
                         <View style={styles.interviewPrepSection}>
-                          <Text style={styles.interviewPrepSectionTitle}>
+                          <Text style={[styles.interviewPrepSectionTitle, isRTL && styles.rtlText]}>
                             {t(
                               'interviewPrep.questionsToAsk',
                               'Questions You Can Ask'
@@ -1184,7 +1185,7 @@ export default function ApplicationDetailScreen({ route, navigation }) {
                             (item, index) => (
                               <View
                                 key={`ask-${index}`}
-                                style={styles.interviewPrepBulletRow}
+                                style={[styles.interviewPrepBulletRow, isRTL && styles.rowRTL]}
                               >
                                 <Ionicons
                                   name="chatbubble-ellipses-outline"
@@ -1200,7 +1201,7 @@ export default function ApplicationDetailScreen({ route, navigation }) {
                         </View>
                       ) : null}
 
-                      <Text style={styles.interviewPrepDisclaimer}>
+                      <Text style={[styles.interviewPrepDisclaimer, isRTL && styles.rtlText]}>
                         {t(
                           'interviewPrep.disclaimer',
                           'These are AI-generated preparation suggestions, not guaranteed employer questions.'
@@ -1213,8 +1214,8 @@ export default function ApplicationDetailScreen({ route, navigation }) {
 
               {/* Status Timeline Card */}
               <Card style={styles.sectionCard} padding="md">
-                <Text style={styles.sectionTitle}>{t('applicationDetail.timelineTitle')}</Text>
-                <Text style={styles.sectionSubtitle}>
+                <Text style={[styles.sectionTitle, isRTL && styles.rtlText]}>{t('applicationDetail.timelineTitle')}</Text>
+                <Text style={[styles.sectionSubtitle, isRTL && styles.rtlText]}>
                   {t('applicationDetail.timelineSubtitle')}
                 </Text>
 
@@ -1227,7 +1228,7 @@ export default function ApplicationDetailScreen({ route, navigation }) {
                       const isLast = index === detail.timeline.length - 1;
 
                       return (
-                        <View key={`${event.status}-${event.occurred_at}-${index}`} style={styles.timelineStepRow}>
+                        <View key={`${event.status}-${event.occurred_at}-${index}`} style={[styles.timelineStepRow, isRTL && styles.rowRTL]}>
                           {/* Rail & Marker */}
                           <View style={styles.timelineRailCol}>
                             <View
@@ -1250,7 +1251,7 @@ export default function ApplicationDetailScreen({ route, navigation }) {
 
                           {/* Event Details */}
                           <View style={styles.timelineContentWrap}>
-                            <View style={styles.timelineHeaderRow}>
+                            <View style={[styles.timelineHeaderRow, isRTL && styles.rowRTL]}>
                               <Text style={styles.timelineStatusTitle}>
                                 {label}
                               </Text>
@@ -1283,11 +1284,11 @@ export default function ApplicationDetailScreen({ route, navigation }) {
 
               {/* Notes Card */}
               <Card style={styles.sectionCard} padding="md">
-                <View style={styles.notesHeaderRow}>
-                  <Text style={styles.sectionTitle}>{t('applicationDetail.personalNotesTitle')}</Text>
+                <View style={[styles.notesHeaderRow, isRTL && styles.rowRTL]}>
+                  <Text style={[styles.sectionTitle, isRTL && styles.rtlText]}>{t('applicationDetail.personalNotesTitle')}</Text>
                   {!isEditingNotes ? (
                     <TouchableOpacity
-                      style={styles.editNotesToggle}
+                      style={[styles.editNotesToggle, isRTL && styles.rowRTL]}
                       onPress={() => setIsEditingNotes(true)}
                       disabled={mutatingStatus || savingNotes || refreshing}
                       accessibilityRole="button"
@@ -1298,7 +1299,7 @@ export default function ApplicationDetailScreen({ route, navigation }) {
                         size={15}
                         color={colors.accent || colors.teal}
                       />
-                      <Text style={styles.editNotesToggleText}>{t('common.edit')}</Text>
+                      <Text style={[styles.editNotesToggleText, isRTL && styles.rtlText]}>{t('common.edit')}</Text>
                     </TouchableOpacity>
                   ) : null}
                 </View>
@@ -1317,7 +1318,7 @@ export default function ApplicationDetailScreen({ route, navigation }) {
                       textAlignVertical="top"
                       accessibilityLabel={t('applicationDetail.personalNotesTitle')}
                     />
-                    <View style={styles.notesActionsRow}>
+                    <View style={[styles.notesActionsRow, isRTL && styles.rowRTL]}>
                       <TouchableOpacity
                         style={styles.notesCancelBtn}
                         onPress={() => {
@@ -1328,7 +1329,7 @@ export default function ApplicationDetailScreen({ route, navigation }) {
                         accessibilityRole="button"
                         accessibilityLabel={t('common.cancel')}
                       >
-                        <Text style={styles.notesCancelBtnText}>{t('common.cancel')}</Text>
+                        <Text style={[styles.notesCancelBtnText, isRTL && styles.rtlText]}>{t('common.cancel')}</Text>
                       </TouchableOpacity>
 
                       <TouchableOpacity
@@ -1344,7 +1345,7 @@ export default function ApplicationDetailScreen({ route, navigation }) {
                             color={colors.textInverse || colors.white}
                           />
                         ) : (
-                          <Text style={styles.notesSaveBtnText}>{t('applicationDetail.saveNotes')}</Text>
+                          <Text style={[styles.notesSaveBtnText, isRTL && styles.rtlText]}>{t('applicationDetail.saveNotes')}</Text>
                         )}
                       </TouchableOpacity>
                     </View>
@@ -1354,7 +1355,7 @@ export default function ApplicationDetailScreen({ route, navigation }) {
                     {detail.notes ? (
                       <Text style={styles.notesDisplayText}>{detail.notes}</Text>
                     ) : (
-                      <Text style={styles.notesEmptyText}>
+                      <Text style={[styles.notesEmptyText, isRTL && styles.rtlText]}>
                         {t('applicationDetail.noNotesText')}
                       </Text>
                     )}
@@ -1990,5 +1991,12 @@ const styles = StyleSheet.create({
     color: colors.textInverse || colors.white,
     fontSize: 13,
     fontWeight: '700',
+  },
+  rowRTL: {
+    flexDirection: 'row-reverse',
+  },
+  rtlText: {
+    writingDirection: 'rtl',
+    textAlign: 'right',
   },
 });

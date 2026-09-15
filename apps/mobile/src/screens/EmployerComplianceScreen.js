@@ -19,6 +19,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as Sharing from 'expo-sharing';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
+import { useLocalization } from '../localization/LocalizationContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import colors from '../theme/colors';
@@ -141,10 +142,11 @@ function ActionButton({
       )
     : '#FFFFFF';
 
+  const { isRTL } = useLocalization();
+
   return (
     <TouchableOpacity
-      style={[
-        styles.actionButton,
+      style={[styles.actionButton, isRTL && styles.rowRTL,
         {
           backgroundColor,
           borderColor: secondary
@@ -189,6 +191,7 @@ export default function EmployerComplianceScreen({
   navigation,
 }) {
   const { t } = useTranslation();
+  const { isRTL } = useLocalization();
   const insets = useSafeAreaInsets();
 
   const [claims, setClaims] = useState([]);
@@ -976,7 +979,7 @@ export default function EmployerComplianceScreen({
         />
 
         <Text
-          style={styles.loadingText}
+          style={[styles.loadingText, isRTL && styles.rtlText]}
         >
           {t(
             'employerCompliance.loading',
@@ -996,7 +999,7 @@ export default function EmployerComplianceScreen({
         },
       ]}
     >
-      <View style={styles.header}>
+      <View style={[styles.header, isRTL && styles.rowRTL]}>
         <TouchableOpacity
           style={styles.backButton}
           onPress={() =>
@@ -1016,14 +1019,14 @@ export default function EmployerComplianceScreen({
         </TouchableOpacity>
 
         <View style={styles.headerText}>
-          <Text style={styles.title}>
+          <Text style={[styles.title, isRTL && styles.rtlText]}>
             {t(
               'employerCompliance.title',
               'Compliance Evidence'
             )}
           </Text>
 
-          <Text style={styles.subtitle}>
+          <Text style={[styles.subtitle, isRTL && styles.rtlText]}>
             {t(
               'employerCompliance.subtitle',
               'Manage jurisdiction-scoped compliance claims separately from organization identity verification.'
@@ -1045,7 +1048,7 @@ export default function EmployerComplianceScreen({
           />
 
           <Text
-            style={styles.centerTitle}
+            style={[styles.centerTitle, isRTL && styles.rtlText]}
           >
             {t(
               'employerCompliance.noOrganizationTitle',
@@ -1091,7 +1094,7 @@ export default function EmployerComplianceScreen({
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <View style={styles.noticeCard}>
+          <View style={[styles.noticeCard, isRTL && styles.rowRTL]}>
             <Ionicons
               name="information-circle-outline"
               size={20}
@@ -1102,7 +1105,7 @@ export default function EmployerComplianceScreen({
               }
             />
 
-            <Text style={styles.noticeText}>
+            <Text style={[styles.noticeText, isRTL && styles.rtlText]}>
               {t(
                 'employerCompliance.separationNotice',
                 'Compliance evidence does not replace organization identity verification and is not automatically used as a publication gate.'
@@ -1132,10 +1135,10 @@ export default function EmployerComplianceScreen({
             </View>
           ) : null}
 
-          <View style={styles.sectionHeader}>
+          <View style={[styles.sectionHeader, isRTL && styles.rowRTL]}>
             <View>
               <Text
-                style={styles.sectionTitle}
+                style={[styles.sectionTitle, isRTL && styles.rtlText]}
               >
                 {t(
                   'employerCompliance.claimsTitle',
@@ -1144,7 +1147,7 @@ export default function EmployerComplianceScreen({
               </Text>
 
               <Text
-                style={styles.sectionSubtitle}
+                style={[styles.sectionSubtitle, isRTL && styles.rtlText]}
               >
                 {t(
                   'employerCompliance.claimsSubtitle',
@@ -1154,7 +1157,7 @@ export default function EmployerComplianceScreen({
             </View>
 
             <TouchableOpacity
-              style={styles.newButton}
+              style={[styles.newButton, isRTL && styles.rowRTL]}
               disabled={busy}
               onPress={startCreate}
               accessibilityRole="button"
@@ -1166,7 +1169,7 @@ export default function EmployerComplianceScreen({
               />
 
               <Text
-                style={styles.newButtonText}
+                style={[styles.newButtonText, isRTL && styles.rtlText]}
               >
                 {t(
                   'employerCompliance.newClaim',
@@ -1188,7 +1191,7 @@ export default function EmployerComplianceScreen({
                 }
               />
 
-              <Text style={styles.emptyTitle}>
+              <Text style={[styles.emptyTitle, isRTL && styles.rtlText]}>
                 {t(
                   'employerCompliance.emptyTitle',
                   'No compliance claims yet'
@@ -1288,8 +1291,7 @@ export default function EmployerComplianceScreen({
                     ]}
                   >
                     <Text
-                      style={[
-                        styles.statusText,
+                      style={[styles.statusText, isRTL && styles.rtlText,
                         {
                           color:
                             tone.color,
@@ -1307,7 +1309,7 @@ export default function EmployerComplianceScreen({
                 </View>
 
                 <Text
-                  style={styles.versionText}
+                  style={[styles.versionText, isRTL && styles.rtlText]}
                 >
                   {t(
                     'employerCompliance.version',
@@ -1333,7 +1335,7 @@ export default function EmployerComplianceScreen({
           {isCreating
           || selectedClaim ? (
             <View style={styles.editorCard}>
-              <Text style={styles.editorTitle}>
+              <Text style={[styles.editorTitle, isRTL && styles.rtlText]}>
                 {isCreating
                   ? t(
                       'employerCompliance.createTitle',
@@ -1374,7 +1376,7 @@ export default function EmployerComplianceScreen({
 
               {isCreating ? (
                 <View style={styles.field}>
-                  <Text style={styles.label}>
+                  <Text style={[styles.label, isRTL && styles.rtlText]}>
                     {t(
                       'employerCompliance.fieldClaimType',
                       'Claim type'
@@ -1382,7 +1384,7 @@ export default function EmployerComplianceScreen({
                   </Text>
 
                   <View
-                    style={styles.chipWrap}
+                    style={[styles.chipWrap, isRTL && styles.rowRTL]}
                   >
                     {CLAIM_TYPES.map(
                       (claimType) => {
@@ -1426,7 +1428,7 @@ export default function EmployerComplianceScreen({
                 </View>
               ) : (
                 <View style={styles.readOnlyRow}>
-                  <Text style={styles.label}>
+                  <Text style={[styles.label, isRTL && styles.rtlText]}>
                     {t(
                       'employerCompliance.fieldClaimType',
                       'Claim type'
@@ -1509,7 +1511,7 @@ export default function EmployerComplianceScreen({
                 }
               )}
 
-              <View style={styles.dateRow}>
+              <View style={[styles.dateRow, isRTL && styles.rowRTL]}>
                 <View style={styles.dateField}>
                   {renderInput(
                     'valid_from',
@@ -2398,5 +2400,12 @@ const styles = StyleSheet.create({
       colors.textSecondary
       || colors.textMuted
       || '#687783',
+  },
+  rowRTL: {
+    flexDirection: 'row-reverse',
+  },
+  rtlText: {
+    writingDirection: 'rtl',
+    textAlign: 'right',
   },
 });

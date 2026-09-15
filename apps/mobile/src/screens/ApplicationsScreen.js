@@ -53,7 +53,7 @@ function StatusPill({ status }) {
 
 export default function ApplicationsScreen({ navigation }) {
   const { t } = useTranslation();
-  const { locale } = useLocalization();
+  const { locale, isRTL } = useLocalization();
   const insets = useSafeAreaInsets();
   const bottomPadding = getTabScreenBottomPadding(insets.bottom);
   const scrollViewRef = useRef(null);
@@ -167,7 +167,7 @@ export default function ApplicationsScreen({ navigation }) {
         {loading && !refreshing && (
           <View style={styles.centerContainer}>
             <ActivityIndicator size="large" color={colors.accent || colors.teal} />
-            <Text style={styles.loadingText}>{t('applications.loading')}</Text>
+            <Text style={[styles.loadingText, isRTL && styles.rtlText]}>{t('applications.loading')}</Text>
           </View>
         )}
 
@@ -175,7 +175,7 @@ export default function ApplicationsScreen({ navigation }) {
         {!loading && error && (
           <Card style={styles.errorCard} padding="lg">
             <Ionicons name="alert-circle-outline" size={40} color={colors.danger || '#EF4444'} />
-            <Text style={styles.errorTitle}>{t('applications.errorTitle')}</Text>
+            <Text style={[styles.errorTitle, isRTL && styles.rtlText]}>{t('applications.errorTitle')}</Text>
             <Text style={styles.errorSubtitle}>
               {error === 'UNAUTHENTICATED'
                 ? t('errors.unauthenticated')
@@ -187,7 +187,7 @@ export default function ApplicationsScreen({ navigation }) {
               accessibilityRole="button"
               accessibilityLabel={t('common.tryAgain')}
             >
-              <Text style={styles.retryBtnText}>{t('common.tryAgain')}</Text>
+              <Text style={[styles.retryBtnText, isRTL && styles.rtlText]}>{t('common.tryAgain')}</Text>
             </TouchableOpacity>
           </Card>
         )}
@@ -196,7 +196,7 @@ export default function ApplicationsScreen({ navigation }) {
         {!loading && !error && applications.length === 0 && (
           <Card style={styles.emptyCard} padding="lg">
             <Ionicons name="briefcase-outline" size={48} color={colors.accent || colors.teal} />
-            <Text style={styles.emptyTitle}>{t('applications.emptyTitle')}</Text>
+            <Text style={[styles.emptyTitle, isRTL && styles.rtlText]}>{t('applications.emptyTitle')}</Text>
             <Text style={styles.emptySubtitle}>
               {t('applications.emptySubtitle')}
             </Text>
@@ -223,9 +223,9 @@ export default function ApplicationsScreen({ navigation }) {
                   style={styles.appCard}
                   padding="md"
                 >
-                  <View style={styles.cardHeader}>
+                  <View style={[styles.cardHeader, isRTL && styles.rowRTL]}>
                     <View style={styles.cardTitleWrap}>
-                      <Text style={styles.jobTitle}>
+                      <Text style={[styles.jobTitle, isRTL && styles.rtlText]}>
                         {app.job_title || t('applications.defaultJobTitle')}
                       </Text>
                       {app.company_name ? (
@@ -237,7 +237,7 @@ export default function ApplicationsScreen({ navigation }) {
 
                   {/* Applied Date */}
                   {appliedDateText ? (
-                    <View style={styles.metaRow}>
+                    <View style={[styles.metaRow, isRTL && styles.rowRTL]}>
                       <Ionicons
                         name="calendar-outline"
                         size={13}
@@ -258,9 +258,9 @@ export default function ApplicationsScreen({ navigation }) {
                   ) : null}
 
                   {/* Action Buttons */}
-                  <View style={styles.cardActions}>
+                  <View style={[styles.cardActions, isRTL && styles.rowRTL]}>
                     <TouchableOpacity
-                      style={styles.detailBtn}
+                      style={[styles.detailBtn, isRTL && styles.rowRTL]}
                       onPress={() =>
                         navigation.navigate('ApplicationDetail', {
                           applicationId: app.id,
@@ -281,7 +281,7 @@ export default function ApplicationsScreen({ navigation }) {
 
                     {hasCoverLetter && (
                       <TouchableOpacity
-                        style={styles.letterBtn}
+                        style={[styles.letterBtn, isRTL && styles.rowRTL]}
                         onPress={() =>
                           navigation.navigate('CoverLetter', {
                             applicationId: app.id,
@@ -308,7 +308,7 @@ export default function ApplicationsScreen({ navigation }) {
 
                     {app.internship_id && (
                       <TouchableOpacity
-                        style={styles.listingBtn}
+                        style={[styles.listingBtn, isRTL && styles.rowRTL]}
                         onPress={() =>
                           navigation.navigate('InternshipDetail', {
                             internshipId: app.internship_id,
@@ -330,7 +330,7 @@ export default function ApplicationsScreen({ navigation }) {
 
                     {app.status === 'saved' && (
                       <TouchableOpacity
-                        style={styles.markAppliedBtn}
+                        style={[styles.markAppliedBtn, isRTL && styles.rowRTL]}
                         onPress={() => handleQuickMarkApplied(app.id)}
                         disabled={isUpdatingThis}
                         accessibilityRole="button"
@@ -525,8 +525,9 @@ const styles = StyleSheet.create({
     borderRadius: spacing.radii.sm,
     minHeight: 36,
     flexGrow: 1,
+    flexShrink: 1,
     flexBasis: '45%',
-    minWidth: 120,
+    minWidth: 0,
   },
   letterBtnText: {
     ...typography.caption,
@@ -546,8 +547,9 @@ const styles = StyleSheet.create({
     borderColor: colors.borderSubtle || colors.border,
     minHeight: 36,
     flexGrow: 1,
+    flexShrink: 1,
     flexBasis: '45%',
-    minWidth: 120,
+    minWidth: 0,
   },
   detailBtnText: {
     ...typography.caption,
@@ -567,8 +569,9 @@ const styles = StyleSheet.create({
     borderColor: colors.borderSubtle || colors.border,
     minHeight: 36,
     flexGrow: 1,
+    flexShrink: 1,
     flexBasis: '45%',
-    minWidth: 120,
+    minWidth: 0,
   },
   listingBtnText: {
     ...typography.caption,
@@ -586,8 +589,9 @@ const styles = StyleSheet.create({
     borderRadius: spacing.radii.sm,
     minHeight: 36,
     flexGrow: 1,
+    flexShrink: 1,
     flexBasis: '45%',
-    minWidth: 120,
+    minWidth: 0,
   },
   markAppliedBtnText: {
     ...typography.caption,
@@ -597,5 +601,12 @@ const styles = StyleSheet.create({
   },
   actionIcon: {
     marginEnd: spacing.xs,
+  },
+  rowRTL: {
+    flexDirection: 'row-reverse',
+  },
+  rtlText: {
+    writingDirection: 'rtl',
+    textAlign: 'right',
   },
 });
