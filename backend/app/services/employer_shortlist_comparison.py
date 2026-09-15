@@ -257,11 +257,7 @@ def generate_employer_shortlist_comparison(
             {
                 "alias": alias,
                 "professional_evidence": {
-                    "headline": getattr(
-                        profile,
-                        "headline",
-                        None,
-                    ),
+                    "headline": None,
                     "department": (
                         preferences.get(
                             "department"

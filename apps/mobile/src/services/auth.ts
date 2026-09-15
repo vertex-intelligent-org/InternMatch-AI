@@ -90,6 +90,32 @@ export async function establishSessionFromAuthCallbackUrl(
     return false;
   }
 
+  const confirmationTokenHash =
+    params.token_hash;
+
+  const confirmationType =
+    params.type;
+
+  if (confirmationTokenHash) {
+    if (confirmationType !== 'email') {
+      return false;
+    }
+
+    const { data, error } =
+      await supabase.auth.verifyOtp({
+        token_hash: confirmationTokenHash,
+        type: 'email',
+      });
+
+    return (
+      !error
+      && Boolean(
+        data.session?.access_token
+        && data.user
+      )
+    );
+  }
+
   const accessToken = params.access_token;
   const refreshToken = params.refresh_token;
 

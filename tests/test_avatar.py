@@ -1,6 +1,6 @@
 """
 Unit & Integration Tests for Profile Avatar End-to-End Features.
-Tests upload, deletion, signed URL generation, MIME validation, file size limits,
+Tests upload, deletion, brokered avatar retrieval, MIME validation, file size limits,
 JWT identity derivation, embedding preservation, and repository updates.
 """
 
@@ -42,10 +42,11 @@ def mock_supabase_storage(monkeypatch):
         uploaded_objects[path] = file
         return {"Key": path}
 
-    def mock_create_signed_url(path, expires_in):
-        return {
-            "signedURL": f"https://mock-storage.supabase.co/signed/{path}?exp={expires_in}"
-        }
+    def mock_download(path):
+        return uploaded_objects.get(
+            path,
+            VALID_JPEG_BYTES,
+        )
 
     def mock_remove(paths):
         for p in paths:
@@ -53,7 +54,7 @@ def mock_supabase_storage(monkeypatch):
         return [{"name": p} for p in paths]
 
     mock_from.upload.side_effect = mock_upload
-    mock_from.create_signed_url.side_effect = mock_create_signed_url
+    mock_from.download.side_effect = mock_download
     mock_from.remove.side_effect = mock_remove
 
     monkeypatch.setattr(
@@ -94,7 +95,7 @@ def test_avatar_upload_no_profile_returns_404(client: TestClient, mock_supabase_
 
 
 def test_valid_avatar_upload_success(client: TestClient, mock_supabase_storage):
-    """Test 4: Valid avatar upload succeeds and returns signed avatar_url."""
+    """Test 4: Valid avatar upload returns only an InternMatch broker reference."""
     user_id = uuid4()
     db = TestingSessionLocal()
     profile = StudentProfile(
@@ -119,7 +120,10 @@ def test_valid_avatar_upload_success(client: TestClient, mock_supabase_storage):
     assert response.status_code == 200
     data = response.json()
     assert "avatar_url" in data
-    assert f"https://mock-storage.supabase.co/signed/{user_id}/" in data["avatar_url"]
+    assert data["avatar_url"].startswith(
+        "/api/v1/profile/avatar/content?v="
+    )
+    assert "supabase.co" not in data["avatar_url"]
 
     # Verify DB state
     db = TestingSessionLocal()
@@ -178,7 +182,7 @@ def test_oversized_avatar_rejected(client: TestClient, mock_supabase_storage):
 def test_get_profile_exposes_avatar_url_not_storage_path(
     client: TestClient, mock_supabase_storage
 ):
-    """Test 7: GET /api/v1/profile exposes avatar_url but never avatar_storage_path."""
+    """Test 7: GET profile exposes only an InternMatch avatar broker reference."""
     user_id = uuid4()
     storage_path = f"{user_id}/test_photo.jpg"
 
@@ -200,7 +204,10 @@ def test_get_profile_exposes_avatar_url_not_storage_path(
     data = response.json()
     assert "avatar_url" in data
     assert data["avatar_url"] is not None
-    assert f"https://mock-storage.supabase.co/signed/{storage_path}" in data["avatar_url"]
+    assert data["avatar_url"].startswith(
+        "/api/v1/profile/avatar/content?v="
+    )
+    assert "supabase.co" not in data["avatar_url"]
     assert "avatar_storage_path" not in data
 
 
@@ -360,3 +367,125 @@ def test_client_cannot_upload_or_delete_other_user_avatar(
     assert a_check.avatar_storage_path is None
     assert b_check.avatar_storage_path == f"{user_b}/photo_b.jpg"
     db.close()
+
+
+
+def test_avatar_content_is_brokered_authenticated_bytes(
+    client: TestClient,
+    mock_supabase_storage,
+):
+    user_id = uuid4()
+
+    db = TestingSessionLocal()
+    profile = StudentProfile(
+        user_id=user_id,
+        full_name="Brokered Avatar",
+        headline="Candidate",
+    )
+    db.add(profile)
+    db.commit()
+    db.close()
+
+    token = f"valid-user-{user_id}"
+
+    upload = client.post(
+        "/api/v1/profile/avatar",
+        headers={
+            "Authorization":
+                f"Bearer {token}",
+        },
+        files={
+            "file": (
+                "avatar.png",
+                VALID_PNG_BYTES,
+                "image/png",
+            )
+        },
+    )
+
+    assert upload.status_code == 200
+
+    response = client.get(
+        "/api/v1/profile/avatar/content",
+        headers={
+            "Authorization":
+                f"Bearer {token}",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.content == VALID_PNG_BYTES
+    assert response.headers["content-type"].startswith(
+        "image/png"
+    )
+    assert (
+        response.headers["cache-control"]
+        == "private, no-store, max-age=0"
+    )
+    assert response.headers["pragma"] == "no-cache"
+    assert (
+        response.headers["x-content-type-options"]
+        == "nosniff"
+    )
+    assert (
+        response.headers["referrer-policy"]
+        == "no-referrer"
+    )
+
+
+def test_avatar_content_requires_authentication(
+    client: TestClient,
+):
+    response = client.get(
+        "/api/v1/profile/avatar/content"
+    )
+
+    assert response.status_code == 401
+
+
+def test_avatar_content_rejects_cross_user_storage_path(
+    client: TestClient,
+    mock_supabase_storage,
+):
+    user_a = uuid4()
+    user_b = uuid4()
+
+    db = TestingSessionLocal()
+    db.add(
+        StudentProfile(
+            user_id=user_a,
+            full_name="User A",
+            headline="Candidate",
+            avatar_storage_path=(
+                f"{user_b}/foreign-avatar.jpg"
+            ),
+        )
+    )
+    db.commit()
+    db.close()
+
+    token = f"valid-user-{user_a}"
+
+    response = client.get(
+        "/api/v1/profile/avatar/content",
+        headers={
+            "Authorization":
+                f"Bearer {token}",
+        },
+    )
+
+    assert response.status_code == 404
+
+
+def test_avatar_storage_has_no_signed_url_capability():
+    from pathlib import Path
+
+    source = Path(
+        "backend/app/services/avatar_storage.py"
+    ).read_text(encoding="utf-8")
+
+    assert "generate_avatar_signed_url" not in source
+    assert "AVATAR_SIGNED_URL_EXPIRY_SECONDS" not in source
+    assert "create_signed_url(" not in source
+    assert "def download_avatar(" in source
+    assert ".download(" in source

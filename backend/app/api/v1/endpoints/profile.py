@@ -3,6 +3,7 @@ Protected Student Profile Endpoints
 Provides authenticated read, write, and CV upload access to candidate profiles.
 """
 
+import hashlib
 import re
 from datetime import date, datetime, timezone
 from typing import Any, Dict, List, Literal, Optional
@@ -35,7 +36,7 @@ from app.services.avatar_storage import (
     MAX_AVATAR_SIZE_BYTES,
     AvatarStorageValidationError,
     delete_candidate_avatar,
-    generate_avatar_signed_url,
+    download_avatar,
     store_candidate_avatar,
 )
 from app.services.candidate_embedding import (
@@ -50,8 +51,12 @@ from app.services.cv_storage import (
     store_candidate_cv,
 )
 from app.services.match_enqueue import enqueue_match_calculation
+from app.services.profile_text_security import (
+    normalize_public_profile_headline,
+)
 from fastapi import APIRouter, Depends, File, Header, HTTPException, UploadFile, status
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from fastapi.responses import Response
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from sqlalchemy.orm import Session
 
 logger = get_logger(__name__)
@@ -59,18 +64,80 @@ logger = get_logger(__name__)
 router = APIRouter()
 
 
+def _build_avatar_content_url(
+    storage_path: Optional[str],
+) -> Optional[str]:
+    """
+    Return an InternMatch-owned opaque avatar reference.
+
+    The storage object path itself is never disclosed.
+    The version is a one-way cache-busting fingerprint only.
+    """
+    if (
+        not isinstance(storage_path, str)
+        or not storage_path.strip()
+    ):
+        return None
+
+    clean_path = storage_path.strip()
+
+    if "." not in clean_path:
+        return None
+
+    extension = clean_path.rsplit(".", 1)[-1].lower()
+
+    if extension == "jpeg":
+        extension = "jpg"
+
+    if extension not in {"jpg", "png", "webp"}:
+        return None
+
+    version = hashlib.sha256(
+        clean_path.encode("utf-8")
+    ).hexdigest()[:16]
+
+    return (
+        "/api/v1/profile/avatar/content"
+        f"?v={version}&ext={extension}"
+    )
+
+
+
 class StudentProfileCreateUpdate(BaseModel):
     """Request schema for creating or updating candidate profile."""
 
+
     full_name: str = Field(..., min_length=1, description="Candidate full name")
     headline: Optional[str] = Field(None, description="Short professional headline")
-    cv_storage_path: Optional[str] = Field(None, description="Storage path for CV file")
     preferences: Optional[Dict[str, Any]] = Field(
         default_factory=dict, description="Job/internship preferences"
     )
     skills: Optional[List[str]] = Field(
         None, description="List of candidate skills"
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def _reject_server_owned_storage_metadata(cls, value):
+        if (
+            isinstance(value, dict)
+            and "cv_storage_path" in value
+        ):
+            raise ValueError(
+                "CV storage metadata is server-managed."
+            )
+
+        return value
+
+    @field_validator("headline")
+    @classmethod
+    def validate_public_headline(
+        cls,
+        value: Optional[str],
+    ) -> Optional[str]:
+        return normalize_public_profile_headline(
+            value
+        )
 
     @field_validator("skills")
     @classmethod
@@ -135,7 +202,7 @@ class StudentProfileResponse(BaseModel):
     experience: List[ExperienceResponse] = Field(default_factory=list)
     projects: List[ProjectResponse] = Field(default_factory=list)
     preferences: Optional[Dict[str, Any]] = Field(default_factory=dict)
-    cv_url: Optional[str] = None
+    has_cv: bool = False
     avatar_url: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
@@ -223,9 +290,8 @@ def get_my_profile(
             ),
         )
 
-    avatar_url = generate_avatar_signed_url(
-        user_id=current_user.user_id,
-        storage_path=profile_data["avatar_storage_path"],
+    avatar_url = _build_avatar_content_url(
+        profile_data["avatar_storage_path"]
     )
 
     return StudentProfileResponse(
@@ -247,6 +313,7 @@ def get_my_profile(
             for entry in profile_data["projects"]
         ],
         preferences=profile_data["preferences"] or {},
+        has_cv=bool(profile_data.get("has_cv")),
         avatar_url=avatar_url,
     )
 
@@ -295,7 +362,6 @@ def upsert_my_profile(
         user_id=current_user.user_id,
         full_name=payload.full_name,
         headline=payload.headline,
-        cv_storage_path=payload.cv_storage_path,
         preferences=profile_preferences,
     )
 
@@ -317,9 +383,8 @@ def upsert_my_profile(
         experience = MatchingDataRepository.get_experience_for_student(db, student_id=profile.id)
         projects = MatchingDataRepository.get_projects_for_student(db, student_id=profile.id)
 
-        avatar_url = generate_avatar_signed_url(
-            user_id=current_user.user_id,
-            storage_path=profile.avatar_storage_path,
+        avatar_url = _build_avatar_content_url(
+            profile.avatar_storage_path
         )
 
         return StudentProfileResponse(
@@ -332,6 +397,7 @@ def upsert_my_profile(
             experience=[ExperienceResponse.model_validate(e) for e in experience],
             projects=[ProjectResponse.model_validate(p) for p in projects],
             preferences=profile.preferences or {},
+            has_cv=bool(profile.cv_storage_path),
             avatar_url=avatar_url,
         )
     except Exception:
@@ -949,10 +1015,9 @@ async def upload_profile_avatar(
             pass
         raise
 
-    # 6. Generate signed URL for immediate presentation
-    signed_url = generate_avatar_signed_url(
-        user_id=current_user.user_id,
-        storage_path=stored_avatar.storage_path,
+    # 6. Return only an InternMatch-owned broker reference.
+    avatar_url = _build_avatar_content_url(
+        stored_avatar.storage_path
     )
 
     # 7. Best-effort delete old avatar object after successful persistence
@@ -966,7 +1031,7 @@ async def upload_profile_avatar(
             pass
 
     return AvatarUploadResponse(
-        avatar_url=signed_url or "",
+        avatar_url=avatar_url or "",
         message="Avatar uploaded successfully.",
     )
 
@@ -1020,4 +1085,100 @@ def delete_profile_avatar(
     return AvatarDeleteResponse(
         avatar_url=None,
         message="Avatar removed successfully.",
+    )
+
+
+@router.get("/avatar/content")
+def download_profile_avatar_content(
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Broker the authenticated user's private avatar through InternMatch.
+
+    The client never receives a Supabase URL, storage object path,
+    service-role credential, or signed storage capability.
+    """
+    profile = StudentProfileRepository.get_by_user_id(
+        db,
+        user_id=current_user.user_id,
+    )
+
+    if (
+        profile is None
+        or not profile.avatar_storage_path
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=format_error_payload(
+                "NOT_FOUND",
+                "Avatar is not available.",
+            ),
+        )
+
+    storage_path = profile.avatar_storage_path
+
+    try:
+        avatar_bytes = download_avatar(
+            user_id=current_user.user_id,
+            storage_path=storage_path,
+        )
+    except AvatarStorageValidationError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=format_error_payload(
+                "NOT_FOUND",
+                "Avatar is not available.",
+            ),
+        )
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=format_error_payload(
+                "STORAGE_UNAVAILABLE",
+                "Avatar is temporarily unavailable.",
+            ),
+        )
+
+    extension = storage_path.rsplit(".", 1)[-1].lower()
+
+    media_types = {
+        "jpg": "image/jpeg",
+        "jpeg": "image/jpeg",
+        "png": "image/png",
+        "webp": "image/webp",
+    }
+
+    media_type = media_types.get(extension)
+
+    if media_type is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=format_error_payload(
+                "NOT_FOUND",
+                "Avatar is not available.",
+            ),
+        )
+
+    safe_extension = (
+        "jpg"
+        if extension == "jpeg"
+        else extension
+    )
+
+    return Response(
+        content=avatar_bytes,
+        media_type=media_type,
+        headers={
+            "Content-Disposition":
+                f'inline; filename="profile-avatar.{safe_extension}"',
+            "Cache-Control":
+                "private, no-store, max-age=0",
+            "Pragma":
+                "no-cache",
+            "X-Content-Type-Options":
+                "nosniff",
+            "Referrer-Policy":
+                "no-referrer",
+        },
     )

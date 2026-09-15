@@ -20,6 +20,9 @@ from app.db.models import (
 )
 from app.repositories.student_profile import StudentProfileRepository
 from app.services.cv_profile_extraction import ExtractedCandidateProfile
+from app.services.profile_text_security import (
+    sanitize_extracted_profile_headline,
+)
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
@@ -74,7 +77,9 @@ def replace_candidate_profile_from_extraction(
         db=db,
         user_id=user_id,
         full_name=re.sub(r"\s+", " ", extracted.full_name.strip()),
-        headline=re.sub(r"\s+", " ", extracted.headline.strip()) if extracted.headline else None,
+        headline=sanitize_extracted_profile_headline(
+            extracted.headline
+        ),
         cv_storage_path=cv_storage_path.strip(),
         preferences=preferences_dict,
     )

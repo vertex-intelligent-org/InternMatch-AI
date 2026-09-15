@@ -316,7 +316,7 @@ class EmployerApplicantResponse(BaseModel):
             candidate=CandidateApplicantSummary(
                 student_id=profile.id,
                 full_name=profile.full_name,
-                headline=profile.headline,
+                headline=None,
                 department=dept,
                 skills=skills or [],
             ),
@@ -329,11 +329,3 @@ class EmployerApplicantListResponse(BaseModel):
     items: List[EmployerApplicantResponse]
     total: int
     internship_id: UUID
-
-
-class EmployerCVAccessResponse(BaseModel):
-    """Short-lived authorized employer access to a submitted candidate CV."""
-
-    cv_url: str
-    expires_in: int
-    file_type: str

@@ -1960,100 +1960,111 @@ def test_employer_cv_access_is_application_scoped_and_private(
     finally:
         db.close()
 
-    signer_calls = []
+    download_calls = []
 
-    def fake_signer(*, user_id, storage_path, expires_in):
-        signer_calls.append(
+    def fake_downloader(*, user_id, storage_path):
+        download_calls.append(
             {
                 "user_id": user_id,
                 "storage_path": storage_path,
-                "expires_in": expires_in,
             }
         )
         return (
-            "https://mock-storage.example/signed/candidate-resume.pdf"
-            "?token=short-lived"
+            b"%PDF-1.7\n"
+            b"InternMatch secure candidate CV\n"
         )
 
     monkeypatch.setattr(
-        "app.api.v1.endpoints.internships.generate_candidate_cv_signed_url",
-        fake_signer,
+        "app.api.v1.endpoints.internships.download_candidate_cv",
+        fake_downloader,
     )
 
     # Owner employer can access the submitted applicant CV.
     response = client.get(
         (
             f"/api/v1/internships/{internship_id}"
-            f"/applicants/{application_id}/cv"
+            f"/applicants/{application_id}/cv/content"
         ),
         headers=owner_headers,
     )
 
     assert response.status_code == 200
-    body = response.json()
-
-    assert body["cv_url"].startswith(
-        "https://mock-storage.example/signed/"
+    assert response.content == (
+        b"%PDF-1.7\n"
+        b"InternMatch secure candidate CV\n"
     )
-    assert body["expires_in"] == 300
-    assert body["file_type"] == "pdf"
 
-    # Never expose the private Supabase object key in the response contract.
-    assert "cv_storage_path" not in body
-    assert str(candidate_user_id) not in body["cv_url"]
+    assert response.headers["content-type"].startswith(
+        "application/pdf"
+    )
+    assert response.headers["content-disposition"] == (
+        'inline; filename="candidate-cv.pdf"'
+    )
+    assert response.headers["cache-control"] == (
+        "private, no-store, max-age=0"
+    )
+    assert response.headers["pragma"] == "no-cache"
+    assert response.headers["x-content-type-options"] == "nosniff"
+    assert response.headers["referrer-policy"] == "no-referrer"
 
-    assert len(signer_calls) == 1
-    assert signer_calls[0]["user_id"] == candidate_user_id
-    assert signer_calls[0]["storage_path"] == (
+    # The response contains only document bytes. It must never expose
+    # the private object key, provider URL, or storage capability token.
+    assert str(candidate_user_id).encode() not in response.content
+    assert b"supabase.co" not in response.content
+    assert b"token=" not in response.content
+
+    assert len(download_calls) == 1
+    assert download_calls[0]["user_id"] == candidate_user_id
+    assert download_calls[0]["storage_path"] == (
         f"{candidate_user_id}/candidate-resume.pdf"
     )
 
-    # Another employer must get owner-hiding 404 and must not trigger signing.
+    # Another employer must get owner-hiding 404 and must not trigger private storage download.
     other_response = client.get(
         (
             f"/api/v1/internships/{internship_id}"
-            f"/applicants/{application_id}/cv"
+            f"/applicants/{application_id}/cv/content"
         ),
         headers=other_headers,
     )
 
     assert other_response.status_code == 404
-    assert len(signer_calls) == 1
+    assert len(download_calls) == 1
 
     # Candidate accounts cannot invoke an employer-only CV endpoint.
     candidate_response = client.get(
         (
             f"/api/v1/internships/{internship_id}"
-            f"/applicants/{application_id}/cv"
+            f"/applicants/{application_id}/cv/content"
         ),
         headers=candidate_headers,
     )
 
     assert candidate_response.status_code == 403
-    assert len(signer_calls) == 1
+    assert len(download_calls) == 1
 
-    # Unauthenticated requests are rejected before any storage signing.
+    # Unauthenticated requests are rejected before any private storage download.
     unauthenticated_response = client.get(
         (
             f"/api/v1/internships/{internship_id}"
-            f"/applicants/{application_id}/cv"
+            f"/applicants/{application_id}/cv/content"
         ),
     )
 
     assert unauthenticated_response.status_code == 401
-    assert len(signer_calls) == 1
+    assert len(download_calls) == 1
 
     # Tampered/nonexistent application IDs do not disclose candidate existence.
     tampered_response = client.get(
         (
             f"/api/v1/internships/{internship_id}"
-            f"/applicants/{uuid4()}/cv"
+            f"/applicants/{uuid4()}/cv/content"
         ),
         headers=owner_headers,
     )
 
     assert tampered_response.status_code == 404
-    assert len(signer_calls) == 1
+    assert len(download_calls) == 1
 
 
 def test_employer_cv_access_rejects_draft_application(
@@ -2118,30 +2129,31 @@ def test_employer_cv_access_rejects_draft_application(
     finally:
         db.close()
 
-    signer_called = False
+    downloader_called = False
 
-    def forbidden_signer(**kwargs):
-        nonlocal signer_called
-        signer_called = True
+    def forbidden_downloader(**kwargs):
+        nonlocal downloader_called
+        downloader_called = True
         raise AssertionError(
-            "CV signing must not occur for an unsubmitted draft"
+            "Private CV download must not occur "
+            "for an unsubmitted draft"
         )
 
     monkeypatch.setattr(
-        "app.api.v1.endpoints.internships.generate_candidate_cv_signed_url",
-        forbidden_signer,
+        "app.api.v1.endpoints.internships.download_candidate_cv",
+        forbidden_downloader,
     )
 
     response = client.get(
         (
             f"/api/v1/internships/{internship_id}"
-            f"/applicants/{application_id}/cv"
+            f"/applicants/{application_id}/cv/content"
         ),
         headers=employer_headers,
     )
 
     assert response.status_code == 404
-    assert signer_called is False
+    assert downloader_called is False
 
 def test_employer_applicant_detail_exposes_server_authoritative_skill_provenance(client):
     from app.db.models import Application, Skill, StudentSkill

@@ -142,12 +142,6 @@ export type EmployerComplianceClaim = {
   [key: string]: unknown;
 };
 
-export type ComplianceEvidenceAccessResponse = {
-  evidence_url: string;
-  expires_in: number;
-  file_type: 'pdf';
-};
-
 export type ComplianceAdminApprovalPayload = {
   expected_version: number;
   internal_note?: string | null;

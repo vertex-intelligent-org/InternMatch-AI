@@ -200,6 +200,7 @@ class MatchingDataRepository:
                 "full_name": profile.full_name,
                 "headline": profile.headline,
                 "preferences": profile.preferences,
+                "has_cv": bool(profile.cv_storage_path),
                 "avatar_storage_path": profile.avatar_storage_path,
                 "skills": MatchingDataRepository.get_skill_names_for_student(
                     db,

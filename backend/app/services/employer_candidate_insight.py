@@ -145,7 +145,7 @@ def generate_employer_candidate_insight(
         "candidate": {
             # Deliberately exclude candidate name, email, user ID, photo,
             # and other identity attributes from AI hiring-assistance context.
-            "headline": getattr(profile, "headline", None),
+            "headline": None,
             "department": preferences.get("department"),
             "skills": candidate_skills,
             "education": education_entries,

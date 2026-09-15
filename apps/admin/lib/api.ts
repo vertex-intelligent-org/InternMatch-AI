@@ -10,7 +10,6 @@ import type {
   VerificationStatus,
   ComplianceClaimStatus,
   EmployerComplianceClaim,
-  ComplianceEvidenceAccessResponse,
   ComplianceAdminApprovalPayload,
   ComplianceAdminRejectionPayload,
   ComplianceAdminRevocationPayload,
@@ -396,23 +395,98 @@ export async function getComplianceClaimForReview(
   );
 }
 
-export async function getComplianceEvidenceAccess(
+export async function downloadComplianceEvidence(
   claimId: string,
   evidenceId: string
-): Promise<ComplianceEvidenceAccessResponse> {
-  return adminApiRequest<ComplianceEvidenceAccessResponse>(
-    (
-      '/admin/employer-compliance/claims/'
-      + encodeURIComponent(claimId)
-      + '/evidence/'
-      + encodeURIComponent(evidenceId)
-      + '/url'
-    ),
-    {
-      method: 'GET',
-    }
-  );
+): Promise<Blob> {
+  const apiBaseUrl =
+    (process.env.NEXT_PUBLIC_API_URL || '')
+      .replace(/\/+$/, '');
+
+  if (!apiBaseUrl) {
+    throw new ApiError(
+      'NEXT_PUBLIC_API_URL is not configured.',
+      0,
+      'API_NOT_CONFIGURED'
+    );
+  }
+
+  const supabase = getSupabaseClient();
+
+  const { data, error } =
+    await supabase.auth.getSession();
+
+  if (error) {
+    throw new ApiError(
+      error.message,
+      401,
+      'SESSION_ERROR'
+    );
+  }
+
+  const token =
+    data.session?.access_token;
+
+  if (!token) {
+    throw new ApiError(
+      'No active authenticated session.',
+      401,
+      'UNAUTHENTICATED'
+    );
+  }
+
+  const path =
+    '/admin/employer-compliance/claims/'
+    + encodeURIComponent(claimId)
+    + '/evidence/'
+    + encodeURIComponent(evidenceId)
+    + '/content';
+
+  const url =
+    apiBaseUrl + path;
+
+  if (/supabase\.co/i.test(url)) {
+    throw new ApiError(
+      'Provider URLs are not permitted for compliance evidence.',
+      0,
+      'PROVIDER_URL_BLOCKED'
+    );
+  }
+
+  let response: Response;
+
+  try {
+    response = await fetch(
+      url,
+      {
+        method: 'GET',
+        headers: {
+          Authorization: 'Bearer ' + token,
+        },
+        cache: 'no-store',
+      }
+    );
+  } catch {
+    throw new ApiError(
+      'Compliance evidence request failed.',
+      0,
+      'NETWORK_ERROR'
+    );
+  }
+
+  if (!response.ok) {
+    throw new ApiError(
+      response.status === 404
+        ? 'This document is unavailable or you do not have permission to access it.'
+        : 'Compliance evidence could not be opened.',
+      response.status,
+      'EVIDENCE_ACCESS_DENIED'
+    );
+  }
+
+  return response.blob();
 }
+
 
 export async function approveComplianceClaim(
   claimId: string,

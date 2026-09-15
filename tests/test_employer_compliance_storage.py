@@ -6,11 +6,9 @@ from uuid import uuid4
 
 import pytest
 from app.services.employer_compliance_storage import (
-    COMPLIANCE_SIGNED_URL_EXPIRY_SECONDS,
     MAX_COMPLIANCE_EVIDENCE_SIZE_BYTES,
     ComplianceStorageValidationError,
     ComplianceStoredObject,
-    generate_compliance_evidence_signed_url,
     store_compliance_evidence,
 )
 
@@ -175,70 +173,12 @@ def test_oversize_evidence_is_rejected(
     assert calls == []
 
 
-def test_signed_url_requires_exact_claim_path(
-    monkeypatch,
-):
-    client, _ = _client()
-
-    monkeypatch.setattr(
-        "app.services.employer_compliance_storage.create_client",
-        lambda url, key: client,
-    )
-
-    organization_id = uuid4()
-    claim_id = uuid4()
-    other_claim_id = uuid4()
-
-    path = (
-        f"{organization_id}/"
-        f"{other_claim_id}/"
-        f"{uuid4()}.pdf"
-    )
-
-    with pytest.raises(
-        ComplianceStorageValidationError,
-        match="does not belong",
-    ):
-        generate_compliance_evidence_signed_url(
-            organization_id=organization_id,
-            claim_id=claim_id,
-            storage_path=path,
-        )
 
 
-def test_signed_url_is_short_lived_and_private(
-    monkeypatch,
-):
-    client, bucket = _client()
 
-    monkeypatch.setattr(
-        "app.services.employer_compliance_storage.create_client",
-        lambda url, key: client,
-    )
 
-    organization_id = uuid4()
-    claim_id = uuid4()
 
-    path = (
-        f"{organization_id}/"
-        f"{claim_id}/"
-        f"{uuid4()}.pdf"
-    )
 
-    url = generate_compliance_evidence_signed_url(
-        organization_id=organization_id,
-        claim_id=claim_id,
-        storage_path=path,
-    )
-
-    assert url == (
-        "https://signed.example/evidence"
-    )
-
-    bucket.create_signed_url.assert_called_once_with(
-        path,
-        COMPLIANCE_SIGNED_URL_EXPIRY_SECONDS,
-    )
 
 
 def test_placeholder_service_credentials_are_rejected(
@@ -260,3 +200,27 @@ def test_placeholder_service_credentials_are_rejected(
             content_type="application/pdf",
             content=b"%PDF-valid",
         )
+
+
+
+def test_compliance_storage_has_no_signed_url_capability():
+    from pathlib import Path
+
+    source = Path(
+        "backend/app/services/employer_compliance_storage.py"
+    ).read_text(encoding="utf-8")
+
+    assert "def download_compliance_evidence(" in source
+
+    assert (
+        "def generate_compliance_evidence_signed_url("
+        not in source
+    )
+
+    assert (
+        "COMPLIANCE_SIGNED_URL_EXPIRY_SECONDS"
+        not in source
+    )
+
+    assert "create_signed_url(" not in source
+    assert ".download(" in source

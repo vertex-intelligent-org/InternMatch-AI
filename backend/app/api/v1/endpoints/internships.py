@@ -21,7 +21,6 @@ from app.schemas.application import (
     EmployerApplicantListResponse,
     EmployerApplicantResponse,
     EmployerApplicantStatusUpdateRequest,
-    EmployerCVAccessResponse,
     EmployerInterviewScheduleRequest,
 )
 from app.schemas.internship import (
@@ -42,9 +41,8 @@ from app.services.ai_quota_integration import (
 )
 from app.services.content_translation import translate_internship_content
 from app.services.cv_storage import (
-    CV_SIGNED_URL_EXPIRY_SECONDS,
     CVStorageValidationError,
-    generate_candidate_cv_signed_url,
+    download_candidate_cv,
 )
 from app.services.embeddings import generate_embedding
 from app.services.employer_ai_quota import (
@@ -91,7 +89,7 @@ from app.services.employer_shortlist_comparison import (
     generate_employer_shortlist_comparison,
 )
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from sqlalchemy.orm import Session
 
 logger = get_logger(__name__)
@@ -208,8 +206,6 @@ def _active_match_calculation_user_ids(db: Session, user_ids) -> set:
     )
 
     return {row[0] for row in rows}
-
-
 
 
 def format_not_found_error(message: str) -> Dict[str, Any]:
@@ -360,7 +356,6 @@ def create_internship(
         raise
 
     return InternshipDetailResponse.from_orm_model(listing)
-
 
 
 @router.get("", response_model=InternshipListResponse)
@@ -593,26 +588,26 @@ def list_internship_applicants(
     )
 
 
-
 @router.get(
-    "/{id}/applicants/{application_id}/cv",
-    response_model=EmployerCVAccessResponse,
+    "/{id}/applicants/{application_id}/cv/content",
 )
-def get_employer_applicant_cv(
+def download_employer_applicant_cv_content(
     id: UUID,
     application_id: UUID,
     current_user: AuthenticatedUser = Depends(require_employer_user),
     db: Session = Depends(get_db),
 ):
     """
-    Return short-lived access to the current CV for a submitted applicant.
+    Stream a submitted candidate CV through the authenticated InternMatch API.
 
-    Authorization is application-scoped and server-authoritative:
-    - authenticated account must be an employer
-    - opportunity must belong to that employer
+    Security boundary:
+    - caller must have an authenticated employer session
+    - opportunity must belong to the authenticated employer
     - application must belong to that opportunity
-    - draft/saved applications are not visible
-    - candidate identity and CV storage path are resolved server-side
+    - saved/draft applications remain invisible
+    - the private storage path is resolved only on the server
+    - the storage provider URL/token is never returned to the client
+    - every download request re-runs authorization
     """
     record = ApplicationRepository.get_applicant_detail_for_employer(
         db=db,
@@ -639,19 +634,18 @@ def get_employer_applicant_cv(
             ),
         )
 
-    storage_path = profile.cv_storage_path
+    storage_object_path = profile.cv_storage_path
 
-    if not storage_path:
+    if not storage_object_path:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Candidate CV is not available.",
         )
 
     try:
-        signed_url = generate_candidate_cv_signed_url(
+        document_bytes = download_candidate_cv(
             user_id=profile.user_id,
-            storage_path=storage_path,
-            expires_in=CV_SIGNED_URL_EXPIRY_SECONDS,
+            storage_path=storage_object_path,
         )
     except CVStorageValidationError:
         raise HTTPException(
@@ -659,12 +653,36 @@ def get_employer_applicant_cv(
             detail="Candidate CV is temporarily unavailable.",
         )
 
-    extension = storage_path.rsplit(".", 1)[-1].lower()
+    extension = storage_object_path.rsplit(".", 1)[-1].lower()
 
-    return EmployerCVAccessResponse(
-        cv_url=signed_url,
-        expires_in=CV_SIGNED_URL_EXPIRY_SECONDS,
-        file_type=extension,
+    media_types = {
+        "pdf": "application/pdf",
+        "doc": "application/msword",
+        "docx": (
+            "application/vnd.openxmlformats-officedocument."
+            "wordprocessingml.document"
+        ),
+    }
+
+    media_type = media_types.get(
+        extension,
+        "application/octet-stream",
+    )
+
+    safe_extension = extension if extension in media_types else "bin"
+
+    return Response(
+        content=document_bytes,
+        media_type=media_type,
+        headers={
+            "Content-Disposition": (
+                f'inline; filename="candidate-cv.{safe_extension}"'
+            ),
+            "Cache-Control": "private, no-store, max-age=0",
+            "Pragma": "no-cache",
+            "X-Content-Type-Options": "nosniff",
+            "Referrer-Policy": "no-referrer",
+        },
     )
 
 
@@ -882,7 +900,6 @@ def schedule_employer_applicant_interview(
     )
 
 
-
 @router.post(
     "/{id}/applicants/{application_id}/insight",
     response_model=EmployerCandidateInsightResponse,
@@ -955,7 +972,6 @@ def generate_employer_applicant_insight(
             content_locale=content_locale,
         ),
     )
-
 
 
 @router.post(
@@ -1035,7 +1051,6 @@ def generate_employer_applicant_interview_kit(
             content_locale=content_locale,
         ),
     )
-
 
 
 @router.post(
@@ -1156,7 +1171,6 @@ def compare_employer_shortlist(
     )
 
 
-
 @router.post(
     "/employer-tools/description-assistant",
     response_model=EmployerInternshipDescriptionResponse,
@@ -1206,7 +1220,6 @@ def generate_employer_internship_description_draft(
             content_locale=content_locale,
         ),
     )
-
 
 
 @router.get(

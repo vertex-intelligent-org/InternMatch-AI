@@ -1,3 +1,4 @@
+from fastapi.responses import Response
 """
 Employer compliance claim and evidence API.
 
@@ -31,11 +32,10 @@ from app.repositories.employer_organization import (
     EmployerOrganizationRepository,
 )
 from app.services.employer_compliance_storage import (
-    COMPLIANCE_SIGNED_URL_EXPIRY_SECONDS,
     MAX_COMPLIANCE_EVIDENCE_SIZE_BYTES,
     ComplianceStorageValidationError,
     delete_compliance_evidence,
-    generate_compliance_evidence_signed_url,
+    download_compliance_evidence,
     store_compliance_evidence,
 )
 from fastapi import (
@@ -173,10 +173,8 @@ class ComplianceAdminRevocationRequest(BaseModel):
     internal_note: Optional[str] = None
 
 
-class ComplianceEvidenceAccessResponse(BaseModel):
-    evidence_url: str
-    expires_in: int
-    file_type: Literal["pdf"] = "pdf"
+
+
 
 
 def _clean_optional(
@@ -881,66 +879,17 @@ async def upload_compliance_evidence(
     )
 
 
-@employer_router.get(
-    "/claims/{claim_id}/evidence/"
-    "{evidence_id}/url",
-    response_model=(
-        ComplianceEvidenceAccessResponse
-    ),
-)
-def get_my_compliance_evidence_url(
-    claim_id: UUID,
-    evidence_id: UUID,
-    current_user: AuthenticatedUser = Depends(
-        require_employer_user
-    ),
-    db: Session = Depends(get_db),
-):
-    organization = _require_organization(
-        db,
-        current_user,
-    )
-
-    claim = _owned_claim(
-        db,
-        organization_id=organization.id,
-        claim_id=claim_id,
-    )
-
-    evidence = _evidence_for_claim(
-        db,
-        claim_id=claim.id,
-        evidence_id=evidence_id,
-    )
-
+@employer_router.get('/claims/{claim_id}/evidence/{evidence_id}/content')
+def download_my_compliance_evidence_content(claim_id: UUID, evidence_id: UUID, current_user: AuthenticatedUser=Depends(require_employer_user), db: Session=Depends(get_db)):
+    organization = _require_organization(db, current_user)
+    claim = _owned_claim(db, organization_id=organization.id, claim_id=claim_id)
+    evidence = _evidence_for_claim(db, claim_id=claim.id, evidence_id=evidence_id)
     try:
-        signed_url = (
-            generate_compliance_evidence_signed_url(
-                organization_id=organization.id,
-                claim_id=claim.id,
-                storage_path=evidence.storage_path,
-                expires_in=(
-                    COMPLIANCE_SIGNED_URL_EXPIRY_SECONDS
-                ),
-            )
-        )
+        document_bytes = download_compliance_evidence(organization_id=organization.id, claim_id=claim.id, storage_path=evidence.storage_path)
     except ComplianceStorageValidationError:
-        raise HTTPException(
-            status_code=(
-                status.HTTP_503_SERVICE_UNAVAILABLE
-            ),
-            detail=(
-                "Compliance evidence is temporarily "
-                "unavailable."
-            ),
-        )
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail='Compliance evidence is temporarily unavailable.')
+    return Response(content=document_bytes, media_type='application/pdf', headers={'Content-Disposition': 'inline; filename="compliance-evidence.pdf"', 'Cache-Control': 'private, no-store, max-age=0', 'Pragma': 'no-cache', 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer'})
 
-    return ComplianceEvidenceAccessResponse(
-        evidence_url=signed_url,
-        expires_in=(
-            COMPLIANCE_SIGNED_URL_EXPIRY_SECONDS
-        ),
-    )
 
 
 @employer_router.post(
@@ -1134,69 +1083,18 @@ def get_compliance_claim_for_review(
     )
 
 
-@admin_router.get(
-    "/claims/{claim_id}/evidence/"
-    "{evidence_id}/url",
-    response_model=(
-        ComplianceEvidenceAccessResponse
-    ),
-)
-def get_admin_compliance_evidence_url(
-    claim_id: UUID,
-    evidence_id: UUID,
-    _admin_user: AuthenticatedUser = Depends(
-        require_admin_user
-    ),
-    db: Session = Depends(get_db),
-):
-    claim = (
-        EmployerComplianceRepository
-        .get_claim(
-            db,
-            claim_id,
-        )
-    )
-
+@admin_router.get('/claims/{claim_id}/evidence/{evidence_id}/content')
+def download_admin_compliance_evidence_content(claim_id: UUID, evidence_id: UUID, _admin_user: AuthenticatedUser=Depends(require_admin_user), db: Session=Depends(get_db)):
+    claim = EmployerComplianceRepository.get_claim(db, claim_id)
     if claim is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Compliance claim not found.",
-        )
-
-    evidence = _evidence_for_claim(
-        db,
-        claim_id=claim.id,
-        evidence_id=evidence_id,
-    )
-
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Compliance claim not found.')
+    evidence = _evidence_for_claim(db, claim_id=claim.id, evidence_id=evidence_id)
     try:
-        signed_url = (
-            generate_compliance_evidence_signed_url(
-                organization_id=claim.organization_id,
-                claim_id=claim.id,
-                storage_path=evidence.storage_path,
-                expires_in=(
-                    COMPLIANCE_SIGNED_URL_EXPIRY_SECONDS
-                ),
-            )
-        )
+        document_bytes = download_compliance_evidence(organization_id=claim.organization_id, claim_id=claim.id, storage_path=evidence.storage_path)
     except ComplianceStorageValidationError:
-        raise HTTPException(
-            status_code=(
-                status.HTTP_503_SERVICE_UNAVAILABLE
-            ),
-            detail=(
-                "Compliance evidence is temporarily "
-                "unavailable."
-            ),
-        )
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail='Compliance evidence is temporarily unavailable.')
+    return Response(content=document_bytes, media_type='application/pdf', headers={'Content-Disposition': 'inline; filename="compliance-evidence.pdf"', 'Cache-Control': 'private, no-store, max-age=0', 'Pragma': 'no-cache', 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer'})
 
-    return ComplianceEvidenceAccessResponse(
-        evidence_url=signed_url,
-        expires_in=(
-            COMPLIANCE_SIGNED_URL_EXPIRY_SECONDS
-        ),
-    )
 
 
 @admin_router.post(

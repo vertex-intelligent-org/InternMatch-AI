@@ -73,7 +73,7 @@ export default function CVUploadScreen({ route, navigation }) {
   const [isCancelling, setIsCancelling] = useState(false);
 
   const { profile, refreshProfile } = useProfile();
-  const hasExistingCV = Boolean(profile?.cv_url || (profile?.skills && profile.skills.length > 0));
+  const hasExistingCV = Boolean(profile?.has_cv || (profile?.skills && profile.skills.length > 0));
 
   const pollTimerRef = useRef(null);
   const isMountedRef = useRef(true);

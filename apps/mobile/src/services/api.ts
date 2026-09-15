@@ -1,5 +1,6 @@
 import Constants from 'expo-constants';
 import { supabase } from '../lib/supabase';
+import * as FileSystem from 'expo-file-system/legacy';
 import { normalizeLocale, DEFAULT_LOCALE } from '../localization/i18n';
 
 function resolveExpoDevelopmentHost(): string | null {
@@ -112,7 +113,7 @@ function extractApiError(payload: unknown, fallback: string) {
   };
 }
 
-export async function apiRequest<T>(
+async function rawApiRequest<T>(
   path: string,
   options: ApiRequestOptions = {}
 ): Promise<T> {
@@ -221,7 +222,7 @@ export type StudentProfileResponse = {
   experience: ExperienceEntry[];
   projects: ProjectEntry[];
   preferences: Record<string, unknown>;
-  cv_url: string | null;
+  has_cv: boolean;
   avatar_url?: string | null;
 };
 
@@ -1118,18 +1119,199 @@ export async function getEmployerApplicants(
   );
 }
 
-export type EmployerCVAccessResponse = {
-  cv_url: string;
-  expires_in: number;
-  file_type: 'pdf' | 'docx';
+export type EmployerCVLocalFile = {
+  uri: string;
+  mime_type: string;
+  file_type: 'pdf' | 'doc' | 'docx' | 'bin';
 };
 
-export async function getEmployerApplicantCV(
+function resolveEmployerCVFileType(
+  mimeType: string | null | undefined
+): EmployerCVLocalFile['file_type'] {
+  const normalized = (mimeType || '')
+    .split(';')[0]
+    .trim()
+    .toLowerCase();
+
+  if (normalized === 'application/pdf') {
+    return 'pdf';
+  }
+
+  if (normalized === 'application/msword') {
+    return 'doc';
+  }
+
+  if (
+    normalized ===
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+  ) {
+    return 'docx';
+  }
+
+  return 'bin';
+}
+
+/**
+ * Download an employer-authorized candidate CV through the InternMatch API.
+ *
+ * Security invariants:
+ * - authentication token travels only in the Authorization header
+ * - every download hits the server-side application ownership check
+ * - no Supabase Storage URL/token is returned to the mobile client
+ * - bytes are written only to the app cache as a temporary local file
+ */
+export async function downloadEmployerApplicantCV(
   internshipId: string,
   applicationId: string
-): Promise<EmployerCVAccessResponse> {
-  return apiRequest<EmployerCVAccessResponse>(
-    `/internships/${encodeURIComponent(internshipId)}/applicants/${encodeURIComponent(applicationId)}/cv`
+): Promise<EmployerCVLocalFile> {
+  if (!apiBaseUrl) {
+    throw new ApiError(
+      'EXPO_PUBLIC_API_URL is not configured.',
+      0,
+      'API_NOT_CONFIGURED'
+    );
+  }
+
+  const token = await getAccessToken();
+
+  const path =
+    `/internships/${encodeURIComponent(internshipId)}` +
+    `/applicants/${encodeURIComponent(applicationId)}/cv/content`;
+
+  const url = apiBaseUrl + path;
+
+  if (/supabase\.co/i.test(url)) {
+    throw new ApiError(
+      'Provider URLs are not permitted for candidate document access.',
+      0,
+      'PROVIDER_URL_BLOCKED'
+    );
+  }
+
+  const cacheDirectory = FileSystem.cacheDirectory;
+
+  if (!cacheDirectory) {
+    throw new ApiError(
+      'Temporary file storage is unavailable on this device.',
+      0,
+      'FILE_CACHE_UNAVAILABLE'
+    );
+  }
+
+  const safeApplicationId = applicationId.replace(
+    /[^a-zA-Z0-9-]/g,
+    ''
+  );
+
+  const stem =
+    `internmatch-cv-${Date.now()}-${safeApplicationId}`;
+
+  const temporaryUri =
+    `${cacheDirectory}${stem}.download`;
+
+  let result;
+
+  try {
+    result = await FileSystem.downloadAsync(
+      url,
+      temporaryUri,
+      {
+        headers: {
+          Authorization: 'Bearer ' + token,
+        },
+      }
+    );
+  } catch {
+    await FileSystem.deleteAsync(
+      temporaryUri,
+      { idempotent: true }
+    ).catch(() => {});
+
+    throw new ApiError(
+      'Candidate CV download failed.',
+      0,
+      'CV_DOWNLOAD_FAILED'
+    );
+  }
+
+  if (result.status < 200 || result.status >= 300) {
+    await FileSystem.deleteAsync(
+      result.uri,
+      { idempotent: true }
+    ).catch(() => {});
+
+    throw new ApiError(
+      'Candidate CV download was rejected.',
+      result.status,
+      'CV_DOWNLOAD_REJECTED'
+    );
+  }
+
+  const contentTypeHeader = Object.entries(
+    result.headers || {}
+  ).find(
+    ([key]) => key.toLowerCase() === 'content-type'
+  )?.[1];
+
+  const mimeType = (
+    typeof contentTypeHeader === 'string'
+      ? contentTypeHeader
+      : 'application/octet-stream'
+  )
+    .split(';')[0]
+    .trim();
+
+  const fileType = resolveEmployerCVFileType(mimeType);
+
+  const finalUri =
+    `${cacheDirectory}${stem}.${fileType}`;
+
+  try {
+    if (result.uri !== finalUri) {
+      await FileSystem.moveAsync({
+        from: result.uri,
+        to: finalUri,
+      });
+    }
+  } catch {
+    await FileSystem.deleteAsync(
+      result.uri,
+      { idempotent: true }
+    ).catch(() => {});
+
+    throw new ApiError(
+      'Candidate CV could not be prepared for viewing.',
+      0,
+      'CV_LOCAL_FILE_FAILED'
+    );
+  }
+
+  return {
+    uri: finalUri,
+    mime_type: mimeType,
+    file_type: fileType,
+  };
+}
+
+/**
+ * Delete only temporary CV files created by downloadEmployerApplicantCV.
+ */
+export async function deleteTemporaryEmployerApplicantCV(
+  uri: string
+): Promise<void> {
+  const cacheDirectory = FileSystem.cacheDirectory;
+
+  if (
+    !cacheDirectory ||
+    typeof uri !== 'string' ||
+    !uri.startsWith(`${cacheDirectory}internmatch-cv-`)
+  ) {
+    return;
+  }
+
+  await FileSystem.deleteAsync(
+    uri,
+    { idempotent: true }
   );
 }
 
@@ -1437,12 +1619,6 @@ export type EmployerComplianceUpdatePayload = {
   valid_until?: string | null;
 };
 
-export type EmployerComplianceEvidenceAccess = {
-  evidence_url: string;
-  expires_in: number;
-  file_type: 'pdf';
-};
-
 export async function listEmployerComplianceClaims(
 ): Promise<EmployerComplianceClaim[]> {
   return apiRequest<EmployerComplianceClaim[]>(
@@ -1518,23 +1694,123 @@ export async function uploadEmployerComplianceEvidence(
   );
 }
 
-export async function getEmployerComplianceEvidenceAccess(
+export type EmployerComplianceLocalEvidence = {
+  uri: string;
+  mime_type: string;
+};
+
+export async function downloadEmployerComplianceEvidence(
   claimId: string,
   evidenceId: string
-): Promise<EmployerComplianceEvidenceAccess> {
-  return apiRequest<EmployerComplianceEvidenceAccess>(
-    (
-      '/employer-compliance/claims/'
-      + encodeURIComponent(claimId)
-      + '/evidence/'
-      + encodeURIComponent(evidenceId)
-      + '/url'
-    ),
-    {
-      method: 'GET',
-    }
+): Promise<EmployerComplianceLocalEvidence> {
+  if (!apiBaseUrl) {
+    throw new ApiError(
+      'EXPO_PUBLIC_API_URL is not configured.',
+      0,
+      'API_NOT_CONFIGURED'
+    );
+  }
+
+  const token = await getAccessToken();
+
+  const path =
+    '/employer-compliance/claims/'
+    + encodeURIComponent(claimId)
+    + '/evidence/'
+    + encodeURIComponent(evidenceId)
+    + '/content';
+
+  const url = apiBaseUrl + path;
+
+  if (/supabase\.co/i.test(url)) {
+    throw new ApiError(
+      'Provider URLs are not permitted for compliance evidence.',
+      0,
+      'PROVIDER_URL_BLOCKED'
+    );
+  }
+
+  const cacheDirectory = FileSystem.cacheDirectory;
+
+  if (!cacheDirectory) {
+    throw new ApiError(
+      'Temporary file storage is unavailable.',
+      0,
+      'FILE_CACHE_UNAVAILABLE'
+    );
+  }
+
+  const safeEvidenceId =
+    evidenceId.replace(/[^a-zA-Z0-9-]/g, '');
+
+  const uri =
+    `${cacheDirectory}internmatch-evidence-`
+    + `${Date.now()}-${safeEvidenceId}.pdf`;
+
+  let result;
+
+  try {
+    result = await FileSystem.downloadAsync(
+      url,
+      uri,
+      {
+        headers: {
+          Authorization: 'Bearer ' + token,
+        },
+      }
+    );
+  } catch {
+    await FileSystem.deleteAsync(
+      uri,
+      { idempotent: true }
+    ).catch(() => {});
+
+    throw new ApiError(
+      'Compliance evidence download failed.',
+      0,
+      'EVIDENCE_DOWNLOAD_FAILED'
+    );
+  }
+
+  if (result.status < 200 || result.status >= 300) {
+    await FileSystem.deleteAsync(
+      result.uri,
+      { idempotent: true }
+    ).catch(() => {});
+
+    throw new ApiError(
+      'Compliance evidence access was rejected.',
+      result.status,
+      'EVIDENCE_DOWNLOAD_REJECTED'
+    );
+  }
+
+  return {
+    uri: result.uri,
+    mime_type: 'application/pdf',
+  };
+}
+
+export async function deleteTemporaryComplianceEvidence(
+  uri: string
+): Promise<void> {
+  const cacheDirectory = FileSystem.cacheDirectory;
+
+  if (
+    !cacheDirectory
+    || !uri.startsWith(
+      `${cacheDirectory}internmatch-evidence-`
+    )
+  ) {
+    return;
+  }
+
+  await FileSystem.deleteAsync(
+    uri,
+    { idempotent: true }
   );
 }
+
 
 export async function submitEmployerComplianceClaim(
   claimId: string,
@@ -1552,5 +1828,230 @@ export async function submitEmployerComplianceClaim(
         expected_version: expectedVersion,
       }),
     }
+  );
+}
+
+
+type BrokeredAvatarDescriptor = {
+  version: string;
+  extension: 'jpg' | 'png' | 'webp';
+};
+
+function parseBrokeredAvatarUrl(
+  value: string
+): BrokeredAvatarDescriptor | null {
+  if (
+    !value.startsWith(
+      '/api/v1/profile/avatar/content'
+    )
+  ) {
+    return null;
+  }
+
+  const versionMatch =
+    /[?&]v=([a-f0-9]{16})(?:&|$)/i.exec(
+      value
+    );
+
+  const extensionMatch =
+    /[?&]ext=(jpg|png|webp)(?:&|$)/i.exec(
+      value
+    );
+
+  if (!versionMatch || !extensionMatch) {
+    return null;
+  }
+
+  const extension =
+    extensionMatch[1].toLowerCase();
+
+  if (
+    extension !== 'jpg'
+    && extension !== 'png'
+    && extension !== 'webp'
+  ) {
+    return null;
+  }
+
+  return {
+    version:
+      versionMatch[1].toLowerCase(),
+    extension,
+  };
+}
+
+async function materializeBrokeredAvatar(
+  avatarUrl: string
+): Promise<string | null> {
+  if (/supabase\.co/i.test(avatarUrl)) {
+    return null;
+  }
+
+  const descriptor =
+    parseBrokeredAvatarUrl(avatarUrl);
+
+  if (!descriptor) {
+    return avatarUrl.startsWith('file://')
+      ? avatarUrl
+      : null;
+  }
+
+  if (!apiBaseUrl) {
+    return null;
+  }
+
+  const cacheDirectory =
+    FileSystem.cacheDirectory;
+
+  if (!cacheDirectory) {
+    return null;
+  }
+
+  const filename =
+    `internmatch-avatar-${descriptor.version}.`
+    + descriptor.extension;
+
+  const localUri =
+    cacheDirectory + filename;
+
+  try {
+    const existing =
+      await FileSystem.getInfoAsync(localUri);
+
+    if (existing.exists) {
+      return localUri;
+    }
+  } catch {
+    // Continue with a fresh authenticated download.
+  }
+
+  try {
+    const entries =
+      await FileSystem.readDirectoryAsync(
+        cacheDirectory
+      );
+
+    for (const entry of entries) {
+      if (
+        entry.startsWith('internmatch-avatar-')
+        && entry !== filename
+      ) {
+        await FileSystem.deleteAsync(
+          cacheDirectory + entry,
+          { idempotent: true }
+        ).catch(() => {});
+      }
+    }
+  } catch {
+    // Cache cleanup is best-effort only.
+  }
+
+  let token: string;
+
+  try {
+    token = await getAccessToken();
+  } catch {
+    return null;
+  }
+
+  const downloadUrl =
+    apiBaseUrl
+    + '/profile/avatar/content';
+
+  let result;
+
+  try {
+    result = await FileSystem.downloadAsync(
+      downloadUrl,
+      localUri,
+      {
+        headers: {
+          Authorization:
+            'Bearer ' + token,
+        },
+      }
+    );
+  } catch {
+    await FileSystem.deleteAsync(
+      localUri,
+      { idempotent: true }
+    ).catch(() => {});
+
+    return null;
+  }
+
+  if (
+    result.status < 200
+    || result.status >= 300
+  ) {
+    await FileSystem.deleteAsync(
+      result.uri,
+      { idempotent: true }
+    ).catch(() => {});
+
+    return null;
+  }
+
+  return result.uri;
+}
+
+async function hydrateAvatarInApiPayload<T>(
+  payload: T
+): Promise<T> {
+  if (!isJsonRecord(payload)) {
+    return payload;
+  }
+
+  const avatarValue =
+    payload.avatar_url;
+
+  if (avatarValue == null) {
+    return payload;
+  }
+
+  if (typeof avatarValue !== 'string') {
+    return {
+      ...payload,
+      avatar_url: null,
+    } as T;
+  }
+
+  if (/supabase\.co/i.test(avatarValue)) {
+    return {
+      ...payload,
+      avatar_url: null,
+    } as T;
+  }
+
+  const localAvatarUri =
+    await materializeBrokeredAvatar(
+      avatarValue
+    );
+
+  return {
+    ...payload,
+    avatar_url: localAvatarUri,
+  } as T;
+}
+
+/**
+ * Central authenticated API boundary.
+ *
+ * Avatar broker references are materialized to private local cache
+ * before any screen receives them. Screens therefore consume file://
+ * URIs only and never receive provider storage URLs or bearer links.
+ */
+export async function apiRequest<T>(
+  path: string,
+  options: ApiRequestOptions = {}
+): Promise<T> {
+  const payload =
+    await rawApiRequest<T>(
+      path,
+      options
+    );
+
+  return hydrateAvatarInApiPayload(
+    payload
   );
 }

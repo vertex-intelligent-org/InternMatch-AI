@@ -61,7 +61,7 @@ export function calculateProfileCompleteness(profile) {
       key: 'cv',
       label: 'Upload your CV',
       route: 'CVUpload',
-      completed: Boolean(profile.cv_storage_path || profile.cv_url),
+      completed: Boolean(profile.has_cv),
     },
     {
       key: 'skills',

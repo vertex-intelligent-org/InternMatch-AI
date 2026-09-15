@@ -13,7 +13,6 @@ from supabase import create_client
 from app.core.config import settings
 
 MAX_AVATAR_SIZE_BYTES: int = 5 * 1024 * 1024  # 5 MiB
-AVATAR_SIGNED_URL_EXPIRY_SECONDS: int = 3600  # 1 hour
 
 ALLOWED_IMAGE_MIMES = {
     "image/jpeg": "jpg",
@@ -158,44 +157,6 @@ def store_candidate_avatar(
     )
 
 
-def generate_avatar_signed_url(
-    *,
-    user_id: UUID,
-    storage_path: Optional[str],
-    expires_in: int = AVATAR_SIGNED_URL_EXPIRY_SECONDS,
-) -> Optional[str]:
-    """
-    Generate short-lived signed download URL for private avatar object.
-    Verifies that the requested storage_path belongs strictly to target user_id ({user_id}/...).
-    Returns None if storage_path is empty or generation fails.
-    """
-    if not storage_path or not isinstance(storage_path, str) or not storage_path.strip():
-        return None
-
-    clean_path = storage_path.strip()
-
-    # Path ownership assertion: must start with {user_id}/
-    expected_prefix = f"{user_id}/"
-    if not clean_path.startswith(expected_prefix):
-        return None
-
-    try:
-        client, bucket = _get_supabase_storage_client()
-        res = client.storage.from_(bucket).create_signed_url(
-            path=clean_path,
-            expires_in=expires_in,
-        )
-        if isinstance(res, dict) and "signedURL" in res:
-            return res["signedURL"]
-        if isinstance(res, dict) and "signedUrl" in res:
-            return res["signedUrl"]
-        if hasattr(res, "signed_url"):
-            return res.signed_url
-        if isinstance(res, str):
-            return res
-        return None
-    except Exception:
-        return None
 
 
 def delete_candidate_avatar(
@@ -223,3 +184,69 @@ def delete_candidate_avatar(
         return True
     except Exception:
         return False
+
+
+def download_avatar(
+    *,
+    user_id: UUID,
+    storage_path: str,
+) -> bytes:
+    """
+    Download avatar bytes through the trusted server-side storage client.
+
+    The storage object must remain strictly namespaced under the
+    authenticated user's UUID. No provider URL or storage capability
+    is returned to the client.
+    """
+    if not isinstance(user_id, UUID):
+        raise AvatarStorageValidationError(
+            "user_id must be a valid UUID"
+        )
+
+    if (
+        not isinstance(storage_path, str)
+        or not storage_path.strip()
+    ):
+        raise AvatarStorageValidationError(
+            "storage_path cannot be empty"
+        )
+
+    clean_path = storage_path.strip()
+    expected_prefix = f"{user_id}/"
+
+    if not clean_path.startswith(expected_prefix):
+        raise AvatarStorageValidationError(
+            "Avatar storage path does not belong to authenticated user"
+        )
+
+    if "." not in clean_path:
+        raise AvatarStorageValidationError(
+            "Avatar storage path is missing file extension"
+        )
+
+    extension = clean_path.rsplit(".", 1)[-1].lower()
+
+    if extension not in {"jpg", "jpeg", "png", "webp"}:
+        raise AvatarStorageValidationError(
+            "Unsupported avatar file extension"
+        )
+
+    client, bucket = _get_supabase_storage_client()
+
+    result = (
+        client.storage
+        .from_(bucket)
+        .download(clean_path)
+    )
+
+    if not isinstance(result, (bytes, bytearray)):
+        raise AvatarStorageValidationError(
+            "Storage provider did not return valid avatar bytes"
+        )
+
+    if not result:
+        raise AvatarStorageValidationError(
+            "Downloaded avatar is empty"
+        )
+
+    return bytes(result)

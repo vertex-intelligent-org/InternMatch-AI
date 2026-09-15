@@ -189,7 +189,7 @@ def generate_employer_interview_kit(
     context = {
         "candidate_professional_evidence": {
             # No name, email, user ID, photo, address, or identity metadata.
-            "headline": getattr(profile, "headline", None),
+            "headline": None,
             "department": preferences.get("department"),
             "skills": candidate_skills,
             "education": education_entries,

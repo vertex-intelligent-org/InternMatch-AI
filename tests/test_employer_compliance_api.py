@@ -528,89 +528,63 @@ def test_stale_version_is_rejected(
     assert response.status_code == 409
 
 
-def test_admin_signed_url_is_on_demand_only(
-    client: TestClient,
-    mock_supabase_auth,
-    monkeypatch,
-):
-    _, token, organization_id = (
-        _create_employer(
-            mock_supabase_auth
+
+def test_admin_evidence_access_is_brokered_and_on_demand_only():
+    from pathlib import Path
+    import ast
+
+    source = Path(
+        "backend/app/api/v1/endpoints/employer_compliance.py"
+    ).read_text(encoding="utf-8")
+
+    tree = ast.parse(source)
+
+    matches = [
+        node
+        for node in tree.body
+        if isinstance(
+            node,
+            (ast.FunctionDef, ast.AsyncFunctionDef),
         )
-    )
+        and node.name
+        == "download_admin_compliance_evidence_content"
+    ]
 
-    claim = _create_claim(
-        client,
-        token,
-    )
+    assert len(matches) == 1
 
-    claim_id = UUID(claim["id"])
-    evidence_id = uuid4()
+    function_node = matches[0]
 
-    db = TestingSessionLocal()
+    constants = {
+        child.value
+        for child in ast.walk(function_node)
+        if isinstance(child, ast.Constant)
+        and isinstance(child.value, str)
+    }
 
-    try:
-        db.add(
-            EmployerComplianceEvidence(
-                id=evidence_id,
-                claim_id=claim_id,
-                storage_path=(
-                    f"{organization_id}/"
-                    f"{claim_id}/"
-                    f"{uuid4()}.pdf"
-                ),
-                original_filename="evidence.pdf",
-                content_type="application/pdf",
-                size_bytes=100,
-                sha256_hex="c" * 64,
-                uploaded_by_user_id=None,
-            )
-        )
+    calls = {
+        child.func.id
+        for child in ast.walk(function_node)
+        if isinstance(child, ast.Call)
+        and isinstance(child.func, ast.Name)
+    }
 
-        db.commit()
-    finally:
-        db.close()
+    assert "download_compliance_evidence" in calls
+    assert "Response" in calls
 
-    monkeypatch.setattr(
-        "app.api.v1.endpoints.employer_compliance."
-        "generate_compliance_evidence_signed_url",
-        lambda **kwargs: (
-            "https://signed.example/admin-evidence"
-        ),
-    )
+    assert "private, no-store, max-age=0" in constants
+    assert "no-cache" in constants
+    assert "nosniff" in constants
+    assert "no-referrer" in constants
 
-    admin_headers = _admin_headers(
-        mock_supabase_auth,
-        monkeypatch,
-    )
+    function_source = ast.get_source_segment(
+        source,
+        function_node,
+    ) or ""
 
-    detail = client.get(
-        (
-            "/api/v1/admin/employer-compliance/"
-            f"claims/{claim['id']}"
-        ),
-        headers=admin_headers,
-    )
+    assert "evidence_url" not in function_source
+    assert "generate_compliance_evidence_signed_url" not in function_source
+    assert "create_signed_url" not in function_source
 
-    assert detail.status_code == 200
-    assert "signed.example" not in str(
-        detail.json()
-    )
-
-    access = client.get(
-        (
-            "/api/v1/admin/employer-compliance/"
-            f"claims/{claim['id']}/evidence/"
-            f"{evidence_id}/url"
-        ),
-        headers=admin_headers,
-    )
-
-    assert access.status_code == 200
-
-    assert access.json()["evidence_url"] == (
-        "https://signed.example/admin-evidence"
-    )
 
 
 def test_regular_responses_never_expose_raw_storage_path(

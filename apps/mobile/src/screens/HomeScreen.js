@@ -131,7 +131,7 @@ export default function HomeScreen({ navigation }) {
 
   // Derived from real backend profile state
   const hasAnalyzedCV = Boolean(
-    profile?.cv_url ||
+    profile?.has_cv ||
       (profile?.skills && profile.skills.length > 0) ||
       (profile?.education && profile.education.length > 0) ||
       (profile?.experience && profile.experience.length > 0) ||

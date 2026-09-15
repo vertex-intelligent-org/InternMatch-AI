@@ -10,9 +10,9 @@ import {
   RefreshControl,
   TouchableOpacity,
   Alert,
-  Linking,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as Sharing from 'expo-sharing';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import colors from '../theme/colors';
@@ -28,7 +28,8 @@ import MatchBadge from '../components/MatchBadge';
 import Reveal from '../components/motion/Reveal';
 import EmployerCandidateIntelligence from '../components/EmployerCandidateIntelligence';
 import {
-  getEmployerApplicantCV,
+  downloadEmployerApplicantCV,
+  deleteTemporaryEmployerApplicantCV,
   getEmployerApplicantDetail,
   updateEmployerApplicantStatus,
 } from '../services/api';
@@ -305,36 +306,58 @@ export default function EmployerApplicantDetailScreen({ route, navigation }) {
 
     setOpeningCV(true);
 
+    let localCV = null;
+
     try {
-      // Security: request the short-lived URL only when the employer explicitly
-      // asks to view the CV. The mobile client never receives the storage path.
-      const access = await getEmployerApplicantCV(
+      // Security boundary:
+      // CV bytes are fetched only through the authenticated InternMatch API.
+      // No storage-provider URL or storage token reaches the mobile client.
+      localCV = await downloadEmployerApplicantCV(
         internshipId,
         applicationId
       );
 
-      const url = access?.cv_url;
+      const sharingAvailable =
+        await Sharing.isAvailableAsync();
 
-      if (!url) {
-        throw new Error('Candidate CV URL was not returned.');
+      if (!sharingAvailable) {
+        throw new Error(
+          'A local document viewer is unavailable on this device.'
+        );
       }
 
-      const supported = await Linking.canOpenURL(url);
-
-      if (!supported) {
-        throw new Error('This CV link cannot be opened on this device.');
-      }
-
-      await Linking.openURL(url);
+      await Sharing.shareAsync(
+        localCV.uri,
+        {
+          mimeType: localCV.mime_type,
+          dialogTitle: t(
+            'employerCandidateEvidence.openCV',
+            'Open candidate CV'
+          ),
+        }
+      );
     } catch (cvError) {
       Alert.alert(
-        t('employerCandidateEvidence.cvErrorTitle', 'Unable to open CV'),
+        t(
+          'employerCandidateEvidence.cvErrorTitle',
+          'Unable to open CV'
+        ),
         t(
           'employerCandidateEvidence.cvErrorMessage',
           'The candidate CV is unavailable right now. Please try again.'
         )
       );
     } finally {
+      if (localCV?.uri) {
+        try {
+          await deleteTemporaryEmployerApplicantCV(
+            localCV.uri
+          );
+        } catch {
+          // Best-effort cache cleanup only.
+        }
+      }
+
       setOpeningCV(false);
     }
   }, [applicationId, internshipId, openingCV, t]);
@@ -1115,7 +1138,7 @@ export default function EmployerApplicantDetailScreen({ route, navigation }) {
                 <Text style={[styles.secureAccessNote, isRTL && styles.rtlText]}>
                   {t(
                     'employerCandidateEvidence.secureAccessNote',
-                    'CV access is private and temporary. A secure link is created only when you open the document.'
+                    'CV access is private and temporary. The document is fetched through InternMatch only when you open it; no storage-provider link is exposed.'
                   )}
                 </Text>
               </Card>

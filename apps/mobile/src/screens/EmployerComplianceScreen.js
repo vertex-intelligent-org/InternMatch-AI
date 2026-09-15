@@ -8,7 +8,6 @@ import React, {
 import {
   ActivityIndicator,
   Alert,
-  Linking,
   ScrollView,
   StyleSheet,
   Text,
@@ -17,6 +16,7 @@ import {
   View,
 } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
+import * as Sharing from 'expo-sharing';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -26,7 +26,8 @@ import { spacing } from '../theme/spacing';
 import {
   ApiError,
   createEmployerComplianceClaim,
-  getEmployerComplianceEvidenceAccess,
+  downloadEmployerComplianceEvidence,
+    deleteTemporaryComplianceEvidence,
   listEmployerComplianceClaims,
   submitEmployerComplianceClaim,
   updateEmployerComplianceClaim,
@@ -768,20 +769,36 @@ export default function EmployerComplianceScreen({
         return;
       }
 
-      setOpeningEvidenceId(
-        evidenceId
-      );
+      setOpeningEvidenceId(evidenceId);
       setErrorMessage(null);
 
+      let localEvidence = null;
+
       try {
-        const access =
-          await getEmployerComplianceEvidenceAccess(
+        localEvidence =
+          await downloadEmployerComplianceEvidence(
             selectedClaim.id,
             evidenceId
           );
 
-        await Linking.openURL(
-          access.evidence_url
+        const sharingAvailable =
+          await Sharing.isAvailableAsync();
+
+        if (!sharingAvailable) {
+          throw new Error(
+            'A local document viewer is unavailable.'
+          );
+        }
+
+        await Sharing.shareAsync(
+          localEvidence.uri,
+          {
+            mimeType: localEvidence.mime_type,
+            dialogTitle: t(
+              'employerCompliance.openEvidence',
+              'Open compliance evidence'
+            ),
+          }
         );
       } catch (error) {
         setErrorMessage(
@@ -789,10 +806,20 @@ export default function EmployerComplianceScreen({
             ? error.message
             : t(
                 'employerCompliance.openEvidenceError',
-                'The secure evidence link could not be opened.'
+                'This document could not be opened. You may not have permission, or it may no longer be available.'
               )
         );
       } finally {
+        if (localEvidence?.uri) {
+          try {
+            await deleteTemporaryComplianceEvidence(
+              localEvidence.uri
+            );
+          } catch {
+            // Best-effort temporary cache cleanup.
+          }
+        }
+
         setOpeningEvidenceId(null);
       }
     },

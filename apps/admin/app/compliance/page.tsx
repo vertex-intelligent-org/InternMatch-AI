@@ -14,7 +14,7 @@ import {
   ApiError,
   approveComplianceClaim,
   getComplianceClaimForReview,
-  getComplianceEvidenceAccess,
+  downloadComplianceEvidence,
   listComplianceClaimsForReview,
   rejectComplianceClaim,
   revokeComplianceClaim,
@@ -500,27 +500,55 @@ export default function AdminCompliancePage() {
     setOpeningEvidenceId(evidence.id);
     setPageError(null);
 
+    let objectUrl: string | null = null;
+
     try {
-      const access =
-        await getComplianceEvidenceAccess(
+      const blob =
+        await downloadComplianceEvidence(
           selected.id,
           evidence.id
         );
 
+      objectUrl =
+        URL.createObjectURL(blob);
+
       if (popup) {
         popup.location.href =
-          access.evidence_url;
+          objectUrl;
       } else {
-        window.location.href =
-          access.evidence_url;
+        window.open(
+          objectUrl,
+          '_blank',
+          'noopener,noreferrer'
+        );
       }
+
+      const disposableUrl =
+        objectUrl;
+
+      window.setTimeout(
+        () => {
+          URL.revokeObjectURL(
+            disposableUrl
+          );
+        },
+        60_000
+      );
     } catch (error) {
       if (popup) {
         popup.close();
       }
 
       if (!handleProtectedFailure(error)) {
-        setPageError(errorMessage(error));
+        setPageError(
+          error instanceof ApiError
+            && (
+              error.status === 403
+              || error.status === 404
+            )
+            ? 'This document is unavailable or you do not have permission to access it.'
+            : errorMessage(error)
+        );
       }
     } finally {
       setOpeningEvidenceId(null);

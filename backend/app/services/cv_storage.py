@@ -14,7 +14,6 @@ from supabase import create_client
 from app.core.config import settings
 
 MAX_CV_SIZE_BYTES: int = 10 * 1024 * 1024  # 10 MiB
-CV_SIGNED_URL_EXPIRY_SECONDS: int = 300  # 5 minutes
 
 ALLOWED_MIME_EXTENSIONS = {
     "application/pdf": "pdf",
@@ -212,98 +211,6 @@ def download_candidate_cv(
 
     return res
 
-
-
-def generate_candidate_cv_signed_url(
-    *,
-    user_id: UUID,
-    storage_path: str,
-    expires_in: int = CV_SIGNED_URL_EXPIRY_SECONDS,
-) -> str:
-    """
-    Generate a short-lived URL for a candidate CV in the private storage bucket.
-
-    Security boundary:
-    - target user_id must be a UUID
-    - storage path must belong to that exact user ({user_id}/...)
-    - only supported CV extensions are allowed
-    - caller must perform application/employer authorization before invoking this
-    - raw storage paths are never intended to be exposed to clients
-    """
-    if not isinstance(user_id, UUID):
-        raise CVStorageValidationError("user_id must be a valid UUID")
-
-    if not isinstance(storage_path, str) or not storage_path.strip():
-        raise CVStorageValidationError("storage_path cannot be empty")
-
-    if not isinstance(expires_in, int) or expires_in < 60 or expires_in > 900:
-        raise CVStorageValidationError(
-            "CV signed URL expiry must be between 60 and 900 seconds"
-        )
-
-    clean_path = storage_path.strip()
-    expected_prefix = f"{user_id}/"
-
-    if not clean_path.startswith(expected_prefix):
-        raise CVStorageValidationError(
-            "Unauthorized storage path access: CV does not belong to target user"
-        )
-
-    if "." not in clean_path:
-        raise CVStorageValidationError("CV storage path is missing file extension")
-
-    extension = clean_path.rsplit(".", 1)[-1].lower()
-    if extension not in ("pdf", "docx"):
-        raise CVStorageValidationError(
-            f"Unsupported CV file extension '.{extension}'"
-        )
-
-    url = settings.SUPABASE_URL.strip() if settings.SUPABASE_URL else ""
-    key = (
-        settings.SUPABASE_SERVICE_ROLE_KEY.strip()
-        if settings.SUPABASE_SERVICE_ROLE_KEY
-        else ""
-    )
-    bucket = (
-        settings.CV_STORAGE_BUCKET.strip()
-        if settings.CV_STORAGE_BUCKET
-        else ""
-    )
-
-    if not url or "placeholder" in url.lower():
-        raise CVStorageValidationError(
-            "SUPABASE_URL configuration is missing or placeholder value"
-        )
-
-    if not key or "placeholder" in key.lower():
-        raise CVStorageValidationError(
-            "SUPABASE_SERVICE_ROLE_KEY configuration is missing or placeholder value"
-        )
-
-    if not bucket:
-        raise CVStorageValidationError(
-            "CV_STORAGE_BUCKET configuration is missing or empty"
-        )
-
-    supabase = create_client(url, key)
-    result = supabase.storage.from_(bucket).create_signed_url(
-        clean_path,
-        expires_in,
-    )
-
-    signed_url = None
-
-    if isinstance(result, dict):
-        signed_url = result.get("signedURL") or result.get("signed_url")
-    elif hasattr(result, "signed_url"):
-        signed_url = result.signed_url
-
-    if not isinstance(signed_url, str) or not signed_url.strip():
-        raise CVStorageValidationError(
-            "Storage provider did not return a valid signed CV URL"
-        )
-
-    return signed_url.strip()
 
 def delete_candidate_cv(
     *,
