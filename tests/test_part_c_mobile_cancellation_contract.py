@@ -107,3 +107,21 @@ def test_existing_cancel_copy_exists_in_all_locales():
         assert "cancelling:" in source
         assert "failedTitle:" in source
         assert "failedMessage:" in source
+
+def test_why_you_match_cancel_confirmation_imports_alert():
+    """Cancel confirmation must never crash because Alert is undefined."""
+    from pathlib import Path
+
+    source = Path(
+        "apps/mobile/src/screens/WhyYouMatchScreen.js"
+    ).read_text(encoding="utf-8")
+
+    react_native_import = source.split(
+        "} from 'react-native';",
+        1,
+    )[0]
+
+    assert "Alert," in react_native_import
+    assert "Alert.alert(" in source
+    assert "requestExplanationCancellation" in source
+    assert "cancelExplanationJob()" in source

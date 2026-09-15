@@ -349,3 +349,141 @@ def test_translate_internship_content_corrupted_cache_recovers_cleanly(monkeypat
     assert res_desc == "Backend servisleri gelistirin."
     assert res_edu == "Bilgisayar Bilimleri"
     assert fake_redis.store[cache_key] == gemini_return.model_dump_json()
+
+def test_mobile_locale_files_have_no_repeated_question_mark_corruption():
+    """Locale files must not ship mojibake-style repeated question marks."""
+    from pathlib import Path
+
+    for locale in ("ar", "tr"):
+        source = Path(
+            f"apps/mobile/src/localization/locales/{locale}.js"
+        ).read_text(encoding="utf-8")
+
+        assert "??" not in source
+
+
+def test_mobile_locale_key_parity_for_ar_en_tr():
+    """Arabic, English, and Turkish locale objects must expose the same keys."""
+    import json
+    import subprocess
+    import textwrap
+
+    script = textwrap.dedent(
+        r"""
+        const fs = require("fs");
+        const vm = require("vm");
+        const path = require("path");
+
+        const files = {
+          ar: path.join("apps/mobile/src/localization/locales/ar.js"),
+          en: path.join("apps/mobile/src/localization/locales/en.js"),
+          tr: path.join("apps/mobile/src/localization/locales/tr.js"),
+        };
+
+        function loadLocale(file) {
+          let source = fs.readFileSync(file, "utf8");
+          source = source.replace(/^\s*export\s+default\s+/, "module.exports = ");
+          const sandbox = { module: { exports: {} }, exports: {} };
+          vm.runInNewContext(source, sandbox, { filename: file, timeout: 3000 });
+          return sandbox.module.exports;
+        }
+
+        function flatten(value, prefix = "", output = []) {
+          if (value === null || typeof value !== "object" || Array.isArray(value)) {
+            if (prefix) output.push(prefix);
+            return output;
+          }
+
+          for (const key of Object.keys(value)) {
+            const full = prefix ? `${prefix}.${key}` : key;
+            const child = value[key];
+
+            if (child !== null && typeof child === "object" && !Array.isArray(child)) {
+              flatten(child, full, output);
+            } else {
+              output.push(full);
+            }
+          }
+
+          return output;
+        }
+
+        const keys = {};
+        for (const [locale, file] of Object.entries(files)) {
+          keys[locale] = new Set(flatten(loadLocale(file)));
+        }
+
+        const union = new Set([...keys.ar, ...keys.en, ...keys.tr]);
+        const mismatches = [];
+
+        for (const key of [...union].sort()) {
+          const missing = [];
+          for (const locale of ["ar", "en", "tr"]) {
+            if (!keys[locale].has(key)) missing.push(locale);
+          }
+          if (missing.length) {
+            mismatches.push({ key, missing });
+          }
+        }
+
+        console.log(JSON.stringify(mismatches));
+        process.exit(mismatches.length === 0 ? 0 : 1);
+        """
+    )
+
+    result = subprocess.run(
+        ["node", "-e", script],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert json.loads(result.stdout) == []
+
+def test_turkish_high_risk_locale_blocks_have_no_encoding_loss():
+    """Critical Turkish locale blocks must not contain encoding-loss markers."""
+    from pathlib import Path
+    import re
+
+    source = Path(
+        "apps/mobile/src/localization/locales/tr.js"
+    ).read_text(encoding="utf-8")
+
+    top = list(
+        re.finditer(
+            r"(?m)^  ([A-Za-z][A-Za-z0-9_]*): \{",
+            source,
+        )
+    )
+
+    blocks = []
+
+    for index, match in enumerate(top):
+        key = match.group(1)
+
+        if key not in {
+            "applicationDetail",
+            "employerProduct",
+            "employerCompliance",
+        }:
+            continue
+
+        start = match.start()
+        end = (
+            top[index + 1].start()
+            if index + 1 < len(top)
+            else len(source)
+        )
+
+        blocks.append((key, source[start:end]))
+
+    assert len(blocks) == 4
+
+    for key, block in blocks:
+        assert "??" not in block, key
+        assert re.search(
+            r"\?(?=\w)",
+            block,
+            re.UNICODE,
+        ) is None, key
