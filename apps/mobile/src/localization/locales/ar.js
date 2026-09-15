@@ -1403,6 +1403,18 @@ export default {
 },
 
   createOpportunity: {
+
+    listingCapacityChecking: 'جارٍ التحقق من حد نشر الفرص...',
+
+    listingLimitReachedTitle: 'تم استخدام حد النشر المجاني',
+
+    listingLimitReachedMessage: 'جهتك موثقة، لكن خطة صاحب العمل المجانية تستخدم حاليًا {{count}} من أصل {{limit}} من فرص التدريب النشطة. اشترك في Employer Pro لنشر فرص إضافية.',
+
+    listingLimitReachedInline: 'تم استخدام مساحة النشر المجانية المتاحة لك. اشترك في Employer Pro لنشر فرصة إضافية.',
+
+    upgradeToPro: 'الترقية إلى Employer Pro',
+
+    reviewNotice: 'تُرسل الفرص الجديدة إلى مراجعة InternMatch قبل أن تظهر للطلاب.',
     title: 'إنشاء فرصة تدريبية',
     subtitle: 'انشر إعلان تدريب جديد',
     sectionBasic: 'المعلومات الأساسية',
@@ -1431,8 +1443,8 @@ export default {
     educationPlaceholder: 'مثال: طالب في السنة الثالثة أو الرابعة في علوم الحاسب',
     experienceRequirements: 'متطلبات الخبرة',
     experiencePlaceholder: 'مثال: خبرة في بناء مشاريع باستخدام Python',
-    publishBtn: 'نشر الفرصة',
-    publishing: 'جارٍ النشر...',
+    publishBtn: 'إرسال للمراجعة',
+    publishing: 'جارٍ الإرسال...',
     validationError: 'يرجى ملء جميع الحقول المطلوبة (المسمى الوظيفي، الشركة، الموقع، نوع العمل، الوصف).',
     successTitle: 'تم نشر الفرصة بنجاح',
     successMessage: 'إعلان التدريب متاح الآن للمرشحين.',

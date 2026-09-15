@@ -1442,6 +1442,18 @@ export default {
   },
 
   createOpportunity: {
+
+    listingCapacityChecking: 'Checking your publishing allowance...',
+
+    listingLimitReachedTitle: 'Free listing limit reached',
+
+    listingLimitReachedMessage: 'Your organization is verified, but your Employer Free plan already uses {{count}} of {{limit}} active internship slots. Upgrade to Employer Pro to publish additional opportunities.',
+
+    listingLimitReachedInline: 'Your free publishing slot is already in use. Upgrade to Employer Pro to publish another opportunity.',
+
+    upgradeToPro: 'Upgrade to Employer Pro',
+
+    reviewNotice: 'New opportunities are reviewed by InternMatch before they become visible to candidates.',
     title: 'Create Opportunity',
     subtitle: 'Publish a new internship listing',
     sectionBasic: 'Basic Information',
@@ -1470,8 +1482,8 @@ export default {
     educationPlaceholder: 'e.g. 3rd or 4th year Computer Science student',
     experienceRequirements: 'Experience Requirements',
     experiencePlaceholder: 'e.g. 1+ projects built with Python',
-    publishBtn: 'Publish Opportunity',
-    publishing: 'Publishing...',
+    publishBtn: 'Submit for review',
+    publishing: 'Submitting...',
     validationError: 'Please fill in all required fields (Title, Company, Location, Work Type, Description).',
     successTitle: 'Opportunity Published',
     successMessage: 'Your internship listing is now live and discoverable by candidates.',

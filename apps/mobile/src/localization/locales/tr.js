@@ -1442,6 +1442,18 @@ export default {
 },
 
   createOpportunity: {
+
+    listingCapacityChecking: 'İlan yayınlama hakkınız kontrol ediliyor...',
+
+    listingLimitReachedTitle: 'Ücretsiz ilan sınırına ulaşıldı',
+
+    listingLimitReachedMessage: "Kuruluşunuz doğrulanmış durumda, ancak Employer Free planınız {{limit}} aktif staj ilanı hakkının {{count}} tanesini kullanıyor. Ek ilan yayınlamak için Employer Pro'ya yükseltin.",
+
+    listingLimitReachedInline: "Ücretsiz yayınlama hakkınız kullanımda. Başka bir fırsat yayınlamak için Employer Pro'ya yükseltin.",
+
+    upgradeToPro: "Employer Pro'ya yükselt",
+
+    reviewNotice: 'Yeni fırsatlar adaylara görünmeden önce InternMatch incelemesine gönderilir.',
     title: 'Fırsat Oluştur',
     subtitle: 'Yeni bir staj ilanı yayınlayın',
     sectionBasic: 'Temel Bilgiler',
@@ -1470,8 +1482,8 @@ export default {
     educationPlaceholder: 'Örn. Bilgisayar Mühendisliği 3. veya 4. sınıf öğrencisi',
     experienceRequirements: 'Deneyim Gereksinimi',
     experiencePlaceholder: 'Örn. Python ile geliştirilmiş proje deneyimi',
-    publishBtn: 'Fırsatı Yayınla',
-    publishing: 'Yayınlanıyor...',
+    publishBtn: 'İncelemeye gönder',
+    publishing: 'Gönderiliyor...',
     validationError: 'Lütfen zorunlu alanları doldurun (Başlık, Şirket, Konum, Çalışma Modeli, Açıklama).',
     successTitle: 'Fırsat Yayınlandı',
     successMessage: 'Staj ilanınız başarıyla yayınlandı ve adayların erişimine açıldı.',

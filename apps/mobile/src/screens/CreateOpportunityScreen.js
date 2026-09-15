@@ -29,6 +29,9 @@ import {
   getInternshipDetail,
   updateEmployerInternship,
   ApiError,
+
+  getEmployerProductPolicy,
+  getEmployerPipelineAnalytics,
 } from '../services/api';
 
 const WORK_TYPES = [
@@ -82,6 +85,15 @@ export default function CreateOpportunityScreen({ navigation, route }) {
   const [fieldErrors, setFieldErrors] = useState({});
   const [verificationChecking, setVerificationChecking] = useState(true);
   const [verifiedOrganization, setVerifiedOrganization] = useState(null);
+  const [listingCapacity, setListingCapacity] = useState(null);
+  const [quotaChecking, setQuotaChecking] = useState(!isEditing);
+
+  const listingQuotaReached = Boolean(
+    !isEditing
+    && listingCapacity
+    && listingCapacity.limit !== null
+    && listingCapacity.count >= listingCapacity.limit
+  );
 
   const scrollRef = useRef(null);
   const titleRef = useRef(null);
@@ -134,7 +146,20 @@ export default function CreateOpportunityScreen({ navigation, route }) {
           err
         );
 
-        navigation.replace('EmployerVerification');
+        Alert.alert(
+          t(
+            'employerVerification.loadErrorTitle',
+            'Could not load verification'
+          ),
+          t(
+            'employerVerification.loadError',
+            'We could not load your organization verification status. Check your connection and try again.'
+          )
+        );
+
+        if (navigation.canGoBack()) {
+          navigation.goBack();
+        }
       } finally {
         if (active) {
           setVerificationChecking(false);
@@ -148,6 +173,77 @@ export default function CreateOpportunityScreen({ navigation, route }) {
       active = false;
     };
   }, [navigation]);
+
+  useEffect(() => {
+    if (isEditing || !verifiedOrganization) {
+      setQuotaChecking(false);
+      return undefined;
+    }
+
+    let active = true;
+
+    const loadListingCapacity = async () => {
+      setQuotaChecking(true);
+
+      try {
+        const [policy, analytics] = await Promise.all([
+          getEmployerProductPolicy(),
+          getEmployerPipelineAnalytics(),
+        ]);
+
+        if (!active) return;
+
+        const rawCount =
+          analytics?.listing_counts?.published ?? 0;
+
+        const count = Number.isFinite(
+          Number(rawCount)
+        )
+          ? Number(rawCount)
+          : 0;
+
+        const rawLimit =
+          policy?.active_listing_limit;
+
+        const limit =
+          rawLimit === null
+          || rawLimit === undefined
+            ? null
+            : Number(rawLimit);
+
+        setListingCapacity({
+          count,
+          limit:
+            Number.isFinite(limit)
+              ? limit
+              : null,
+          isPro:
+            policy?.plan === 'employer_pro'
+            || policy?.is_pro === true,
+        });
+      } catch (err) {
+        console.warn(
+          'Failed to load employer listing capacity:',
+          err
+        );
+
+        if (active) {
+          setListingCapacity(null);
+        }
+      } finally {
+        if (active) {
+          setQuotaChecking(false);
+        }
+      }
+    };
+
+    loadListingCapacity();
+
+    return () => {
+      active = false;
+    };
+  }, [isEditing, verifiedOrganization]);
+
 
   useEffect(() => {
     if (!verifiedOrganization) {
@@ -210,6 +306,42 @@ export default function CreateOpportunityScreen({ navigation, route }) {
 
   const handleSubmit = async () => {
     setErrorMessage(null);
+
+    if (!isEditing && listingQuotaReached) {
+      Alert.alert(
+        t(
+          'createOpportunity.listingLimitReachedTitle',
+          'Free listing limit reached'
+        ),
+        t(
+          'createOpportunity.listingLimitReachedMessage',
+          {
+            count: listingCapacity.count,
+            limit: listingCapacity.limit,
+          }
+        ),
+        [
+          {
+            text: t(
+              'common.cancel',
+              'Not now'
+            ),
+            style: 'cancel',
+          },
+          {
+            text: t(
+              'createOpportunity.upgradeToPro',
+              'Upgrade to Employer Pro'
+            ),
+            onPress: () => {
+              navigation.navigate('Plans');
+            },
+          },
+        ]
+      );
+
+      return;
+    }
 
     const trimmedTitle = title.trim();
     const trimmedCompany = company.trim();
@@ -413,6 +545,80 @@ export default function CreateOpportunityScreen({ navigation, route }) {
         alignment="center"
         bordered
       />
+
+        {!isEditing ? (
+          <Card padding="sm">
+            <Text
+              style={{
+                color: colors.textPrimary,
+                fontWeight: '700',
+                textAlign: isRTL ? 'right' : 'left',
+              }}
+            >
+              {quotaChecking
+                ? t(
+                    'createOpportunity.listingCapacityChecking',
+                    'Checking your publishing allowance...'
+                  )
+                : listingCapacity?.limit === null
+                  ? t(
+                      'employerProduct.workspace.multipleActiveInternships'
+                    )
+                  : listingCapacity
+                    ? t(
+                        'employerProduct.workspace.activeInternshipCapacity',
+                        {
+                          count: listingCapacity.count,
+                          limit: listingCapacity.limit,
+                        }
+                      )
+                    : t(
+                        'employerProduct.workspace.unavailable'
+                      )}
+            </Text>
+
+            <Text
+              style={{
+                color: listingQuotaReached
+                  ? colors.error
+                  : colors.textSecondary,
+                marginTop: spacing.xs,
+                textAlign: isRTL ? 'right' : 'left',
+              }}
+            >
+              {listingQuotaReached
+                ? t(
+                    'createOpportunity.listingLimitReachedInline',
+                    'Your free publishing slot is already in use. Upgrade to Employer Pro to publish another opportunity.'
+                  )
+                : t(
+                    'createOpportunity.reviewNotice',
+                    'New opportunities are reviewed by InternMatch before they become visible to candidates.'
+                  )}
+            </Text>
+
+            {listingQuotaReached ? (
+              <Text
+                accessibilityRole="button"
+                onPress={() => {
+                  navigation.navigate('Plans');
+                }}
+                style={{
+                  color: colors.accentStrong || colors.tealDark,
+                  fontWeight: '800',
+                  marginTop: spacing.sm,
+                  textAlign: isRTL ? 'right' : 'left',
+                }}
+              >
+                {t(
+                  'createOpportunity.upgradeToPro',
+                  'Upgrade to Employer Pro'
+                )}
+              </Text>
+            ) : null}
+          </Card>
+        ) : null}
+
 
       <KeyboardAvoidingView
         style={styles.flex}

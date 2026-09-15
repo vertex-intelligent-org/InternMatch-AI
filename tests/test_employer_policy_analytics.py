@@ -133,6 +133,12 @@ def test_pipeline_analytics_is_current_state_and_tenant_scoped():
         application_result,
     ]
 
+    # Raw publication_status contains two "published" rows,
+    # but only one satisfies the canonical candidate/public
+    # visibility predicate. This intentionally models the
+    # historical Admin 38 vs Candidate 35 class of mismatch.
+    db.scalar.return_value = 1
+
     result = get_employer_pipeline_analytics(
         db,
         employer_user_id=employer_id,
@@ -143,7 +149,9 @@ def test_pipeline_analytics_is_current_state_and_tenant_scoped():
     )
     assert result.total_listings == 4
     assert result.draft_listings == 1
-    assert result.published_listings == 2
+    # Published analytics are candidate-visible listings,
+    # not the raw publication_status bucket.
+    assert result.published_listings == 1
     assert result.closed_listings == 1
 
     assert (
@@ -171,6 +179,16 @@ def test_pipeline_analytics_is_current_state_and_tenant_scoped():
     ]
 
     assert len(statements) == 2
+
+    assert db.scalar.call_count == 1
+
+    visible_statement = str(
+        db.scalar.call_args.args[0]
+    )
+
+    assert "employer_user_id" in visible_statement
+    assert "publication_status" in visible_statement
+    assert "listing_source" in visible_statement
 
     assert all(
         "employer_user_id" in statement

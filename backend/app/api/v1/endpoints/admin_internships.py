@@ -41,12 +41,21 @@ def list_admin_internships(
     db: Session = Depends(get_db),
 ):
     """List internship listings across all publication states."""
-    items, total = InternshipRepository.list_for_admin(
-        db=db,
-        publication_status=publication_status,
-        limit=limit,
-        offset=offset,
-    )
+    if publication_status == "published":
+        # Published in the admin console means candidate-visible,
+        # not merely a raw database status label.
+        items, total = InternshipRepository.list_internships(
+            db=db,
+            limit=limit,
+            offset=offset,
+        )
+    else:
+        items, total = InternshipRepository.list_for_admin(
+            db=db,
+            publication_status=publication_status,
+            limit=limit,
+            offset=offset,
+        )
 
     return InternshipListResponse(
         items=[
@@ -236,3 +245,121 @@ def reopen_admin_internship(
         raise
 
     return InternshipDetailResponse.from_orm_model(listing)
+
+
+@router.post(
+    "/{id}/approve",
+    response_model=InternshipDetailResponse,
+)
+def approve_admin_internship(
+    id: UUID,
+    _admin_user: AuthenticatedUser = Depends(
+        require_admin_user
+    ),
+    db: Session = Depends(get_db),
+):
+    """
+    Approve an employer-submitted listing after human review.
+
+    Publication still passes through the existing verified-organization and
+    employer-plan capacity checks used for administrative republication.
+    """
+    snapshot = InternshipRepository.get_by_id(
+        db=db,
+        internship_id=id,
+    )
+
+    if snapshot is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Internship listing not found.",
+        )
+
+    if snapshot.listing_source != "employer":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Only employer-submitted listings use "
+                "the review approval workflow."
+            ),
+        )
+
+    if snapshot.publication_status != "under_review":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Only listings currently under review "
+                "can be approved."
+            ),
+        )
+
+    # Reuse the established publication path so organization verification,
+    # row locking, plan capacity, rollback, and publication writes stay
+    # centralized rather than being duplicated here.
+    return reopen_admin_internship(
+        id=id,
+        _admin_user=_admin_user,
+        db=db,
+    )
+
+
+@router.post(
+    "/{id}/request-changes",
+    response_model=InternshipDetailResponse,
+)
+def request_changes_admin_internship(
+    id: UUID,
+    _admin_user: AuthenticatedUser = Depends(
+        require_admin_user
+    ),
+    db: Session = Depends(get_db),
+):
+    """
+    Return an employer-submitted listing to draft state for correction.
+
+    Draft listings remain hidden until the employer edits/resubmits them,
+    which moves them back to under_review.
+    """
+    listing = InternshipRepository.get_by_id_for_update(
+        db=db,
+        internship_id=id,
+    )
+
+    if listing is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Internship listing not found.",
+        )
+
+    if listing.listing_source != "employer":
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Only employer-submitted listings can "
+                "receive change requests."
+            ),
+        )
+
+    if listing.publication_status != "under_review":
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Only listings currently under review "
+                "can receive change requests."
+            ),
+        )
+
+    try:
+        listing.publication_status = "draft"
+        listing.is_active = False
+        db.commit()
+        db.refresh(listing)
+    except Exception:
+        db.rollback()
+        raise
+
+    return InternshipDetailResponse.from_orm_model(
+        listing
+    )

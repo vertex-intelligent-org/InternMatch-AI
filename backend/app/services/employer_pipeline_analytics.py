@@ -14,6 +14,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.db.models import Application, InternshipListing
+from app.repositories.internship import public_internship_visibility_condition
 
 
 class EmployerPipelineAnalyticsResponse(BaseModel):
@@ -80,6 +81,11 @@ def get_employer_pipeline_analytics(
         listing_stmt
     ).all()
 
+    raw_total_listings = sum(
+        int(count or 0)
+        for _, count in listing_rows
+    )
+
     listing_counts = {
         "draft": 0,
         "under_review": 0,
@@ -92,6 +98,23 @@ def get_employer_pipeline_analytics(
             listing_counts[publication_status] = int(
                 count or 0
             )
+
+    visible_published_stmt = (
+        select(func.count())
+        .select_from(InternshipListing)
+        .where(
+            InternshipListing.employer_user_id
+            == employer_user_id,
+            InternshipListing.listing_source
+            == "employer",
+            public_internship_visibility_condition(),
+        )
+    )
+
+    listing_counts["published"] = int(
+        db.scalar(visible_published_stmt)
+        or 0
+    )
 
     application_stmt = (
         select(
@@ -130,9 +153,7 @@ def get_employer_pipeline_analytics(
                 count or 0
             )
 
-    total_listings = sum(
-        listing_counts.values()
-    )
+    total_listings = raw_total_listings
 
     total_submitted = sum(
         application_counts.values()

@@ -179,8 +179,8 @@ class InternshipRepository:
             employer_user_id=employer_user_id,
             employer_organization_id=employer_organization_id,
             listing_source="employer",
-            publication_status="published",
-            is_active=True,
+            publication_status="under_review",
+            is_active=False,
             title=title,
             company=company,
             location=location,
@@ -214,8 +214,7 @@ class InternshipRepository:
                 == employer_user_id,
                 InternshipListing.listing_source
                 == "employer",
-                InternshipListing.publication_status
-                == "published",
+                public_internship_visibility_condition(),
             )
         )
 
@@ -308,6 +307,12 @@ class InternshipRepository:
 
         if description_embedding is not None:
             listing.description_embedding = description_embedding
+
+        # Any employer-authored content change invalidates prior publication
+        # approval. The listing must be reviewed again before candidates can
+        # discover or apply to it.
+        listing.publication_status = "under_review"
+        listing.is_active = False
 
         db.flush()
         return listing

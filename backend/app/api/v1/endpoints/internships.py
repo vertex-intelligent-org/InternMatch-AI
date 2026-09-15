@@ -427,9 +427,11 @@ def update_internship_opportunity(
     """
     Update an employer-owned internship opportunity.
 
-    Requires verified employer ownership. Ownership and publication state are
-    immutable through this endpoint. Description embeddings are regenerated
-    only when the canonical description changes.
+    Requires verified employer ownership. Ownership is immutable through this
+    endpoint. Any successful employer edit returns the listing to draft/hidden
+    state so administrative review is required again before publication.
+    Description embeddings are regenerated only when the canonical description
+    changes.
     """
 
     listing = InternshipRepository.get_by_id_and_owner(

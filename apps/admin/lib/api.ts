@@ -591,3 +591,34 @@ export async function getAdminUser(
     + encodeURIComponent(userId)
   );
 }
+
+
+export async function approveAdminInternship(
+  internshipId: string
+): Promise<AdminInternshipDetail> {
+  return adminApiRequest<AdminInternshipDetail>(
+    (
+      '/admin/internships/'
+      + encodeURIComponent(internshipId)
+      + '/approve'
+    ),
+    {
+      method: 'POST',
+    }
+  );
+}
+
+export async function requestChangesAdminInternship(
+  internshipId: string
+): Promise<AdminInternshipDetail> {
+  return adminApiRequest<AdminInternshipDetail>(
+    (
+      '/admin/internships/'
+      + encodeURIComponent(internshipId)
+      + '/request-changes'
+    ),
+    {
+      method: 'POST',
+    }
+  );
+}

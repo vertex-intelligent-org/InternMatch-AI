@@ -139,6 +139,23 @@ def _create_profile(
         db.close()
 
 
+
+def _publish_listing_for_test(listing_id):
+    """Test-only setup for behavior that requires an admin-published listing."""
+    with TestingSessionLocal() as db:
+        listing = db.get(
+            InternshipListing,
+            UUID(str(listing_id)),
+        )
+
+        assert listing is not None
+
+        listing.publication_status = "published"
+        listing.is_active = True
+
+        db.commit()
+
+
 # ==============================================================================
 # 1. AUTHENTICATION & ROLE LAW TESTS
 # ==============================================================================
@@ -203,14 +220,14 @@ def test_create_internship_forbidden_when_no_profile_exists(client: TestClient):
 # ==============================================================================
 
 
-def test_create_internship_success_and_immediate_publication(client: TestClient):
+def test_create_internship_is_hidden_until_admin_publication(client: TestClient):
     """
-    Verify employer can create an opportunity:
+    Verify employer submission enters mandatory moderation:
     - Returns 201 Created
-    - Sets employer_user_id server-side in DB (not exposed in public responses)
-    - Immediately visible in public GET /api/v1/internships
-    - Detail accessible via GET /api/v1/internships/{id}
-    - Privacy: employer_user_id is NOT exposed in POST, catalog GET, or detail GET
+    - Persists employer ownership server-side
+    - Starts under review and inactive
+    - Is hidden from candidate catalog and public detail until admin publication
+    - Does not expose employer_user_id
     """
     employer_user_id = uuid4()
     _create_profile(employer_user_id, "Acme Recruiter", account_type="employer")
@@ -247,7 +264,9 @@ def test_create_internship_success_and_immediate_publication(client: TestClient)
     assert created_data["languages"] == ["English"]
     assert created_data["min_education"] == "Computer Science student"
 
-    # Privacy check on POST response
+    # Moderation and privacy contract on POST response
+    assert created_data["publication_status"] == "under_review"
+    assert created_data["is_active"] is False
     assert "employer_user_id" not in created_data
     listing_id = UUID(created_data["id"])
 
@@ -257,27 +276,23 @@ def test_create_internship_success_and_immediate_publication(client: TestClient)
         persisted_listing = db.get(InternshipListing, listing_id)
         assert persisted_listing is not None
         assert persisted_listing.employer_user_id == employer_user_id
+        assert persisted_listing.publication_status == "under_review"
+        assert persisted_listing.is_active is False
         assert persisted_listing.description_embedding is not None
         assert len(persisted_listing.description_embedding) == settings.EMBEDDING_DIMENSION
     finally:
         db.close()
 
-    # 3. Immediately visible in public catalog without exposing employer_user_id
+    # 3. Hidden from candidate catalog until an admin publishes it
     res_list = client.get("/api/v1/internships")
     assert res_list.status_code == 200
     catalog = res_list.json()
-    assert catalog["total"] == 1
-    assert catalog["items"][0]["id"] == str(listing_id)
-    assert catalog["items"][0]["title"] == "Cloud Backend Intern"
-    assert "employer_user_id" not in catalog["items"][0]
+    assert catalog["total"] == 0
+    assert catalog["items"] == []
 
-    # 4. Accessible in public detail without exposing employer_user_id
+    # 4. Hidden from public detail until an admin publishes it
     res_detail = client.get(f"/api/v1/internships/{listing_id}")
-    assert res_detail.status_code == 200
-    detail = res_detail.json()
-    assert detail["id"] == str(listing_id)
-    assert detail["company"] == "Acme Corp"
-    assert "employer_user_id" not in detail
+    assert res_detail.status_code == 404
 
 
 def test_create_internship_input_validation(client: TestClient):
@@ -730,6 +745,9 @@ def test_employer_close_opportunity_success_and_catalog_exclusion(client: TestCl
     assert create_res.status_code == 201
     listing_id = create_res.json()["id"]
 
+    # Simulate completed admin moderation for this close-behavior test.
+    _publish_listing_for_test(listing_id)
+
     # Verify present in public catalog
     cat_res = client.get("/api/v1/internships")
     assert cat_res.status_code == 200
@@ -823,6 +841,9 @@ def test_candidate_submit_application_endpoint(client: TestClient):
         headers=emp_headers,
     )
     listing_id = UUID(create_res.json()["id"])
+
+    # Candidate submission is allowed only after administrative publication.
+    _publish_listing_for_test(listing_id)
 
     # Candidate profile
     candidate_id = uuid4()
@@ -1482,6 +1503,9 @@ def test_employer_can_update_owned_opportunity_without_changing_ownership(client
     created = create_response.json()
     listing_id = created["id"]
 
+    # Simulate a listing previously approved by an administrator.
+    _publish_listing_for_test(listing_id)
+
     update_response = client.patch(
         f"/api/v1/internships/{listing_id}",
         json={
@@ -1519,14 +1543,16 @@ def test_employer_can_update_owned_opportunity_without_changing_ownership(client
         updated["experience_requirements"]
         == "No prior professional experience required"
     )
-    assert updated["is_active"] is True
+    assert updated["publication_status"] == "under_review"
+    assert updated["is_active"] is False
 
     with TestingSessionLocal() as db:
         listing = db.get(InternshipListing, UUID(listing_id))
 
         assert listing is not None
         assert listing.employer_user_id == employer_id
-        assert listing.is_active is True
+        assert listing.publication_status == "under_review"
+        assert listing.is_active is False
 
 
 def test_employer_cannot_update_another_employers_opportunity(client):
@@ -1574,6 +1600,9 @@ def test_employer_cannot_update_another_employers_opportunity(client):
 
     listing_id = create_response.json()["id"]
 
+    # Existing admin approval must survive an unauthorized mutation attempt.
+    _publish_listing_for_test(listing_id)
+
     forbidden_update = client.patch(
         f"/api/v1/internships/{listing_id}",
         json={
@@ -1605,6 +1634,7 @@ def test_employer_cannot_update_another_employers_opportunity(client):
         assert listing.location == "Istanbul"
         assert listing.work_type == "hybrid"
         assert listing.required_skills == ["Python"]
+        assert listing.publication_status == "published"
         assert listing.is_active is True
 
 def test_update_opportunity_requires_authentication_and_employer_role(client):
@@ -1650,6 +1680,9 @@ def test_update_opportunity_requires_authentication_and_employer_role(client):
 
     listing_id = create_response.json()["id"]
 
+    # Existing admin approval must survive rejected authorization attempts.
+    _publish_listing_for_test(listing_id)
+
     update_payload = {
         "title": "Unauthorized Mutation Attempt",
         "company": "Secure Company",
@@ -1688,6 +1721,7 @@ def test_update_opportunity_requires_authentication_and_employer_role(client):
         assert listing.company == "Acme Corp"
         assert listing.location == "Istanbul"
         assert listing.work_type == "hybrid"
+        assert listing.publication_status == "published"
         assert listing.is_active is True
     finally:
         db.close()

@@ -14,6 +14,9 @@ import {
   getAdminInternship,
   listAdminInternships,
   reopenAdminInternship,
+
+  approveAdminInternship,
+  requestChangesAdminInternship,
 } from '../../lib/api';
 import {
   AdminConfigurationError,
@@ -484,6 +487,65 @@ export default function AdminListingsPage() {
           </button>
         </div>
       </main>
+    );
+  }
+
+  async function approveListing() {
+    if (
+      !selected
+      || selected.publication_status
+        !== 'closed'
+    ) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      (
+        'Reopen '
+        + selected.title
+        + '?'
+      )
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    await runMutation(
+      () => approveAdminInternship(
+        selected.id
+      ),
+      selected.title + ' was approve and published.'
+    );
+  }
+
+
+  async function requestListingChanges() {
+    if (
+      !selected
+      || selected.publication_status
+        === 'closed'
+    ) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      (
+        'Close '
+        + selected.title
+        + '? It will no longer be publicly available.'
+      )
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    await runMutation(
+      () => requestChangesAdminInternship(
+        selected.id
+      ),
+      selected.title + ' was returned for changes.'
     );
   }
 
@@ -1036,15 +1098,61 @@ export default function AdminListingsPage() {
                     </div>
                   </div>
 
-                  {selected.publication_status
-                    === 'closed' ? (
+                  {selected.publication_status === 'under_review' ? (
+                    <div className="actionForm">
+                      <div className="dangerNotice">
+                        This employer submission is hidden from candidates
+                        until an administrator approves it.
+                      </div>
+
+                      <div className="actionFooter">
+                        <span className="actionHint">
+                          Approval rechecks organization verification and
+                          the employer plan&apos;s active-listing capacity.
+                        </span>
+
+                        <button
+                          className="button buttonDanger"
+                          type="button"
+                          disabled={mutating}
+                          onClick={() => {
+                            void requestListingChanges();
+                          }}
+                        >
+                          {mutating
+                            ? 'Submitting...'
+                            : 'Request changes'}
+                        </button>
+
+                        <button
+                          className="button buttonPrimary"
+                          type="button"
+                          disabled={mutating}
+                          onClick={() => {
+                            void approveListing();
+                          }}
+                        >
+                          {mutating
+                            ? 'Submitting...'
+                            : 'Approve & publish'}
+                        </button>
+                      </div>
+                    </div>
+                  ) : selected.publication_status === 'draft' ? (
+                    <div className="actionForm">
+                      <div className="dangerNotice">
+                        Changes were requested or this listing is still a
+                        draft. It remains hidden until the employer edits
+                        and resubmits it for review.
+                      </div>
+                    </div>
+                  ) : selected.publication_status === 'closed' ? (
                     <div className="actionForm">
                       <div className="actionFooter">
                         <span className="actionHint">
-                          Employer-owned listings
-                          can reopen only when the
-                          bound organization is
-                          currently verified.
+                          Employer-owned listings can reopen only when the
+                          bound organization is currently verified and the
+                          active-listing plan limit permits publication.
                         </span>
 
                         <button
@@ -1064,17 +1172,14 @@ export default function AdminListingsPage() {
                   ) : (
                     <div className="actionForm">
                       <div className="dangerNotice">
-                        Closing removes this
-                        opportunity from public
-                        discovery while preserving
-                        historical applications.
+                        Closing removes this opportunity from public
+                        discovery while preserving historical applications.
                       </div>
 
                       <div className="actionFooter">
                         <span className="actionHint">
-                          The backend remains
-                          authoritative for the
-                          final publication state.
+                          Published here means candidate-visible under the
+                          same backend visibility rule used by the app.
                         </span>
 
                         <button
