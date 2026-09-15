@@ -530,8 +530,8 @@ def test_stale_version_is_rejected(
 
 
 def test_admin_evidence_access_is_brokered_and_on_demand_only():
-    from pathlib import Path
     import ast
+    from pathlib import Path
 
     source = Path(
         "backend/app/api/v1/endpoints/employer_compliance.py"

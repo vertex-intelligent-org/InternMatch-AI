@@ -443,8 +443,8 @@ def test_mobile_locale_key_parity_for_ar_en_tr():
 
 def test_turkish_high_risk_locale_blocks_have_no_encoding_loss():
     """Critical Turkish locale blocks must not contain encoding-loss markers."""
-    from pathlib import Path
     import re
+    from pathlib import Path
 
     source = Path(
         "apps/mobile/src/localization/locales/tr.js"

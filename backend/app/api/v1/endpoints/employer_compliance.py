@@ -1,4 +1,3 @@
-from fastapi.responses import Response
 """
 Employer compliance claim and evidence API.
 
@@ -47,6 +46,7 @@ from fastapi import (
     UploadFile,
     status,
 )
+from fastapi.responses import Response
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -879,16 +879,60 @@ async def upload_compliance_evidence(
     )
 
 
-@employer_router.get('/claims/{claim_id}/evidence/{evidence_id}/content')
-def download_my_compliance_evidence_content(claim_id: UUID, evidence_id: UUID, current_user: AuthenticatedUser=Depends(require_employer_user), db: Session=Depends(get_db)):
-    organization = _require_organization(db, current_user)
-    claim = _owned_claim(db, organization_id=organization.id, claim_id=claim_id)
-    evidence = _evidence_for_claim(db, claim_id=claim.id, evidence_id=evidence_id)
+@employer_router.get(
+    "/claims/{claim_id}/evidence/{evidence_id}/content"
+)
+def download_my_compliance_evidence_content(
+    claim_id: UUID,
+    evidence_id: UUID,
+    current_user: AuthenticatedUser = Depends(
+        require_employer_user
+    ),
+    db: Session = Depends(get_db),
+):
+    organization = _require_organization(
+        db,
+        current_user,
+    )
+    claim = _owned_claim(
+        db,
+        organization_id=organization.id,
+        claim_id=claim_id,
+    )
+    evidence = _evidence_for_claim(
+        db,
+        claim_id=claim.id,
+        evidence_id=evidence_id,
+    )
     try:
-        document_bytes = download_compliance_evidence(organization_id=organization.id, claim_id=claim.id, storage_path=evidence.storage_path)
+        document_bytes = download_compliance_evidence(
+            organization_id=organization.id,
+            claim_id=claim.id,
+            storage_path=evidence.storage_path,
+        )
     except ComplianceStorageValidationError:
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail='Compliance evidence is temporarily unavailable.')
-    return Response(content=document_bytes, media_type='application/pdf', headers={'Content-Disposition': 'inline; filename="compliance-evidence.pdf"', 'Cache-Control': 'private, no-store, max-age=0', 'Pragma': 'no-cache', 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer'})
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=(
+                "Compliance evidence is temporarily unavailable."
+            ),
+        )
+
+    return Response(
+        content=document_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": (
+                'inline; filename="compliance-evidence.pdf"'
+            ),
+            "Cache-Control": (
+                "private, no-store, max-age=0"
+            ),
+            "Pragma": "no-cache",
+            "X-Content-Type-Options": "nosniff",
+            "Referrer-Policy": "no-referrer",
+        },
+    )
 
 
 
@@ -1083,17 +1127,61 @@ def get_compliance_claim_for_review(
     )
 
 
-@admin_router.get('/claims/{claim_id}/evidence/{evidence_id}/content')
-def download_admin_compliance_evidence_content(claim_id: UUID, evidence_id: UUID, _admin_user: AuthenticatedUser=Depends(require_admin_user), db: Session=Depends(get_db)):
-    claim = EmployerComplianceRepository.get_claim(db, claim_id)
+@admin_router.get(
+    "/claims/{claim_id}/evidence/{evidence_id}/content"
+)
+def download_admin_compliance_evidence_content(
+    claim_id: UUID,
+    evidence_id: UUID,
+    _admin_user: AuthenticatedUser = Depends(
+        require_admin_user
+    ),
+    db: Session = Depends(get_db),
+):
+    claim = EmployerComplianceRepository.get_claim(
+        db,
+        claim_id,
+    )
     if claim is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Compliance claim not found.')
-    evidence = _evidence_for_claim(db, claim_id=claim.id, evidence_id=evidence_id)
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Compliance claim not found.",
+        )
+
+    evidence = _evidence_for_claim(
+        db,
+        claim_id=claim.id,
+        evidence_id=evidence_id,
+    )
     try:
-        document_bytes = download_compliance_evidence(organization_id=claim.organization_id, claim_id=claim.id, storage_path=evidence.storage_path)
+        document_bytes = download_compliance_evidence(
+            organization_id=claim.organization_id,
+            claim_id=claim.id,
+            storage_path=evidence.storage_path,
+        )
     except ComplianceStorageValidationError:
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail='Compliance evidence is temporarily unavailable.')
-    return Response(content=document_bytes, media_type='application/pdf', headers={'Content-Disposition': 'inline; filename="compliance-evidence.pdf"', 'Cache-Control': 'private, no-store, max-age=0', 'Pragma': 'no-cache', 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer'})
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=(
+                "Compliance evidence is temporarily unavailable."
+            ),
+        )
+
+    return Response(
+        content=document_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": (
+                'inline; filename="compliance-evidence.pdf"'
+            ),
+            "Cache-Control": (
+                "private, no-store, max-age=0"
+            ),
+            "Pragma": "no-cache",
+            "X-Content-Type-Options": "nosniff",
+            "Referrer-Policy": "no-referrer",
+        },
+    )
 
 
 

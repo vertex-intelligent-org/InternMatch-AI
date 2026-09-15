@@ -1,7 +1,6 @@
 import ast
 from pathlib import Path
 
-
 ENDPOINT_SOURCE = Path(
     "backend/app/api/v1/endpoints/internships.py"
 ).read_text(encoding="utf-8")

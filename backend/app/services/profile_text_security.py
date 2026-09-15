@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import re
 
-
 MAX_PUBLIC_HEADLINE_LENGTH = 160
 
 _CREDENTIAL_ASSIGNMENT_RE = re.compile(

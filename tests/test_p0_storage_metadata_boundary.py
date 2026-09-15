@@ -3,13 +3,12 @@ from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
-from pydantic import ValidationError
-
 from app.api.v1.endpoints.profile import (
     StudentProfileCreateUpdate,
     StudentProfileResponse,
 )
 from app.schemas.job import ProcessingJobResponse
+from pydantic import ValidationError
 
 
 def test_public_profile_write_rejects_client_cv_storage_path():

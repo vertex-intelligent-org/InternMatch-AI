@@ -1,6 +1,4 @@
 import pytest
-from pydantic import ValidationError
-
 from app.api.v1.endpoints.profile import (
     StudentProfileCreateUpdate,
 )
@@ -9,6 +7,7 @@ from app.services.profile_text_security import (
     normalize_public_profile_headline,
     sanitize_extracted_profile_headline,
 )
+from pydantic import ValidationError
 
 
 @pytest.mark.parametrize(

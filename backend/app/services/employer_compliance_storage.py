@@ -253,17 +253,34 @@ def store_compliance_evidence(
     )
 
 
-def download_compliance_evidence(*, organization_id: UUID, claim_id: UUID, storage_path: str) -> str:
-    if not isinstance(expires_in, int) or expires_in < 60 or expires_in > 900:
-        raise ComplianceStorageValidationError('Compliance evidence signed URL expiry must be between 60 and 900 seconds')
-    clean_path = _validate_storage_path(organization_id=organization_id, claim_id=claim_id, storage_path=storage_path)
+def download_compliance_evidence(
+    *,
+    organization_id: UUID,
+    claim_id: UUID,
+    storage_path: str,
+) -> bytes:
+    clean_path = _validate_storage_path(
+        organization_id=organization_id,
+        claim_id=claim_id,
+        storage_path=storage_path,
+    )
     url, key, bucket = _storage_config()
     client = create_client(url, key)
-    downloaded = client.storage.from_(bucket).download(clean_path)
+
+    downloaded = client.storage.from_(bucket).download(
+        clean_path
+    )
+
     if not isinstance(downloaded, (bytes, bytearray)):
-        raise ComplianceStorageValidationError('Storage provider did not return valid evidence bytes')
+        raise ComplianceStorageValidationError(
+            "Storage provider did not return valid evidence bytes"
+        )
+
     if not downloaded:
-        raise ComplianceStorageValidationError('Downloaded compliance evidence is empty')
+        raise ComplianceStorageValidationError(
+            "Downloaded compliance evidence is empty"
+        )
+
     return bytes(downloaded)
 
 
