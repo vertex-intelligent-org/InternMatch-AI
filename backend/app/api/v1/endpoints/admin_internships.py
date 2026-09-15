@@ -7,6 +7,7 @@ from app.core.security import AuthenticatedUser, require_admin_user
 from app.db.session import get_db
 from app.repositories.employer_organization import EmployerOrganizationRepository
 from app.repositories.internship import InternshipRepository
+from app.repositories.notification import NotificationRepository
 from app.schemas.internship import (
     InternshipDetailResponse,
     InternshipListResponse,
@@ -247,6 +248,7 @@ def reopen_admin_internship(
     return InternshipDetailResponse.from_orm_model(listing)
 
 
+
 @router.post(
     "/{id}/approve",
     response_model=InternshipDetailResponse,
@@ -261,8 +263,8 @@ def approve_admin_internship(
     """
     Approve an employer-submitted listing after human review.
 
-    Publication still passes through the existing verified-organization and
-    employer-plan capacity checks used for administrative republication.
+    Organization verification and active-listing capacity are rechecked under
+    the same publication transaction before the listing becomes public.
     """
     snapshot = InternshipRepository.get_by_id(
         db=db,
@@ -293,13 +295,124 @@ def approve_admin_internship(
             ),
         )
 
-    # Reuse the established publication path so organization verification,
-    # row locking, plan capacity, rollback, and publication writes stay
-    # centralized rather than being duplicated here.
-    return reopen_admin_internship(
-        id=id,
-        _admin_user=_admin_user,
-        db=db,
+    organization_id = (
+        snapshot.employer_organization_id
+    )
+
+    if organization_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Employer-owned listing is not bound "
+                "to an organization."
+            ),
+        )
+
+    organization = (
+        EmployerOrganizationRepository
+        .get_by_id_for_update(
+            db,
+            organization_id,
+        )
+    )
+
+    if (
+        organization is None
+        or organization.verification_status
+        != "verified"
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Employer organization must be "
+                "verified before publication."
+            ),
+        )
+
+    employer_user_id = (
+        snapshot.employer_user_id
+    )
+
+    if employer_user_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Employer-owned listing has no "
+                "authoritative employer owner."
+            ),
+        )
+
+    try:
+        require_employer_listing_capacity(
+            db,
+            user_id=employer_user_id,
+            exclude_internship_id=snapshot.id,
+        )
+    except EmployerListingLimitError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "The employer's current plan has no "
+                "capacity for another published internship."
+            ),
+        ) from exc
+
+    listing = (
+        InternshipRepository.get_by_id_for_update(
+            db=db,
+            internship_id=id,
+        )
+    )
+
+    if (
+        listing is None
+        or listing.publication_status
+        != "under_review"
+    ):
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Internship listing changed before "
+                "the approval action completed."
+            ),
+        )
+
+    try:
+        listing = (
+            InternshipRepository.reopen_listing(
+                db=db,
+                listing=listing,
+            )
+        )
+
+        NotificationRepository.create(
+            db,
+            recipient_user_id=employer_user_id,
+            event_type="listing_published",
+            entity_type="internship",
+            entity_id=listing.id,
+            data={
+                "internship_id": str(
+                    listing.id
+                ),
+                "publication_status": "published",
+            },
+            dedupe_key=(
+                f"internship:{listing.id}:"
+                "published:"
+                f"{listing.updated_at}"
+            ),
+        )
+
+        db.commit()
+        db.refresh(listing)
+    except Exception:
+        db.rollback()
+        raise
+
+    return InternshipDetailResponse.from_orm_model(
+        listing
     )
 
 
@@ -354,6 +467,25 @@ def request_changes_admin_internship(
     try:
         listing.publication_status = "draft"
         listing.is_active = False
+
+        if listing.employer_user_id is not None:
+            NotificationRepository.create(
+                db,
+                recipient_user_id=listing.employer_user_id,
+                event_type="listing_changes_requested",
+                entity_type="internship",
+                entity_id=listing.id,
+                data={
+                    "internship_id": str(listing.id),
+                    "publication_status": "draft",
+                },
+                dedupe_key=(
+                    f"internship:{listing.id}:"
+                    "changes-requested:"
+                    f"{listing.updated_at}"
+                ),
+            )
+
         db.commit()
         db.refresh(listing)
     except Exception:

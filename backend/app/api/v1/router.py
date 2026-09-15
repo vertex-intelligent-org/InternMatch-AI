@@ -12,6 +12,7 @@ from app.api.v1.endpoints import (
     internships,
     jobs,
     matches,
+    notifications,
     profile,
     saved_internships,
     subscriptions,
@@ -69,6 +70,14 @@ api_v1_router.include_router(
 api_v1_router.include_router(
     jobs.router, prefix="/jobs", tags=["Job Tracking"]
 )
+
+# Authenticated durable notification inbox and push devices.
+api_v1_router.include_router(
+    notifications.router,
+    prefix="/notifications",
+    tags=["Notification Operations"],
+)
+
 
 # Register candidate match engine router
 api_v1_router.include_router(

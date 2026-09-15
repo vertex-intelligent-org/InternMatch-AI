@@ -28,6 +28,7 @@ import EmployerApplicantDetailScreen from '../screens/EmployerApplicantDetailScr
 import PrivacyPolicyScreen from '../screens/PrivacyPolicyScreen';
 
 import TermsOfUseScreen from '../screens/TermsOfUseScreen';
+import NotificationsScreen from '../screens/NotificationsScreen';
 import {
   isPasswordRecoveryUrl,
   consumePasswordRecoveryUrl,
@@ -312,7 +313,13 @@ export default function RootNavigator() {
 
         <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} />
         <Stack.Screen name="TermsOfUse" component={TermsOfUseScreen} />
-      </Stack.Navigator>
+
+          <Stack.Screen
+            name="Notifications"
+            component={NotificationsScreen}
+            options={{ headerShown: false }}
+          />
+</Stack.Navigator>
     </NavigationContainer>
   );
 }

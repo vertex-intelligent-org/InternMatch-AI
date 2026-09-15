@@ -2055,3 +2055,102 @@ export async function apiRequest<T>(
     payload
   );
 }
+
+
+export type UserNotification = {
+  id: string;
+  event_type: string;
+  entity_type: string | null;
+  entity_id: string | null;
+  data: Record<string, unknown>;
+  read_at: string | null;
+  created_at: string;
+};
+
+export type NotificationListResponse = {
+  items: UserNotification[];
+  total: number;
+  unread_count: number;
+  limit: number;
+  offset: number;
+};
+
+export async function getNotifications(
+  limit = 30,
+  offset = 0
+): Promise<NotificationListResponse> {
+  const params = new URLSearchParams({
+    limit: String(limit),
+    offset: String(offset),
+  });
+
+  return apiRequest<NotificationListResponse>(
+    '/notifications?' + params.toString()
+  );
+}
+
+export async function getNotificationUnreadCount(): Promise<{
+  unread_count: number;
+}> {
+  return apiRequest<{ unread_count: number }>(
+    '/notifications/unread-count'
+  );
+}
+
+export async function markNotificationRead(
+  notificationId: string
+): Promise<UserNotification> {
+  return apiRequest<UserNotification>(
+    (
+      '/notifications/'
+      + encodeURIComponent(notificationId)
+      + '/read'
+    ),
+    {
+      method: 'POST',
+    }
+  );
+}
+
+export async function markAllNotificationsRead(): Promise<{
+  updated: number;
+  unread_count: number;
+}> {
+  return apiRequest<{
+    updated: number;
+    unread_count: number;
+  }>(
+    '/notifications/read-all',
+    {
+      method: 'POST',
+    }
+  );
+}
+
+export async function registerPushDevice(payload: {
+  expo_push_token: string;
+  platform: 'ios' | 'android';
+  locale: string;
+}): Promise<{ registered: boolean }> {
+  return apiRequest<{ registered: boolean }>(
+    '/notifications/devices',
+    {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }
+  );
+}
+
+export async function disablePushDevice(
+  expoPushToken: string
+): Promise<{ registered: boolean }> {
+  return apiRequest<{ registered: boolean }>(
+    '/notifications/devices',
+    {
+      method: 'DELETE',
+      body: JSON.stringify({
+        expo_push_token: expoPushToken,
+      }),
+    }
+  );
+}

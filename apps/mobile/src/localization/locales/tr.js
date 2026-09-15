@@ -1616,5 +1616,51 @@ export default {
     strengths: 'Öne Çıkarılacak Güçlü Yönler',
     questionsToAsk: 'Sorabileceğiniz Sorular',
     disclaimer: 'Bunlar yapay zeka tarafından oluşturulan hazırlık önerileridir; işverenin kesin olarak soracağı sorular değildir.',
-  }
+  },
+
+  notifications: {
+    title: 'Bildirimler',
+    unreadCount: '{{count}} okunmamış',
+    markAllRead: 'Tümünü okundu işaretle',
+    emptyTitle: 'Yeni bildiriminiz yok',
+    emptyBody: 'Başvuru ve işveren hesabı güncellemeleri burada görünecek.',
+    events: {
+      applicationSubmitted: {
+        title: 'Yeni başvuru',
+        body: 'Bir aday fırsatlarınızdan birine başvurdu.',
+      },
+      applicationStatus: {
+        title: 'Başvuru güncellendi',
+        body: 'Başvurunuzun durumu {{status}} olarak değişti.',
+      },
+      listingPublished: {
+        title: 'Fırsat yayınlandı',
+        body: 'Fırsatınız onaylandı ve artık adaylara görünür.',
+      },
+      listingChanges: {
+        title: 'Değişiklik istendi',
+        body: 'Fırsatınız yayınlanmadan önce değişiklik gerekiyor.',
+      },
+      organizationVerified: {
+        title: 'Kuruluş doğrulandı',
+        body: 'İşveren kuruluşunuz doğrulandı.',
+      },
+      organizationRejected: {
+        title: 'Doğrulama güncellemesi',
+        body: 'Kuruluş doğrulamanızla ilgilenmeniz gerekiyor.',
+      },
+      complianceApproved: {
+        title: 'Uyumluluk onaylandı',
+        body: 'Gönderdiğiniz uyumluluk kanıtı onaylandı.',
+      },
+      complianceRejected: {
+        title: 'Uyumluluk güncellemesi',
+        body: 'Gönderdiğiniz uyumluluk kanıtıyla ilgilenmeniz gerekiyor.',
+      },
+      default: {
+        title: 'InternMatch AI güncellemesi',
+        body: 'Hesabınız için yeni bir güncelleme var.',
+      },
+    },
+  },
 };

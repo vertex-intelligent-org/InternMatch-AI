@@ -1577,5 +1577,51 @@ export default {
     strengths: 'نقاط قوة لإبرازها',
     questionsToAsk: 'أسئلة يمكنك طرحها',
     disclaimer: 'هذه اقتراحات تحضيرية مولدة بالذكاء الاصطناعي، وليست أسئلة مضمونة من صاحب العمل.',
-  }
+  },
+
+  notifications: {
+    title: 'الإشعارات',
+    unreadCount: '{{count}} غير مقروء',
+    markAllRead: 'تحديد الكل كمقروء',
+    emptyTitle: 'لا توجد إشعارات جديدة',
+    emptyBody: 'ستظهر هنا تحديثات الطلبات ونشاط حساب صاحب العمل.',
+    events: {
+      applicationSubmitted: {
+        title: 'طلب جديد',
+        body: 'قدّم مرشح طلباً على إحدى فرصك.',
+      },
+      applicationStatus: {
+        title: 'تم تحديث الطلب',
+        body: 'تغيّرت حالة طلبك إلى {{status}}.',
+      },
+      listingPublished: {
+        title: 'تم نشر الفرصة',
+        body: 'تمت الموافقة على فرصتك وأصبحت ظاهرة للمرشحين.',
+      },
+      listingChanges: {
+        title: 'مطلوب تعديلات',
+        body: 'تحتاج فرصتك إلى تعديلات قبل أن يتم نشرها.',
+      },
+      organizationVerified: {
+        title: 'تم توثيق المؤسسة',
+        body: 'تم توثيق مؤسسة صاحب العمل الخاصة بك.',
+      },
+      organizationRejected: {
+        title: 'تحديث التوثيق',
+        body: 'يحتاج طلب توثيق مؤسستك إلى مراجعتك.',
+      },
+      complianceApproved: {
+        title: 'تمت الموافقة على الامتثال',
+        body: 'تمت الموافقة على مستندات الامتثال المقدمة.',
+      },
+      complianceRejected: {
+        title: 'تحديث الامتثال',
+        body: 'تحتاج مستندات الامتثال المقدمة إلى مراجعتك.',
+      },
+      default: {
+        title: 'تحديث من InternMatch AI',
+        body: 'يوجد تحديث جديد لحسابك.',
+      },
+    },
+  },
 };

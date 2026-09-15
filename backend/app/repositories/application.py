@@ -15,6 +15,7 @@ from app.db.models import (
     Match,
     StudentProfile,
 )
+from app.repositories.notification import NotificationRepository
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -152,6 +153,12 @@ class ApplicationRepository:
             ApplicationRepository.record_status_event(
                 db=db,
                 application_id=application.id,
+                status=status,
+            )
+
+            NotificationRepository.emit_application_status(
+                db,
+                application=application,
                 status=status,
             )
 

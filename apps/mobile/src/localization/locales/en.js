@@ -1616,5 +1616,51 @@ export default {
     strengths: 'Strengths to Highlight',
     questionsToAsk: 'Questions You Can Ask',
     disclaimer: 'These are AI-generated preparation suggestions, not guaranteed employer questions.',
-  }
+  },
+
+  notifications: {
+    title: 'Notifications',
+    unreadCount: '{{count}} unread',
+    markAllRead: 'Mark all read',
+    emptyTitle: 'You are all caught up',
+    emptyBody: 'Application and employer activity will appear here.',
+    events: {
+      applicationSubmitted: {
+        title: 'New application',
+        body: 'A candidate submitted an application to one of your opportunities.',
+      },
+      applicationStatus: {
+        title: 'Application updated',
+        body: 'Your application status changed to {{status}}.',
+      },
+      listingPublished: {
+        title: 'Opportunity published',
+        body: 'Your opportunity was approved and is now visible to candidates.',
+      },
+      listingChanges: {
+        title: 'Changes requested',
+        body: 'Your opportunity needs changes before it can be published.',
+      },
+      organizationVerified: {
+        title: 'Organization verified',
+        body: 'Your employer organization has been verified.',
+      },
+      organizationRejected: {
+        title: 'Verification update',
+        body: 'Your organization verification needs attention.',
+      },
+      complianceApproved: {
+        title: 'Compliance approved',
+        body: 'Your submitted compliance evidence was approved.',
+      },
+      complianceRejected: {
+        title: 'Compliance update',
+        body: 'Your submitted compliance evidence needs attention.',
+      },
+      default: {
+        title: 'InternMatch AI update',
+        body: 'There is a new update for your account.',
+      },
+    },
+  },
 };

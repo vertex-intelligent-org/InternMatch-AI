@@ -244,10 +244,40 @@ def test_gate5_admin_review_and_visibility_integrity_contract():
         in admin_source
     )
 
+    approve_start = admin_source.index(
+        "def approve_admin_internship("
+    )
+    approve_end = admin_source.index(
+        "def request_changes_admin_internship(",
+        approve_start,
+    )
+    approve_block = admin_source[
+        approve_start:approve_end
+    ]
+
+    # Approval is a distinct under_review -> published transition.
+    # It must not delegate into the closed-listing reopen route.
+    assert (
+        'publication_status != "under_review"'
+        in approve_block
+    )
+    assert (
+        "require_employer_listing_capacity("
+        in approve_block
+    )
+    assert (
+        "get_by_id_for_update("
+        in approve_block
+    )
+    assert (
+        "InternshipRepository.reopen_listing("
+        in approve_block
+    )
     assert (
         "return reopen_admin_internship("
-        in admin_source
+        not in approve_block
     )
+
 
     list_start = admin_source.index(
         "def list_admin_internships("

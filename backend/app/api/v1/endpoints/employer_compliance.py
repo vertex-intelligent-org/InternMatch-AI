@@ -30,6 +30,7 @@ from app.repositories.employer_compliance import (
 from app.repositories.employer_organization import (
     EmployerOrganizationRepository,
 )
+from app.repositories.notification import NotificationRepository
 from app.services.employer_compliance_storage import (
     MAX_COMPLIANCE_EVIDENCE_SIZE_BYTES,
     ComplianceStorageValidationError,
@@ -1274,6 +1275,27 @@ def approve_compliance_claim(
             internal_note=internal_note,
         )
 
+        NotificationRepository.create_for_organization_owner(
+            db,
+            organization_id=claim.organization_id,
+            event_type="compliance_approved",
+            entity_type="employer_compliance_claim",
+            entity_id=claim.id,
+            data={
+                "claim_id": str(
+                    claim.id
+                ),
+                "organization_id": str(
+                    claim.organization_id
+                ),
+                "status": "approved",
+            },
+            dedupe_key=(
+                f"compliance:{claim.id}:"
+                f"approved:v{claim.version}"
+            ),
+        )
+
         db.commit()
         db.refresh(claim)
     except Exception:
@@ -1365,6 +1387,27 @@ def reject_compliance_claim(
             new_status="rejected",
             reason_code=payload.reason_code,
             internal_note=internal_note,
+        )
+
+        NotificationRepository.create_for_organization_owner(
+            db,
+            organization_id=claim.organization_id,
+            event_type="compliance_rejected",
+            entity_type="employer_compliance_claim",
+            entity_id=claim.id,
+            data={
+                "claim_id": str(
+                    claim.id
+                ),
+                "organization_id": str(
+                    claim.organization_id
+                ),
+                "status": "rejected",
+            },
+            dedupe_key=(
+                f"compliance:{claim.id}:"
+                f"rejected:v{claim.version}"
+            ),
         )
 
         db.commit()

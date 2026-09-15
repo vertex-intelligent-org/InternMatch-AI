@@ -1451,3 +1451,94 @@ class RevenueCatWebhookEvent(Base):
     processed_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+
+
+class UserNotification(Base):
+    """
+    Durable user-facing event notification.
+
+    The backend owns event identity/read state. Clients localize presentation
+    from event_type + data_json and may not select another recipient.
+    """
+
+    __tablename__ = "user_notifications"
+
+    id: Mapped[UUID] = mapped_column(
+        primary_key=True,
+        default=uuid4,
+    )
+    recipient_user_id: Mapped[UUID] = mapped_column(
+        nullable=False,
+        index=True,
+    )
+    event_type: Mapped[str] = mapped_column(
+        nullable=False,
+        index=True,
+    )
+    entity_type: Mapped[Optional[str]] = mapped_column(
+        nullable=True,
+    )
+    entity_id: Mapped[Optional[UUID]] = mapped_column(
+        nullable=True,
+        index=True,
+    )
+    data_json: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+        default="{}",
+    )
+    dedupe_key: Mapped[Optional[str]] = mapped_column(
+        nullable=True,
+        unique=True,
+    )
+    read_at: Mapped[Optional[datetime]] = mapped_column(
+        nullable=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc),
+        index=True,
+    )
+
+
+class PushDevice(Base):
+    """
+    Authenticated Expo push-device registration.
+
+    Tokens belong only to the JWT user that registered them. Delivery is added
+    in Gate 6B; this table establishes the durable device/locale boundary now.
+    """
+
+    __tablename__ = "push_devices"
+
+    id: Mapped[UUID] = mapped_column(
+        primary_key=True,
+        default=uuid4,
+    )
+    user_id: Mapped[UUID] = mapped_column(
+        nullable=False,
+        index=True,
+    )
+    expo_push_token: Mapped[str] = mapped_column(
+        nullable=False,
+        unique=True,
+    )
+    platform: Mapped[str] = mapped_column(
+        nullable=False,
+    )
+    locale: Mapped[str] = mapped_column(
+        nullable=False,
+        default="en",
+    )
+    enabled: Mapped[bool] = mapped_column(
+        nullable=False,
+        default=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc),
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc),
+    )

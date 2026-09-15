@@ -21,6 +21,7 @@ from app.db.session import get_db
 from app.repositories.employer_organization import (
     EmployerOrganizationRepository,
 )
+from app.repositories.notification import NotificationRepository
 from fastapi import (
     APIRouter,
     Depends,
@@ -720,6 +721,25 @@ def approve_organization(
             )
         )
 
+        NotificationRepository.create(
+            db,
+            recipient_user_id=organization.owner_user_id,
+            event_type="organization_verified",
+            entity_type="employer_organization",
+            entity_id=organization.id,
+            data={
+                "organization_id": str(
+                    organization.id
+                ),
+                "verification_status": "verified",
+            },
+            dedupe_key=(
+                f"organization:{organization.id}:"
+                "verification:verified:"
+                f"{now.isoformat()}"
+            ),
+        )
+
         db.commit()
         db.refresh(organization)
     except Exception:
@@ -782,6 +802,25 @@ def reject_organization(
             reason_code=payload.reason_code,
             internal_note=_clean_optional(
                 payload.internal_note
+            ),
+        )
+
+        NotificationRepository.create(
+            db,
+            recipient_user_id=organization.owner_user_id,
+            event_type="organization_rejected",
+            entity_type="employer_organization",
+            entity_id=organization.id,
+            data={
+                "organization_id": str(
+                    organization.id
+                ),
+                "verification_status": "rejected",
+            },
+            dedupe_key=(
+                f"organization:{organization.id}:"
+                "verification:rejected:"
+                f"{now.isoformat()}"
             ),
         )
 
