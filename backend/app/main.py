@@ -4,6 +4,8 @@ Authors: Mohammad & Selen (AISS Club — Üsküdar University)
 """
 
 from contextlib import asynccontextmanager
+from time import perf_counter
+from uuid import uuid4
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -74,6 +76,42 @@ async def handle_ai_idempotency_conflict(
         status_code=409,
         content=format_ai_idempotency_conflict_payload(),
     )
+
+@app.middleware("http")
+async def add_request_observability(
+    request: Request,
+    call_next,
+):
+    """Attach a safe correlation ID and emit request lifecycle logs."""
+    request_id = uuid4().hex
+    request.state.request_id = request_id
+    started_at = perf_counter()
+
+    try:
+        response = await call_next(request)
+    except Exception:
+        duration_ms = (perf_counter() - started_at) * 1000
+        logger.exception(
+            "request_failed request_id=%s method=%s path=%s duration_ms=%.2f",
+            request_id,
+            request.method,
+            request.url.path,
+            duration_ms,
+        )
+        raise
+
+    response.headers["X-Request-ID"] = request_id
+    duration_ms = (perf_counter() - started_at) * 1000
+    logger.info(
+        "request_completed request_id=%s method=%s path=%s status_code=%s duration_ms=%.2f",
+        request_id,
+        request.method,
+        request.url.path,
+        response.status_code,
+        duration_ms,
+    )
+
+    return response
 
 @app.middleware("http")
 async def add_security_headers(
