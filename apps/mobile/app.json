@@ -1,87 +1,95 @@
 {
-  "expo": {
-    "name": "InternMatch AI",
-    "slug": "internmatch-ai",
-    "scheme": "internmatch",
-    "version": "1.0.0",
-    "orientation": "portrait",
-    "platforms": [
-      "ios",
-      "android"
-    ],
-    "android": {
-      "package": "com.aissclub.internmatchai",
-      "intentFilters": [
-        {
-          "action": "VIEW",
-          "autoVerify": true,
-          "data": [
-            {
-              "scheme": "https",
-              "host": "internmatch.college",
-              "pathPrefix": "/auth/confirmed"
-            },
-            {
-              "scheme": "https",
-              "host": "internmatch.college",
-              "pathPrefix": "/auth/reset-password"
-            }
-          ],
-          "category": [
-            "BROWSABLE",
-            "DEFAULT"
-          ]
-        }
-      ],
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/branding/adaptive-icon-foreground.png",
-        "backgroundColor": "#0B5F70"
-      }
-    },
-    "plugins": [
-      [
-        "expo-notifications",
-        {
-          "defaultChannel": "general"
-        }
-      ],
-      "expo-asset",
-      "expo-font",
-      "expo-localization",
-      "expo-web-browser",
-      [
-        "expo-build-properties",
-        {
-          "android": {
-            "usesCleartextTraffic": true
-          }
-        }
-      ],
-      "expo-apple-authentication",
-      [
-        "expo-splash-screen",
-        {
-          "backgroundColor": "#075E6E",
-          "image": "./assets/branding/splash-icon.png",
-          "imageWidth": 180,
-          "resizeMode": "contain"
-        }
-      ]
-    ],
-    "extra": {
-      "eas": {
-        "projectId": "0c2b7e7c-71da-4236-951b-0580ef71476e"
-      }
-    },
-    "owner": "aiss-uskudar",
-    "ios": {
-      "bundleIdentifier": "com.aissclub.internmatchai",
-      "usesAppleSignIn": true,
-      "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
-      },
-      "icon": "./assets/branding/app-icon.png"
-    },
-    "icon": "./assets/branding/app-icon.png"
-  }
+    "expo":  {
+                 "name":  "InternMatch AI",
+                 "slug":  "internmatch-ai",
+                 "scheme":  "internmatch",
+                 "version":  "1.0.0",
+                 "orientation":  "portrait",
+                 "platforms":  [
+                                   "ios",
+                                   "android"
+                               ],
+                 "android":  {
+                                 "package":  "com.aissclub.internmatchai",
+                                 "intentFilters":  [
+                                                       {
+                                                           "action":  "VIEW",
+                                                           "autoVerify":  true,
+                                                           "data":  [
+                                                                        {
+                                                                            "scheme":  "https",
+                                                                            "host":  "internmatch.college",
+                                                                            "pathPrefix":  "/auth/confirmed"
+                                                                        },
+                                                                        {
+                                                                            "scheme":  "https",
+                                                                            "host":  "internmatch.college",
+                                                                            "pathPrefix":  "/auth/reset-password"
+                                                                        }
+                                                                    ],
+                                                           "category":  [
+                                                                            "BROWSABLE",
+                                                                            "DEFAULT"
+                                                                        ]
+                                                       }
+                                                   ],
+                                 "adaptiveIcon":  {
+                                                      "foregroundImage":  "./assets/branding/adaptive-icon-foreground.png",
+                                                      "backgroundColor":  "#0B5F70"
+                                                  }
+                             },
+                 "plugins":  [
+                                 [
+                                     "expo-notifications",
+                                     {
+                                         "defaultChannel":  "general"
+                                     }
+                                 ],
+                                 "expo-asset",
+                                 "expo-font",
+                                 "expo-localization",
+                                 "expo-web-browser",
+                                 [
+                                     "expo-image-picker",
+                                     {
+                                         "photosPermission":  "Allow InternMatch AI to access your photo library so you can choose a profile picture.",
+                                         "cameraPermission":  false,
+                                         "microphonePermission":  false
+                                     }
+                                 ],
+                                 [
+                                     "expo-build-properties",
+                                     {
+                                         "android":  {
+                                                         "usesCleartextTraffic":  true
+                                                     }
+                                     }
+                                 ],
+                                 "expo-apple-authentication",
+                                 [
+                                     "expo-splash-screen",
+                                     {
+                                         "backgroundColor":  "#075E6E",
+                                         "image":  "./assets/branding/splash-icon.png",
+                                         "imageWidth":  180,
+                                         "resizeMode":  "contain"
+                                     }
+                                 ]
+                             ],
+                 "extra":  {
+                               "eas":  {
+                                           "projectId":  "0c2b7e7c-71da-4236-951b-0580ef71476e"
+                                       }
+                           },
+                 "owner":  "aiss-uskudar",
+                 "ios":  {
+                             "bundleIdentifier":  "com.aissclub.internmatchai",
+                             "usesAppleSignIn":  true,
+                             "infoPlist":  {
+                                               "ITSAppUsesNonExemptEncryption":  false
+                                           },
+                             "icon":  "./assets/branding/app-icon.png"
+                         },
+                 "icon":  "./assets/branding/app-icon.png"
+             }
 }
