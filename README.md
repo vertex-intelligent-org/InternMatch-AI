@@ -2,7 +2,7 @@
 
 InternMatch AI helps students discover internships that fit their skills, understand why they match, and prepare stronger applications through an AI-assisted workflow.
 
-*Built for RevenueCat Shipaton 2026 — Next Gen Track.*
+*Built for RevenueCat Shipaton 2026 — Standard Track.*
 
 ---
 
@@ -38,6 +38,24 @@ InternMatch AI delivers an end-to-end candidate copilot:
 > **Employer Scope:** Candidate discovery, matching, and application workflows are fully functional. Employer workspace tools (job posting and applicant management) are currently presented in role-aware preview mode.
 
 ---
+
+## Current Product & Trust Surface
+
+InternMatch AI now spans the complete candidate, employer, and trust workflow:
+
+- **Candidate experience:** internship discovery, profile and CV workflows, explainable matching, application preparation, application tracking, interview preparation, saved opportunities, and subscription-aware AI usage.
+- **Employer experience:** organization workspace, opportunity creation, candidate review, interview workflow, employer AI tools, and subscription-aware limits.
+- **Admin Trust Console:** administrative review tools for users, employer organizations, opportunity moderation, and trust/compliance workflows.
+- **Employer organization verification:** identity verification is reviewed independently from employer compliance evidence.
+- **Listing moderation:** employer opportunities use a review lifecycle before public publication; organization verification does not automatically publish a listing.
+- **Notifications:** event-driven mobile notification infrastructure supports product and workflow events.
+- **Privacy and account control:** in-app Privacy Policy, Terms of Use, support contact, recent re-authentication for sensitive deletion, and permanent account deletion workflows.
+- **Public product site:** `https://internmatch.college`
+- **Production API:** `https://api.internmatch.college`
+
+### Shipaton 2026 release target
+
+The current submission target is the **RevenueCat Shipaton 2026 Standard Track**. Test Store and sandbox evidence remain useful development evidence, but the final submission path targets publicly distributed iOS and Android builds and production-store RevenueCat purchase validation.
 
 ## RevenueCat Integration
 

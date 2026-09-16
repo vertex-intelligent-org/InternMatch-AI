@@ -371,7 +371,7 @@ InternMatch AI implements a candidate monetization model powered natively by **R
 - **Mobile Integration:** The React Native / Expo application embeds the official RevenueCat SDK (`react-native-purchases` 10.7.2).
 - **Entitlement Determination:** The mobile app derives subscription authority strictly via `Purchases.getCustomerInfo()`. If `CustomerInfo.entitlements.active['pro_student']` is active, Pro Student candidate features are unlocked.
 - **Zero Card Data Storage Policy:** Our backend (`FastAPI`) and database (`Supabase`) **NEVER store or handle payment card numbers, CVVs, or billing credentials**. All in-app purchase transactions are processed securely via RevenueCat and platform stores.
-- **Test Store Demonstration:** For the Shipaton 2026 Next Gen hackathon workflow, the application operates against the RevenueCat Test Store with public SDK key (`EXPO_PUBLIC_REVENUECAT_API_KEY`), enabling zero-friction evaluation without live store billing setup.
+- **Test Store Demonstration:** For pre-release purchase validation, the application operates against the RevenueCat Test Store with public SDK key (`EXPO_PUBLIC_REVENUECAT_API_KEY`), enabling zero-friction evaluation without live store billing setup.
 
 ```mermaid
 graph TD
@@ -414,14 +414,14 @@ graph TD
 
 ---
 
-## 12. Shipaton 2026 Submission & Next Gen Compliance
+## 12. Shipaton 2026 Submission & Standard Track Readiness
 
-- **Next Gen Student Track Innovation:** InternMatch AI is a RevenueCat Shipaton 2026 Next Gen student entry independently developed by Mohamad Barakat and Selanur Yurdakul.
+- **Standard Track Entry:** InternMatch AI is a student-built RevenueCat Shipaton 2026 standard-track entry independently developed by Mohamad Barakat and Selanur Yurdakul.
 - **Team Identity & Academic Context:** Mohamad Barakat and Selanur Yurdakul are Software / Computer Engineering students at Üsküdar University and serve as President and Vice President of AISS (Artificial Intelligence and Intelligent Systems Club). InternMatch AI is an independent student hackathon project and MUST NOT be described as an official AISS Club or Üsküdar University project, nor did either institution provide financial, technical, development, institutional, or material support. Affiliation represents academic and student-club context only for student-track eligibility.
 - **Public Open-Source Repository:** The repository is public on GitHub under the OSI-approved MIT License at [https://github.com/AISSCLUB/InternMatch-AI](https://github.com/AISSCLUB/InternMatch-AI).
 - **Language & Localization:** System documentation and submission materials are prepared in English. The mobile application interface provides native support for English, Turkish, and Arabic with dynamic RTL layout.
 - **Demonstration Scope:** The submission demo is designed as a concise under-2-minute walkthrough of the end-to-end candidate journey, including CV upload, profile enrichment, hybrid matching, Why You Match, AI application preparation, localization, and the RevenueCat Pro Student Test Store flow.
-- **Store Publication Exemption for Next Gen Track:** As a Next Gen student entry, public App Store / Google Play publication is exempt (demonstrable via native Android development client and RevenueCat Test Store); **the RevenueCat SDK integration is fully functional in sandbox/test mode**.
+- **Public Store Release Target:** The current Standard Track submission path targets publicly distributed App Store and Google Play builds. RevenueCat Test Store and sandbox runs are development evidence only and do not replace production-store purchase validation for the final release.
 - **Judge Access:** Evaluators create test candidate accounts dynamically via the in-app Supabase Auth sign-up flow.
 
 ---

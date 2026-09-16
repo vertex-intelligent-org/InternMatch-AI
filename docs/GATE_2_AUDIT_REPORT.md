@@ -160,7 +160,7 @@ The following authoritative documents were updated with documentation-only align
 ## 14. Hackathon Compliance Audit (Shipaton 2026)
 
 - **RevenueCat Integration:** Supported via `react-native-purchases` in mobile app for `internmatch_pro` entitlement. Zero credit card data stored on backend/database.
-- **Next Gen Student Track:** Verified student team (Mohammad & Selen). Sandbox mode authorized for demonstration.
+- **Historical test-stage note:** This earlier audit was written while the project was being evaluated under a student-track assumption. The current Shipaton 2026 submission target is the Standard Track. Sandbox/Test Store evidence remains historical testing evidence and does not replace public-store release validation.
 - **Licensing & Repo:** Open-source MIT License hosted on GitHub (`https://github.com/aissclub/internmatch-ai`).
 
 ---

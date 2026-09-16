@@ -1,7 +1,7 @@
 # InternMatch AI — RevenueCat Shipaton 2026 Submission
 
-> **Competition:** RevenueCat Shipaton 2026 — Next Gen Track
-> **Track:** Student / Next Gen Innovation
+> **Competition:** RevenueCat Shipaton 2026 — Standard Track
+> **Track:** Standard Track
 > **Repository:** InternMatch AI
 
 ---
@@ -91,13 +91,29 @@ InternMatch AI implements a native RevenueCat monetization architecture:
 
 ---
 
-## Why Next Gen
+## Current Standard Track Release Position
+
+InternMatch AI is being prepared as a live Standard Track submission rather than relying on a student-track publication exemption.
+
+The final submission path includes:
+
+- publicly distributed iOS and Android builds;
+- RevenueCat production/store purchase validation in addition to sandbox testing;
+- candidate, employer, and Admin Trust Console workflows;
+- employer organization verification and separate compliance evidence review;
+- mandatory opportunity moderation before public publication;
+- account deletion, legal/privacy surfaces, and operational security controls;
+- live product infrastructure at `internmatch.college` and `api.internmatch.college`.
+
+Earlier Test Store and sandbox results remain part of the engineering evidence, but they are not presented as substitutes for the final public-store release.
+
+## Why InternMatch AI
 
 InternMatch AI was conceived and developed by a collaborative two-person student team, **Mohamad Barakat** and **Selanur Yurdakul**. Both are Software / Computer Engineering students at Üsküdar University and members of AISS (Artificial Intelligence and Intelligent Systems Club), where Mohamad serves as President and Selanur as Vice President.
 
 Selanur originated the product vision, and Mohamad established the technical architecture and engineering foundation. Together, they designed, implemented, and refined a complete student career copilot that solves the fundamental fit problem: helping students understand *why* they match, identifying skill gaps before applying, and providing practical AI tools that turn aspirations into interview invitations.
 
-*Independent Project Note:* InternMatch AI is an independent student entry created directly by the authors for the RevenueCat Shipaton Next Gen track. It is not an official AISS Club or Üsküdar University project, and neither institution provided financial, technical, development, or material support.
+*Independent Project Note:* InternMatch AI is an independent student entry created directly by the authors for the RevenueCat Shipaton 2026 standard track. It is not an official AISS Club or Üsküdar University project, and neither institution provided financial, technical, development, or material support.
 
 ---
 
@@ -136,7 +152,7 @@ Selanur originated the product vision, and Mohamad established the technical arc
 
 5. **Student Eligibility Verification:**
    - Developed by student creators Mohamad Barakat and Selanur Yurdakul, both Software / Computer Engineering students at Üsküdar University.
-   - Student-track eligibility is documented in accordance with the Shipaton Next Gen submission guidelines.
+   - The current submission is prepared for the Shipaton 2026 Standard Track and follows the public-store release path described above.
 
 6. **GitHub Release Baseline:**
    - The final GitHub release serves as the stable, reproducible Shipaton 2026 submission milestone.
