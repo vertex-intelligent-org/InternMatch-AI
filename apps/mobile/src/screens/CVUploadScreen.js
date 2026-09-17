@@ -71,6 +71,7 @@ export default function CVUploadScreen({ route, navigation }) {
   const [jobId, setJobId] = useState(null);
   const [isConfirming, setIsConfirming] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
+  const [isUploadActionPending, setIsUploadActionPending] = useState(false);
 
   const { profile, refreshProfile } = useProfile();
   const hasExistingCV = Boolean(profile?.has_cv || (profile?.skills && profile.skills.length > 0));
@@ -80,6 +81,7 @@ export default function CVUploadScreen({ route, navigation }) {
   const isPollingRef = useRef(false);
   const confirmInFlightRef = useRef(false);
   const cancelInFlightRef = useRef(false);
+  const uploadActionInFlightRef = useRef(false);
   const cancelPromptVisibleRef = useRef(false);
   const allowNavigationRef = useRef(false);
   const cancelledJobIdRef = useRef(null);
@@ -201,6 +203,12 @@ export default function CVUploadScreen({ route, navigation }) {
   }, [status]);
 
   const pickFileAndUpload = async () => {
+    if (uploadActionInFlightRef.current) return;
+
+    uploadActionInFlightRef.current = true;
+    setIsUploadActionPending(true);
+
+    try {
     if (isCVAnalysisExhausted) {
       try {
         const latestUsage =
@@ -273,6 +281,10 @@ export default function CVUploadScreen({ route, navigation }) {
       setErrorMessage('CV_PICKER_ERROR');
       setStatus('failed');
       haptics.error();
+    }
+    } finally {
+      uploadActionInFlightRef.current = false;
+      setIsUploadActionPending(false);
     }
   };
 
@@ -781,15 +793,27 @@ export default function CVUploadScreen({ route, navigation }) {
             <TouchableOpacity
               style={styles.dropZone}
               onPress={pickFileAndUpload}
+              disabled={isUploadActionPending}
+              accessibilityState={{
+                disabled: isUploadActionPending,
+                busy: isUploadActionPending,
+              }}
               accessibilityRole="button"
               accessibilityLabel={hasExistingCV ? t('cvUpload.dropZoneReplace') : t('cvUpload.dropZoneDefault')}
               activeOpacity={0.7}
             >
-              <Ionicons
-                name="cloud-upload-outline"
-                size={36}
-                color={colors.accent || colors.teal}
-              />
+              {isUploadActionPending ? (
+                <ActivityIndicator
+                  size="small"
+                  color={colors.accent || colors.teal}
+                />
+              ) : (
+                <Ionicons
+                  name="cloud-upload-outline"
+                  size={36}
+                  color={colors.accent || colors.teal}
+                />
+              )}
               <Text style={styles.dropText}>
                 {selectedFile
                   ? selectedFile.name
@@ -847,7 +871,15 @@ export default function CVUploadScreen({ route, navigation }) {
               disabled={isCancelling}
               accessibilityRole="button"
               accessibilityLabel={t('cvUpload.cancelAnalysis')}
+              accessibilityState={{ disabled: isCancelling, busy: isCancelling }}
             >
+              {isCancelling && (
+                <ActivityIndicator
+                  size="small"
+                  color={colors.accent || colors.teal}
+                  style={{ marginRight: spacing.sm }}
+                />
+              )}
               <Text style={styles.cancelText}>
                 {isCancelling
                   ? t('cvUpload.cancellingAnalysis')
@@ -962,6 +994,8 @@ export default function CVUploadScreen({ route, navigation }) {
               title={t('cvUpload.chooseAnother')}
               color={colors.primaryBlue}
               onPress={pickFileAndUpload}
+              loading={isUploadActionPending}
+              disabled={isUploadActionPending}
               style={{ marginTop: spacing.xl, width: '100%' }}
             />
           </Card>
@@ -991,7 +1025,18 @@ export default function CVUploadScreen({ route, navigation }) {
               disabled={!jobId || isCancelling}
               accessibilityRole="button"
               accessibilityLabel={t('cvUpload.cancelAnalysis')}
+              accessibilityState={{
+                disabled: !jobId || isCancelling,
+                busy: isCancelling,
+              }}
             >
+              {isCancelling && (
+                <ActivityIndicator
+                  size="small"
+                  color={colors.accent || colors.teal}
+                  style={{ marginRight: spacing.sm }}
+                />
+              )}
               <Text style={styles.secondaryBtnText}>
                 {isCancelling
                   ? t('cvUpload.cancellingAnalysis')

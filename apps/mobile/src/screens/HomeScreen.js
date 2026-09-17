@@ -54,6 +54,10 @@ export default function HomeScreen({ navigation }) {
     (isEmployer ? t('home.employerFallback', { defaultValue: 'Employer' }) : t('home.studentFallback'));
 
   const scrollViewRef = useRef(null);
+  const createGateInFlightRef = useRef(false);
+  const refreshInFlightRef = useRef(false);
+  const employerRetryInFlightRef = useRef(false);
+  const matchesRetryInFlightRef = useRef(false);
   useTabScroll('Home', scrollViewRef);
   useScrollToTop(scrollViewRef);
   const onScroll = useTabScrollReporter(20);
@@ -71,8 +75,9 @@ export default function HomeScreen({ navigation }) {
   const [createGateLoading, setCreateGateLoading] = useState(false);
 
   const handleCreateOpportunity = useCallback(async () => {
-    if (createGateLoading) return;
+    if (createGateInFlightRef.current || createGateLoading) return;
 
+    createGateInFlightRef.current = true;
     setCreateGateLoading(true);
 
     try {
@@ -97,6 +102,7 @@ export default function HomeScreen({ navigation }) {
         t('employerVerification.loadError')
       );
     } finally {
+      createGateInFlightRef.current = false;
       setCreateGateLoading(false);
     }
   }, [createGateLoading, navigation, t]);
@@ -185,7 +191,11 @@ export default function HomeScreen({ navigation }) {
   }, [isEmployer, hasAnalyzedCV, fetchEmployerData, fetchMatchesData]);
 
   const handleRefresh = async () => {
+    if (refreshInFlightRef.current || refreshing) return;
+
+    refreshInFlightRef.current = true;
     setRefreshing(true);
+
     try {
       await refreshProfile();
       if (isEmployer) {
@@ -196,7 +206,32 @@ export default function HomeScreen({ navigation }) {
     } catch (err) {
       console.warn('Home refresh error:', err);
     } finally {
+      refreshInFlightRef.current = false;
       setRefreshing(false);
+    }
+  };
+
+  const handleEmployerRetry = async () => {
+    if (employerRetryInFlightRef.current || employerLoading) return;
+
+    employerRetryInFlightRef.current = true;
+
+    try {
+      await fetchEmployerData();
+    } finally {
+      employerRetryInFlightRef.current = false;
+    }
+  };
+
+  const handleMatchesRetry = async () => {
+    if (matchesRetryInFlightRef.current || matchesLoading) return;
+
+    matchesRetryInFlightRef.current = true;
+
+    try {
+      await fetchMatchesData();
+    } finally {
+      matchesRetryInFlightRef.current = false;
     }
   };
 
@@ -362,9 +397,14 @@ export default function HomeScreen({ navigation }) {
                   </Text>
                   <TouchableOpacity
                     style={styles.retryBtn}
-                    onPress={fetchEmployerData}
+                    onPress={handleEmployerRetry}
+                    disabled={employerLoading}
                     accessibilityRole="button"
                     accessibilityLabel={t('home.employer.retry')}
+                    accessibilityState={{
+                      disabled: employerLoading,
+                      busy: employerLoading,
+                    }}
                   >
                     <Text style={[styles.retryBtnText, isRTL && styles.rtlWriting]}>
                       {t('home.employer.retry')}
@@ -645,9 +685,14 @@ export default function HomeScreen({ navigation }) {
                   <Text style={[styles.errorText, isRTL && styles.rtlWriting]}>{matchesErrorMessage}</Text>
                   <TouchableOpacity
                     style={styles.retryBtn}
-                    onPress={fetchMatchesData}
+                    onPress={handleMatchesRetry}
+                    disabled={matchesLoading}
                     accessibilityRole="button"
                     accessibilityLabel={t('home.matches.retry')}
+                    accessibilityState={{
+                      disabled: matchesLoading,
+                      busy: matchesLoading,
+                    }}
                   >
                     <Text style={[styles.retryBtnText, isRTL && styles.rtlWriting]}>{t('home.matches.retry')}</Text>
                   </TouchableOpacity>

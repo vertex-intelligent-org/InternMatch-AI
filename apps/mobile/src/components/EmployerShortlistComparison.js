@@ -92,6 +92,7 @@ export default function EmployerShortlistComparison({
   const [error, setError] = useState(null);
 
   const keyRef = useRef(null);
+  const compareInFlightRef = useRef(false);
 
   const candidatesById = useMemo(() => {
     const mapping = {};
@@ -126,6 +127,8 @@ export default function EmployerShortlistComparison({
   }
 
   async function handleCompare() {
+    if (compareInFlightRef.current) return;
+
     if (
       selectedIds.length < 2
       || selectedIds.length > 5
@@ -136,6 +139,7 @@ export default function EmployerShortlistComparison({
       return;
     }
 
+    compareInFlightRef.current = true;
     setLoading(true);
     setError(null);
 
@@ -203,6 +207,7 @@ export default function EmployerShortlistComparison({
         );
       }
     } finally {
+      compareInFlightRef.current = false;
       setLoading(false);
     }
   }

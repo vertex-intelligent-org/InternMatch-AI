@@ -87,6 +87,7 @@ export default function EmployerVerificationScreen({ navigation }) {
   const scrollRef = useRef(null);
   const inputRefs = useRef({});
   const fieldPositions = useRef({});
+  const submitInFlightRef = useRef(false);
 
   const [organization, setOrganization] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
@@ -233,8 +234,16 @@ export default function EmployerVerificationScreen({ navigation }) {
   });
 
   const handleSubmit = async () => {
-    if (submitting || !editable || !validate()) return;
+    if (
+      submitInFlightRef.current ||
+      submitting ||
+      !editable ||
+      !validate()
+    ) {
+      return;
+    }
 
+    submitInFlightRef.current = true;
     setSubmitting(true);
     setActionError(null);
     setActionMessage(null);
@@ -290,6 +299,7 @@ export default function EmployerVerificationScreen({ navigation }) {
 
       haptics.error();
     } finally {
+      submitInFlightRef.current = false;
       setSubmitting(false);
     }
   };

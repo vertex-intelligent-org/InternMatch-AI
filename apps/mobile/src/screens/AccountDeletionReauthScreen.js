@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -7,12 +7,11 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  TouchableOpacity,
   View,
 } from 'react-native';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { useTranslation } from 'react-i18next';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 
 import { useProfile } from '../context/ProfileContext';
 import { signInWithApple } from '../services/appleAuth';
@@ -28,17 +27,23 @@ import haptics from '../services/haptics';
 import colors from '../theme/colors';
 import { spacing } from '../theme/spacing';
 import { typography } from '../theme/typography';
+import ScreenContainer from '../components/ScreenContainer';
+import ScreenHeader from '../components/ScreenHeader';
+import Card from '../components/Card';
+import GradientButton from '../components/GradientButton';
+import { useLocalization } from '../localization/LocalizationContext';
 
 
 export default function AccountDeletionReauthScreen({ navigation }) {
   const { t } = useTranslation();
-  const insets = useSafeAreaInsets();
+  const { isRTL } = useLocalization();
   const { clearProfile } = useProfile();
 
   const [originalUserId, setOriginalUserId] = useState(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loadingSource, setLoadingSource] = useState(null);
+  const reauthInFlightRef = useRef(false);
 
   const busy = Boolean(loadingSource);
 
@@ -129,7 +134,7 @@ export default function AccountDeletionReauthScreen({ navigation }) {
   };
 
   const handlePasswordReauth = async () => {
-    if (busy || !originalUserId) return;
+    if (reauthInFlightRef.current || busy || !originalUserId) return;
 
     if (!email || !password) {
       Alert.alert(
@@ -139,6 +144,7 @@ export default function AccountDeletionReauthScreen({ navigation }) {
       return;
     }
 
+    reauthInFlightRef.current = true;
     setLoadingSource('password');
 
     try {
@@ -160,13 +166,15 @@ export default function AccountDeletionReauthScreen({ navigation }) {
         t('settings.accountDeletionReauth.failedMessage')
       );
     } finally {
+      reauthInFlightRef.current = false;
       setLoadingSource(null);
     }
   };
 
   const handleGoogleReauth = async () => {
-    if (busy || !originalUserId) return;
+    if (reauthInFlightRef.current || busy || !originalUserId) return;
 
+    reauthInFlightRef.current = true;
     setLoadingSource('google');
 
     try {
@@ -189,13 +197,15 @@ export default function AccountDeletionReauthScreen({ navigation }) {
         t('settings.accountDeletionReauth.failedMessage')
       );
     } finally {
+      reauthInFlightRef.current = false;
       setLoadingSource(null);
     }
   };
 
   const handleAppleReauth = async () => {
-    if (busy || !originalUserId) return;
+    if (reauthInFlightRef.current || busy || !originalUserId) return;
 
+    reauthInFlightRef.current = true;
     setLoadingSource('apple');
 
     try {
@@ -228,236 +238,252 @@ export default function AccountDeletionReauthScreen({ navigation }) {
         t('settings.accountDeletionReauth.failedMessage')
       );
     } finally {
+      reauthInFlightRef.current = false;
       setLoadingSource(null);
     }
   };
 
   return (
-    <View
-      style={[
-        styles.screen,
-        {
-          paddingTop: insets.top,
-          paddingBottom: insets.bottom,
-        },
-      ]}
-    >
+    <ScreenContainer edges={['top', 'bottom']}>
+      <ScreenHeader
+        title={t('settings.accountDeletionReauth.title')}
+        showBack
+        navigation={navigation}
+      />
+
       <ScrollView
+        style={styles.screen}
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
       >
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-          disabled={busy}
-          accessibilityRole="button"
-        >
-          <Text style={styles.backText}>
-            {t('settings.accountDeletionReauth.back')}
-          </Text>
-        </TouchableOpacity>
-
-        <Text style={styles.title}>
-          {t('settings.accountDeletionReauth.title')}
-        </Text>
-
-        <Text style={styles.message}>
-          {t('settings.accountDeletionReauth.message')}
-        </Text>
-
-        <Text style={styles.email}>
-          {email}
-        </Text>
-
-        <TextInput
-          style={styles.input}
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-          autoCapitalize="none"
-          autoCorrect={false}
-          editable={!busy}
-          placeholder={t(
-            'settings.accountDeletionReauth.passwordPlaceholder'
-          )}
-          placeholderTextColor={colors.textSecondary || '#8A94A3'}
-        />
-
-        <TouchableOpacity
-          style={styles.dangerButton}
-          onPress={handlePasswordReauth}
-          disabled={busy || !originalUserId}
-          accessibilityRole="button"
-        >
-          {loadingSource === 'password' ? (
-            <ActivityIndicator color="#FFFFFF" />
-          ) : (
-            <Text style={styles.dangerButtonText}>
-              {t(
-                'settings.accountDeletionReauth.passwordButton'
-              )}
-            </Text>
-          )}
-        </TouchableOpacity>
-
-        <View style={styles.dividerRow}>
-          <View style={styles.divider} />
-          <Text style={styles.dividerText}>
-            {t('auth.or')}
-          </Text>
-          <View style={styles.divider} />
-        </View>
-
-        <TouchableOpacity
-          style={styles.providerButton}
-          onPress={handleGoogleReauth}
-          disabled={busy || !originalUserId}
-          accessibilityRole="button"
-        >
-          {loadingSource === 'google' ? (
-            <ActivityIndicator />
-          ) : (
-            <Text style={styles.providerButtonText}>
-              {t(
-                'settings.accountDeletionReauth.googleButton'
-              )}
-            </Text>
-          )}
-        </TouchableOpacity>
-
-        {Platform.OS === 'ios' && (
-          <View style={styles.appleWrapper}>
-            {loadingSource === 'apple' ? (
-              <ActivityIndicator />
-            ) : (
-              <AppleAuthentication.AppleAuthenticationButton
-                buttonType={
-                  AppleAuthentication
-                    .AppleAuthenticationButtonType
-                    .SIGN_IN
-                }
-                buttonStyle={
-                  AppleAuthentication
-                    .AppleAuthenticationButtonStyle
-                    .BLACK
-                }
-                cornerRadius={10}
-                style={styles.appleButton}
-                onPress={handleAppleReauth}
-              />
-            )}
+        <Card style={styles.identityCard} padding="lg">
+          <View style={styles.warningIcon}>
+            <Ionicons
+              name="shield-checkmark-outline"
+              size={26}
+              color={colors.danger || colors.red}
+            />
           </View>
-        )}
 
-        {busy && (
-          <Text style={styles.loadingText}>
-            {t(
-              'settings.accountDeletionReauth.loading'
-            )}
+          <Text style={[styles.message, isRTL && styles.textRTL]}>
+            {t('settings.accountDeletionReauth.message')}
           </Text>
-        )}
+
+          <View style={styles.emailPill}>
+            <Ionicons
+              name="mail-outline"
+              size={16}
+              color={colors.textSecondary || colors.textMuted}
+            />
+
+            <Text
+              style={styles.email}
+              numberOfLines={1}
+              ellipsizeMode="middle"
+            >
+              {email}
+            </Text>
+          </View>
+
+          <TextInput
+            style={styles.input}
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+            autoCapitalize="none"
+            autoCorrect={false}
+            editable={!busy}
+            placeholder={t(
+              'settings.accountDeletionReauth.passwordPlaceholder'
+            )}
+            placeholderTextColor={
+              colors.textTertiary || colors.textMuted
+            }
+          />
+
+          <GradientButton
+            title={t(
+              'settings.accountDeletionReauth.passwordButton'
+            )}
+            color={colors.danger || colors.red}
+            onPress={handlePasswordReauth}
+            disabled={busy || !originalUserId}
+            loading={loadingSource === 'password'}
+          />
+
+          <View style={styles.dividerRow}>
+            <View style={styles.divider} />
+
+            <Text style={styles.dividerText}>
+              {t('auth.or')}
+            </Text>
+
+            <View style={styles.divider} />
+          </View>
+
+          <GradientButton
+            title={t(
+              'settings.accountDeletionReauth.googleButton'
+            )}
+            color={colors.accent || colors.teal}
+            outline
+            onPress={handleGoogleReauth}
+            disabled={busy || !originalUserId}
+            loading={loadingSource === 'google'}
+          />
+
+          {Platform.OS === 'ios' && (
+            <View style={styles.appleWrapper}>
+              {loadingSource === 'apple' ? (
+                <ActivityIndicator
+                  color={colors.accent || colors.teal}
+                />
+              ) : (
+                <AppleAuthentication.AppleAuthenticationButton
+                  buttonType={
+                    AppleAuthentication
+                      .AppleAuthenticationButtonType
+                      .SIGN_IN
+                  }
+                  buttonStyle={
+                    AppleAuthentication
+                      .AppleAuthenticationButtonStyle
+                      .BLACK
+                  }
+                  cornerRadius={24}
+                  style={styles.appleButton}
+                  onPress={handleAppleReauth}
+                />
+              )}
+            </View>
+          )}
+
+          {busy && (
+            <Text
+              style={[
+                styles.loadingText,
+                isRTL && styles.textRTL,
+              ]}
+            >
+              {t('settings.accountDeletionReauth.loading')}
+            </Text>
+          )}
+        </Card>
       </ScrollView>
-    </View>
+    </ScreenContainer>
   );
 }
-
 
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: colors.background || '#0B1020',
+    backgroundColor: colors.background || colors.screenBg,
   },
+
   content: {
     flexGrow: 1,
-    padding: spacing.lg || 24,
+    paddingHorizontal: spacing.screenHorizontalPadding,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.xxxl,
     justifyContent: 'center',
   },
-  backButton: {
-    alignSelf: 'flex-start',
-    marginBottom: spacing.xl || 28,
-    paddingVertical: 8,
+
+  identityCard: {
+    width: '100%',
+    maxWidth: 560,
+    alignSelf: 'center',
   },
-  backText: {
-    color: colors.textSecondary || '#A8B0C0',
-    ...typography.body,
-  },
-  title: {
-    color: colors.textPrimary || '#FFFFFF',
-    ...typography.h1,
-    marginBottom: spacing.md || 16,
-  },
-  message: {
-    color: colors.textSecondary || '#A8B0C0',
-    ...typography.body,
-    lineHeight: 22,
-    marginBottom: spacing.lg || 24,
-  },
-  email: {
-    color: colors.textPrimary || '#FFFFFF',
-    ...typography.body,
-    marginBottom: spacing.sm || 12,
-  },
-  input: {
-    minHeight: 52,
-    borderWidth: 1,
-    borderColor: colors.border || '#2B3448',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    color: colors.textPrimary || '#FFFFFF',
-    backgroundColor: colors.surface || '#141B2D',
-    marginBottom: spacing.md || 16,
-  },
-  dangerButton: {
-    minHeight: 52,
-    borderRadius: 12,
+
+  warningIcon: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    alignSelf: 'center',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.danger || '#D92D20',
-    paddingHorizontal: 16,
+    backgroundColor: colors.dangerSoft || colors.redBg,
+    marginBottom: spacing.lg,
   },
-  dangerButtonText: {
-    color: '#FFFFFF',
-    ...typography.button,
+
+  message: {
+    ...typography.body,
+    color: colors.textSecondary || colors.textMuted,
+    textAlign: 'center',
+    marginBottom: spacing.lg,
   },
+
+  emailPill: {
+    minHeight: spacing.minimumTouchTarget,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: spacing.radii.md,
+    borderWidth: 1,
+    borderColor: colors.borderSubtle || colors.border,
+    backgroundColor: colors.surfaceSubtle,
+    marginBottom: spacing.sm,
+  },
+
+  email: {
+    ...typography.bodyEmphasis,
+    color: colors.textPrimary || colors.textDark,
+    flex: 1,
+    writingDirection: 'ltr',
+    textAlign: 'left',
+  },
+
+  input: {
+    minHeight: 48,
+    borderWidth: 1,
+    borderColor: colors.borderSubtle || colors.border,
+    borderRadius: spacing.radii.md,
+    paddingHorizontal: spacing.md,
+    color: colors.textPrimary || colors.textDark,
+    backgroundColor: colors.surface || colors.cardBg,
+    ...typography.body,
+    marginBottom: spacing.md,
+  },
+
   dividerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: spacing.lg || 24,
+    marginVertical: spacing.lg,
   },
+
   divider: {
     flex: 1,
     height: StyleSheet.hairlineWidth,
-    backgroundColor: colors.border || '#2B3448',
+    backgroundColor: colors.borderSubtle || colors.border,
   },
+
   dividerText: {
-    marginHorizontal: 12,
-    color: colors.textSecondary || '#A8B0C0',
+    ...typography.caption,
+    marginHorizontal: spacing.md,
+    color: colors.textSecondary || colors.textMuted,
   },
-  providerButton: {
-    minHeight: 52,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.border || '#2B3448',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.surface || '#141B2D',
-  },
-  providerButtonText: {
-    color: colors.textPrimary || '#FFFFFF',
-    ...typography.button,
-  },
+
   appleWrapper: {
-    minHeight: 52,
-    marginTop: 12,
+    minHeight: 48,
+    marginTop: spacing.md,
     justifyContent: 'center',
   },
+
   appleButton: {
     width: '100%',
-    height: 52,
+    height: 48,
   },
+
   loadingText: {
-    marginTop: 16,
+    ...typography.caption,
+    marginTop: spacing.md,
     textAlign: 'center',
-    color: colors.textSecondary || '#A8B0C0',
+    color: colors.textSecondary || colors.textMuted,
+  },
+
+  textRTL: {
+    textAlign: 'right',
+    writingDirection: 'rtl',
   },
 });

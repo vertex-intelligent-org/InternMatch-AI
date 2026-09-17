@@ -8,7 +8,7 @@ import logging
 import sys
 from uuid import UUID
 
-from app.core.config import settings, validate_production_config
+from app.core.config import settings, validate_runtime_config
 from app.db.session import SessionLocal
 from app.repositories.processing_job import ProcessingJobRepository
 from app.services.ai_quota import (
@@ -140,8 +140,8 @@ def _recover_abandoned_processing_job(
 def run_worker():
     """Initialize Redis connection and start RQ worker loop."""
     logger.info("Initializing Python RQ worker foundation...")
-    # Validate production configuration before attempting network operations
-    validate_production_config(settings)
+    # Validate runtime isolation before attempting network operations
+    validate_runtime_config(settings)
 
     _preload_job_modules()
     logger.info(

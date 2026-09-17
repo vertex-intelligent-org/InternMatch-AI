@@ -117,7 +117,11 @@ export default function SettingsScreen({ navigation }) {
   const [supportFallbackVisible, setSupportFallbackVisible] = useState(false);
   const [changingLanguage, setChangingLanguage] = useState(false);
   const [resettingPassword, setResettingPassword] = useState(false);
+  const languageChangeInFlightRef = useRef(false);
+  const passwordResetPromptVisibleRef = useRef(false);
   const passwordResetInFlightRef = useRef(false);
+  const signOutPromptVisibleRef = useRef(false);
+  const signOutInFlightRef = useRef(false);
 
   const accountType = profile?.preferences?.account_type
     ? normalizeAccountType(profile.preferences.account_type)
@@ -147,11 +151,16 @@ export default function SettingsScreen({ navigation }) {
   }, []);
 
   const handleLanguageChange = async (nextLocale) => {
-    if (changingLanguage || nextLocale === locale) {
+    if (
+      languageChangeInFlightRef.current ||
+      changingLanguage ||
+      nextLocale === locale
+    ) {
       setLanguagePickerVisible(false);
       return;
     }
 
+    languageChangeInFlightRef.current = true;
     setLanguagePickerVisible(false);
     setChangingLanguage(true);
 
@@ -166,12 +175,17 @@ export default function SettingsScreen({ navigation }) {
         t('settings.languagePicker.changeFailedMessage')
       );
     } finally {
+      languageChangeInFlightRef.current = false;
       setChangingLanguage(false);
     }
   };
 
   const handlePasswordReset = async () => {
-    if (resettingPassword) return;
+    if (
+      passwordResetPromptVisibleRef.current ||
+      passwordResetInFlightRef.current ||
+      resettingPassword
+    ) return;
 
     try {
       const email = userEmail.trim();
@@ -180,14 +194,23 @@ export default function SettingsScreen({ navigation }) {
         return;
       }
 
+      passwordResetPromptVisibleRef.current = true;
+
       Alert.alert(
         t('settings.password.confirmTitle'),
         t('settings.password.confirmMessage', { email }),
         [
-          { text: t('common.cancel'), style: 'cancel' },
+          {
+            text: t('common.cancel'),
+            style: 'cancel',
+            onPress: () => {
+              passwordResetPromptVisibleRef.current = false;
+            },
+          },
           {
             text: t('settings.password.sendLink'),
             onPress: async () => {
+              passwordResetPromptVisibleRef.current = false;
               if (passwordResetInFlightRef.current) return;
               passwordResetInFlightRef.current = true;
               setResettingPassword(true);
@@ -211,7 +234,12 @@ export default function SettingsScreen({ navigation }) {
               }
             },
           },
-        ]
+        ],
+        {
+          onDismiss: () => {
+            passwordResetPromptVisibleRef.current = false;
+          },
+        }
       );
     } catch (err) {
       const msg = getLocalizedErrorMessage(err, t);
@@ -288,34 +316,63 @@ export default function SettingsScreen({ navigation }) {
   };
 
   const handleSignOut = () => {
-    Alert.alert(t('settings.signOutDialog.title'), t('settings.signOutDialog.message'), [
-      { text: t('common.cancel'), style: 'cancel' },
-      {
-        text: t('settings.signOut'),
-        style: 'destructive',
-        onPress: async () => {
-          if (signingOut) return;
-          setSigningOut(true);
-          try {
-            const { error } = await signOut();
-            if (error) {
-              throw error;
-            }
-            clearProfile();
-            haptics.success();
-            navigation.reset({
-              index: 0,
-              routes: [{ name: 'SignIn' }],
-            });
-          } catch (error) {
-            const message = getLocalizedErrorMessage(error, t);
-            Alert.alert(t('settings.signOutDialog.failedTitle'), message);
-          } finally {
-            setSigningOut(false);
-          }
+    if (
+      signOutPromptVisibleRef.current ||
+      signOutInFlightRef.current ||
+      signingOut
+    ) return;
+
+    signOutPromptVisibleRef.current = true;
+
+    Alert.alert(
+      t('settings.signOutDialog.title'),
+      t('settings.signOutDialog.message'),
+      [
+        {
+          text: t('common.cancel'),
+          style: 'cancel',
+          onPress: () => {
+            signOutPromptVisibleRef.current = false;
+          },
         },
-      },
-    ]);
+        {
+          text: t('settings.signOut'),
+          style: 'destructive',
+          onPress: async () => {
+            signOutPromptVisibleRef.current = false;
+
+            if (signOutInFlightRef.current || signingOut) return;
+
+            signOutInFlightRef.current = true;
+            setSigningOut(true);
+
+            try {
+              const { error } = await signOut();
+              if (error) {
+                throw error;
+              }
+              clearProfile();
+              haptics.success();
+              navigation.reset({
+                index: 0,
+                routes: [{ name: 'SignIn' }],
+              });
+            } catch (error) {
+              const message = getLocalizedErrorMessage(error, t);
+              Alert.alert(t('settings.signOutDialog.failedTitle'), message);
+            } finally {
+              signOutInFlightRef.current = false;
+              setSigningOut(false);
+            }
+          },
+        },
+      ],
+      {
+        onDismiss: () => {
+          signOutPromptVisibleRef.current = false;
+        },
+      }
+    );
   };
 
   if (!profile) {
@@ -476,6 +533,7 @@ export default function SettingsScreen({ navigation }) {
           disabled={signingOut}
           accessibilityRole="button"
           accessibilityLabel={t('settings.accessibility.signOut')}
+          accessibilityState={{ disabled: signingOut, busy: signingOut }}
           activeOpacity={0.75}
         >
           <Ionicons

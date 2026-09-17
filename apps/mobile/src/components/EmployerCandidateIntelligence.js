@@ -148,6 +148,8 @@ export default function EmployerCandidateIntelligence({
 
   const insightKeyRef = useRef(null);
   const kitKeyRef = useRef(null);
+  const insightInFlightRef = useRef(false);
+  const kitInFlightRef = useRef(false);
 
   const canUseInterviewKit = (
     policy?.interview_kit_available === true
@@ -169,6 +171,8 @@ export default function EmployerCandidateIntelligence({
   }
 
   async function handleGenerateInsight() {
+    if (insightInFlightRef.current) return;
+    insightInFlightRef.current = true;
     setInsightLoading(true);
     setInsightError(null);
 
@@ -217,11 +221,14 @@ export default function EmployerCandidateIntelligence({
         );
       }
     } finally {
+      insightInFlightRef.current = false;
       setInsightLoading(false);
     }
   }
 
   async function handleGenerateInterviewKit() {
+    if (kitInFlightRef.current) return;
+    kitInFlightRef.current = true;
     setKitLoading(true);
     setKitError(null);
 
@@ -278,6 +285,7 @@ export default function EmployerCandidateIntelligence({
         );
       }
     } finally {
+      kitInFlightRef.current = false;
       setKitLoading(false);
     }
   }

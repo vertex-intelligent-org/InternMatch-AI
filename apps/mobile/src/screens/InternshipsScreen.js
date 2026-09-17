@@ -60,6 +60,7 @@ export default function InternshipsScreen({ navigation }) {
   const [error, setError] = useState(null);
 
   const activeFilterRef = useRef(selectedFilterKey);
+  const catalogActionInFlightRef = useRef(null);
   activeFilterRef.current = selectedFilterKey;
 
   const getFilterValue = (filterKey) => {
@@ -105,6 +106,9 @@ export default function InternshipsScreen({ navigation }) {
   }, [selectedFilterKey, fetchInitialInternships]);
 
   const handleRefresh = async () => {
+    if (catalogActionInFlightRef.current || loading) return;
+
+    catalogActionInFlightRef.current = 'refresh';
     const filterKey = selectedFilterKey;
     setRefreshing(true);
     setError(null);
@@ -127,6 +131,10 @@ export default function InternshipsScreen({ navigation }) {
         setError('INTERNSHIPS_LOAD_FAILED');
       }
     } finally {
+      if (catalogActionInFlightRef.current === 'refresh') {
+        catalogActionInFlightRef.current = null;
+      }
+
       if (activeFilterRef.current === filterKey) {
         setRefreshing(false);
       }
@@ -134,9 +142,16 @@ export default function InternshipsScreen({ navigation }) {
   };
 
   const handleLoadMore = async () => {
-    if (loadingMore || loading || items.length >= total) {
+    if (
+      catalogActionInFlightRef.current ||
+      loadingMore ||
+      loading ||
+      items.length >= total
+    ) {
       return;
     }
+
+    catalogActionInFlightRef.current = 'load-more';
 
     const filterKey = selectedFilterKey;
     setLoadingMore(true);
@@ -162,13 +177,37 @@ export default function InternshipsScreen({ navigation }) {
         console.warn('Load more error:', err);
       }
     } finally {
+      if (catalogActionInFlightRef.current === 'load-more') {
+        catalogActionInFlightRef.current = null;
+      }
+
       if (activeFilterRef.current === filterKey) {
         setLoadingMore(false);
       }
     }
   };
 
+  const handleRetry = async () => {
+    if (catalogActionInFlightRef.current || loading) return;
+
+    catalogActionInFlightRef.current = 'retry';
+
+    try {
+      await fetchInitialInternships(selectedFilterKey);
+    } finally {
+      if (catalogActionInFlightRef.current === 'retry') {
+        catalogActionInFlightRef.current = null;
+      }
+    }
+  };
   const handleFilterSelect = (key) => {
+    if (
+      catalogActionInFlightRef.current ||
+      loading ||
+      refreshing ||
+      loadingMore
+    ) return;
+
     if (selectedFilterKey !== key) {
       haptics.selection();
       setSelectedFilterKey(key);
@@ -246,9 +285,14 @@ export default function InternshipsScreen({ navigation }) {
                   isSelected && styles.filterChipActive,
                 ]}
                 onPress={() => handleFilterSelect(f.key)}
+                disabled={loading || refreshing || loadingMore}
                 accessibilityRole="button"
                 accessibilityLabel={t('internships.filters.filterA11y', { label })}
-                accessibilityState={{ selected: isSelected }}
+                accessibilityState={{
+                  selected: isSelected,
+                  disabled: loading || refreshing || loadingMore,
+                  busy: loading || refreshing || loadingMore,
+                }}
                 hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
               >
                 <Text
@@ -282,9 +326,14 @@ export default function InternshipsScreen({ navigation }) {
             </Text>
             <TouchableOpacity
               style={styles.retryButton}
-              onPress={() => fetchInitialInternships(selectedFilterKey)}
+              onPress={handleRetry}
+              disabled={loading || refreshing}
               accessibilityRole="button"
               accessibilityLabel={t('common.tryAgain')}
+              accessibilityState={{
+                disabled: loading || refreshing,
+                busy: loading || refreshing,
+              }}
             >
               <Text style={styles.retryButtonText}>{t('common.tryAgain')}</Text>
             </TouchableOpacity>

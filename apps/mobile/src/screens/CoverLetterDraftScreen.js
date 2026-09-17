@@ -59,8 +59,12 @@ export default function CoverLetterDraftScreen({ route, navigation }) {
   const [loadingExisting, setLoadingExisting] = useState(true);
   const [resolveError, setResolveError] = useState(null);
   const [isDiscarding, setIsDiscarding] = useState(false);
+  const [generationStarting, setGenerationStarting] = useState(false);
   const cancelPromptVisibleRef = useRef(false);
   const allowNavigationRef = useRef(false);
+  const generationPreflightInFlightRef = useRef(false);
+  const discardPromptVisibleRef = useRef(false);
+  const discardInFlightRef = useRef(false);
 
   const {
     isGenerating,
@@ -69,6 +73,7 @@ export default function CoverLetterDraftScreen({ route, navigation }) {
     generationError,
     startGeneration,
     cancelGeneration,
+    isGenerationActive,
   } = useApplicationGeneration();
 
   const requestGenerationCancellation = (options = {}) => {
@@ -243,6 +248,20 @@ export default function CoverLetterDraftScreen({ route, navigation }) {
   ]);
 
   const handleGenerate = async () => {
+    if (
+      generationPreflightInFlightRef.current ||
+      isGenerationActive() ||
+      isGenerating ||
+      discardInFlightRef.current ||
+      isDiscarding
+    ) {
+      return;
+    }
+
+    generationPreflightInFlightRef.current = true;
+    setGenerationStarting(true);
+
+    try {
     if (isApplicationSupportExhausted) {
       try {
         const latestUsage =
@@ -325,12 +344,27 @@ export default function CoverLetterDraftScreen({ route, navigation }) {
         }
       }
     );
+    } finally {
+      generationPreflightInFlightRef.current = false;
+      setGenerationStarting(false);
+    }
   };
 
   const handleDiscardDraft = () => {
-    if (!application || application.status !== 'saved' || isDiscarding) {
+    if (
+      !application ||
+      application.status !== 'saved' ||
+      isDiscarding ||
+      discardPromptVisibleRef.current ||
+      discardInFlightRef.current ||
+      generationPreflightInFlightRef.current ||
+      isGenerationActive() ||
+      isGenerating
+    ) {
       return;
     }
+
+    discardPromptVisibleRef.current = true;
 
     Alert.alert(
       t('coverLetterDraft.discardTitle'),
@@ -339,13 +373,28 @@ export default function CoverLetterDraftScreen({ route, navigation }) {
         {
           text: t('coverLetterDraft.discardCancel'),
           style: 'cancel',
+          onPress: () => {
+            discardPromptVisibleRef.current = false;
+          },
         },
         {
           text: t('coverLetterDraft.discardConfirm'),
           style: 'destructive',
           onPress: async () => {
+            discardPromptVisibleRef.current = false;
+
+            if (
+              discardInFlightRef.current ||
+              generationPreflightInFlightRef.current ||
+              isGenerationActive()
+            ) {
+              return;
+            }
+
+            discardInFlightRef.current = true;
+            setIsDiscarding(true);
+
             try {
-              setIsDiscarding(true);
               await discardApplicationDraft(application.id);
               setApplication(null);
               navigation.goBack();
@@ -356,11 +405,18 @@ export default function CoverLetterDraftScreen({ route, navigation }) {
                 t('coverLetterDraft.discardErrorMessage')
               );
             } finally {
+              discardInFlightRef.current = false;
               setIsDiscarding(false);
             }
           },
         },
-      ]
+      ],
+      {
+        cancelable: true,
+        onDismiss: () => {
+          discardPromptVisibleRef.current = false;
+        },
+      }
     );
   };
 
@@ -543,10 +599,22 @@ export default function CoverLetterDraftScreen({ route, navigation }) {
             <TouchableOpacity
               style={styles.retryBtn}
               onPress={handleGenerate}
+              disabled={generationStarting}
               accessibilityRole="button"
+              accessibilityState={{
+                disabled: generationStarting,
+                busy: generationStarting,
+              }}
               accessibilityLabel={t('common.tryAgain')}
             >
-              <Text style={styles.retryBtnText}>{t('common.tryAgain')}</Text>
+              {generationStarting ? (
+                <ActivityIndicator
+                  size="small"
+                  color={colors.accent || colors.teal}
+                />
+              ) : (
+                <Text style={styles.retryBtnText}>{t('common.tryAgain')}</Text>
+              )}
             </TouchableOpacity>
           </Card>
         )}
@@ -605,15 +673,28 @@ export default function CoverLetterDraftScreen({ route, navigation }) {
               <TouchableOpacity
                 style={styles.recreateBtn}
                 onPress={handleGenerate}
+                disabled={generationStarting || isDiscarding}
                 accessibilityRole="button"
+                accessibilityState={{
+                  disabled: generationStarting || isDiscarding,
+                  busy: generationStarting,
+                }}
                 accessibilityLabel={t('coverLetterDraft.regenerate')}
               >
-                <Ionicons
-                  name="refresh-outline"
-                  size={16}
-                  color={colors.accentStrong || colors.tealDark}
-                  style={styles.recreateIcon}
-                />
+                {generationStarting ? (
+                  <ActivityIndicator
+                    size="small"
+                    color={colors.accentStrong || colors.tealDark}
+                    style={styles.recreateIcon}
+                  />
+                ) : (
+                  <Ionicons
+                    name="refresh-outline"
+                    size={16}
+                    color={colors.accentStrong || colors.tealDark}
+                    style={styles.recreateIcon}
+                  />
+                )}
                 <Text style={styles.recreateBtnText}>{t('coverLetterDraft.regenerate')}</Text>
               </TouchableOpacity>
 
@@ -621,16 +702,28 @@ export default function CoverLetterDraftScreen({ route, navigation }) {
                 <TouchableOpacity
                   style={styles.discardBtn}
                   onPress={handleDiscardDraft}
-                  disabled={isDiscarding}
+                  disabled={isDiscarding || generationStarting}
                   accessibilityRole="button"
+                  accessibilityState={{
+                    disabled: isDiscarding || generationStarting,
+                    busy: isDiscarding,
+                  }}
                   accessibilityLabel={t('coverLetterDraft.discardAction')}
                 >
-                  <Ionicons
-                    name="trash-outline"
-                    size={16}
-                    color={colors.error || '#B42318'}
-                    style={styles.recreateIcon}
-                  />
+                  {isDiscarding ? (
+                    <ActivityIndicator
+                      size="small"
+                      color={colors.error || '#B42318'}
+                      style={styles.recreateIcon}
+                    />
+                  ) : (
+                    <Ionicons
+                      name="trash-outline"
+                      size={16}
+                      color={colors.error || '#B42318'}
+                      style={styles.recreateIcon}
+                    />
+                  )}
                   <Text style={styles.discardBtnText}>
                     {isDiscarding
                       ? t('coverLetterDraft.discarding')
@@ -648,6 +741,8 @@ export default function CoverLetterDraftScreen({ route, navigation }) {
             title={t('coverLetterDraft.generateBtn')}
             color={colors.accent || colors.teal}
             onPress={handleGenerate}
+            disabled={generationStarting}
+            loading={generationStarting}
             style={{ marginTop: spacing.xl }}
           />
         ) : null}

@@ -24,6 +24,11 @@ export function useApplicationGeneration() {
   const activeJobIdRef = useRef(null);
   const cancelInFlightRef = useRef(false);
 
+  const isGenerationActive = useCallback(
+    () => isGeneratingRef.current,
+    []
+  );
+
   const clearPolling = useCallback(() => {
     if (pollTimerRef.current) {
       clearTimeout(pollTimerRef.current);
@@ -319,5 +324,6 @@ export function useApplicationGeneration() {
     generationError,
     startGeneration,
     cancelGeneration,
+    isGenerationActive,
   };
 }

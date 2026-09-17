@@ -142,6 +142,8 @@ export default function EditProfileScreen({ navigation }) {
   const githubRef = useRef(null);
   const portfolioRef = useRef(null);
   const fieldPositions = useRef({});
+  const avatarActionInFlightRef = useRef(false);
+  const saveInFlightRef = useRef(false);
 
   const currentAvatar = avatarUri || profile?.avatar_url || null;
 
@@ -179,6 +181,16 @@ export default function EditProfileScreen({ navigation }) {
   const initials = getInitials(fullName || profile?.full_name);
 
   const handlePickImage = async () => {
+    if (
+      avatarActionInFlightRef.current ||
+      saveInFlightRef.current
+    ) {
+      return;
+    }
+
+    avatarActionInFlightRef.current = true;
+    setUploadingAvatar(true);
+
     try {
       const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!permission.granted) {
@@ -202,7 +214,6 @@ export default function EditProfileScreen({ navigation }) {
 
       const asset = result.assets[0];
       setAvatarUri(asset.uri);
-      setUploadingAvatar(true);
 
       try {
         const uploadRes = await uploadAvatar({
@@ -218,17 +229,26 @@ export default function EditProfileScreen({ navigation }) {
         console.warn('Avatar upload failed:', err);
         Alert.alert(t('common.error'), t('editProfile.uploadFailed'));
         haptics.error();
-      } finally {
-        setUploadingAvatar(false);
       }
     } catch (err) {
       console.warn('Image picker error:', err);
+    } finally {
+      avatarActionInFlightRef.current = false;
       setUploadingAvatar(false);
     }
   };
 
   const handleRemoveAvatar = async () => {
+    if (
+      avatarActionInFlightRef.current ||
+      saveInFlightRef.current
+    ) {
+      return;
+    }
+
+    avatarActionInFlightRef.current = true;
     setUploadingAvatar(true);
+
     try {
       await deleteAvatar();
       setAvatarUri(null);
@@ -239,12 +259,20 @@ export default function EditProfileScreen({ navigation }) {
       Alert.alert(t('common.error'), t('editProfile.removeFailed'));
       haptics.error();
     } finally {
+      avatarActionInFlightRef.current = false;
       setUploadingAvatar(false);
     }
   };
 
   const handleAvatarPress = () => {
-    if (uploadingAvatar) return;
+    if (
+      avatarActionInFlightRef.current ||
+      saveInFlightRef.current ||
+      uploadingAvatar ||
+      saving
+    ) {
+      return;
+    }
 
     if (currentAvatar) {
       Alert.alert(t('editProfile.avatarOptionsTitle'), t('editProfile.avatarOptionsSubtitle'), [
@@ -389,7 +417,14 @@ export default function EditProfileScreen({ navigation }) {
   };
 
   const handleSave = async () => {
-    if (saving) return;
+    if (
+      saveInFlightRef.current ||
+      avatarActionInFlightRef.current ||
+      saving ||
+      uploadingAvatar
+    ) {
+      return;
+    }
 
     const trimmedName = fullName.trim();
     const normalizedLinkedin = normalizeUrl(linkedinUrl);
@@ -426,7 +461,10 @@ export default function EditProfileScreen({ navigation }) {
     }
 
     setFieldErrors({});
+
+    saveInFlightRef.current = true;
     setSaving(true);
+
     try {
       const payload = isEmployer
         ? {
@@ -466,6 +504,7 @@ export default function EditProfileScreen({ navigation }) {
       console.warn('Profile save failed:', error);
       Alert.alert(t('common.error'), t('errors.profileSaveFailed'));
     } finally {
+      saveInFlightRef.current = false;
       setSaving(false);
     }
   };
@@ -509,10 +548,14 @@ export default function EditProfileScreen({ navigation }) {
             <TouchableOpacity
               style={styles.avatarTouchTarget}
               onPress={handleAvatarPress}
-              disabled={uploadingAvatar}
+              disabled={uploadingAvatar || saving}
               accessibilityRole="button"
               accessibilityLabel={currentAvatar ? t('editProfile.changePhoto') : t('editProfile.addPhoto')}
               accessibilityHint={t('editProfile.avatarOptionsSubtitle')}
+              accessibilityState={{
+                disabled: uploadingAvatar || saving,
+                busy: uploadingAvatar,
+              }}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
               <View style={styles.avatarContainer}>
@@ -866,6 +909,7 @@ export default function EditProfileScreen({ navigation }) {
             color={colors.accent || colors.teal}
             onPress={handleSave}
             disabled={saving || uploadingAvatar}
+            loading={saving}
             style={{ marginTop: spacing.lg }}
           />
         </ScrollView>

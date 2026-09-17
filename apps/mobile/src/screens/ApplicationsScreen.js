@@ -65,8 +65,9 @@ export default function ApplicationsScreen({ navigation }) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
-  const [statusUpdatingId, setStatusUpdatingId] = useState(null);
+  const [statusUpdatingIds, setStatusUpdatingIds] = useState(() => new Set());
   const requestGenerationRef = useRef(0);
+  const statusUpdateInFlightRef = useRef(new Set());
 
   const fetchApplicationsData = useCallback(async () => {
     const generation = ++requestGenerationRef.current;
@@ -108,8 +109,17 @@ export default function ApplicationsScreen({ navigation }) {
   };
 
   const handleQuickMarkApplied = async (applicationId) => {
+    if (statusUpdateInFlightRef.current.has(applicationId)) return;
+
+    statusUpdateInFlightRef.current.add(applicationId);
     requestGenerationRef.current += 1;
-    setStatusUpdatingId(applicationId);
+
+    setStatusUpdatingIds((current) => {
+      const next = new Set(current);
+      next.add(applicationId);
+      return next;
+    });
+
     try {
       await updateApplicationStatus(applicationId, { status: 'applied' });
       haptics.success();
@@ -119,7 +129,13 @@ export default function ApplicationsScreen({ navigation }) {
       console.warn('Failed to update status:', err);
       Alert.alert(t('common.error'), t('errors.applicationStatusUpdateFailed'));
     } finally {
-      setStatusUpdatingId(null);
+      statusUpdateInFlightRef.current.delete(applicationId);
+
+      setStatusUpdatingIds((current) => {
+        const next = new Set(current);
+        next.delete(applicationId);
+        return next;
+      });
     }
   };
 
@@ -214,7 +230,7 @@ export default function ApplicationsScreen({ navigation }) {
           <View style={styles.listContainer}>
             {applications.map((app) => {
               const hasCoverLetter = Boolean(app.generated_cover_letter);
-              const isUpdatingThis = statusUpdatingId === app.id;
+              const isUpdatingThis = statusUpdatingIds.has(app.id);
               const appliedDateText = formatDateString(app.applied_date);
 
               return (
@@ -335,6 +351,10 @@ export default function ApplicationsScreen({ navigation }) {
                         disabled={isUpdatingThis}
                         accessibilityRole="button"
                         accessibilityLabel={t('applications.markAppliedBtn')}
+                        accessibilityState={{
+                          disabled: isUpdatingThis,
+                          busy: isUpdatingThis,
+                        }}
                         hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
                       >
                         {isUpdatingThis ? (

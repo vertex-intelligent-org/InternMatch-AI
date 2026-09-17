@@ -101,6 +101,7 @@ export default function CreateOpportunityScreen({ navigation, route }) {
   const locationRef = useRef(null);
   const descriptionRef = useRef(null);
   const fieldPositions = useRef({});
+  const submitInFlightRef = useRef(false);
 
   const rememberFieldPosition = (field) => (event) => {
     fieldPositions.current[field] = event.nativeEvent.layout.y;
@@ -437,6 +438,9 @@ export default function CreateOpportunityScreen({ navigation, route }) {
       experience_requirements: experienceRequirements.trim() || null,
     };
 
+    if (submitInFlightRef.current) return;
+
+    submitInFlightRef.current = true;
     setSubmitting(true);
 
     try {
@@ -491,6 +495,7 @@ export default function CreateOpportunityScreen({ navigation, route }) {
         setErrorMessage(t('createOpportunity.errorGeneric'));
       }
     } finally {
+      submitInFlightRef.current = false;
       setSubmitting(false);
     }
   };

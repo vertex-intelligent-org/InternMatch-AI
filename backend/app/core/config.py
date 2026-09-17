@@ -4,6 +4,7 @@ All configuration values are populated strictly from environment variables.
 """
 
 from typing import List
+from urllib.parse import urlparse
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -74,7 +75,11 @@ class Settings(BaseSettings):
     ADMIN_USER_IDS: str = ""
     ALLOWED_ORIGINS: str = "http://localhost:3000,http://localhost:8000,http://localhost:19006"
 
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=(".env", ".env.local"),
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
 
     @property
     def cors_origins_list(self) -> List[str]:
@@ -189,6 +194,82 @@ def validate_production_config(cfg: Settings) -> None:
 
     if errors:
         raise RuntimeError(f"Production configuration validation failed for: {', '.join(errors)}")
+
+
+def validate_runtime_config(cfg: Settings) -> None:
+    """
+    Validate runtime isolation before network access.
+
+    Development must target local infrastructure only.
+    Production delegates to the existing production validator.
+    Other environments preserve the historical production-validator contract.
+    """
+    environment = (cfg.ENVIRONMENT or "").strip().lower()
+
+    if environment == "development":
+        errors: List[str] = []
+
+        database_host = (
+            urlparse(
+                (cfg.DATABASE_URL or "").strip()
+            ).hostname
+            or ""
+        ).lower()
+
+        supabase_host = (
+            urlparse(
+                (cfg.SUPABASE_URL or "").strip()
+            ).hostname
+            or ""
+        ).lower()
+
+        allowed_local_hosts = {
+            "127.0.0.1",
+            "localhost",
+            "::1",
+            "db",
+            "kong",
+            "supabase_db_internmatch_ai",
+            "supabase_kong_internmatch_ai",
+        }
+
+        hosted_supabase = (
+            database_host.endswith(".supabase.com")
+            or "pooler.supabase.com" in database_host
+            or supabase_host.endswith(".supabase.co")
+            or supabase_host.endswith(".supabase.com")
+        )
+
+        if hosted_supabase:
+            errors.append(
+                "development environment cannot use hosted Supabase"
+            )
+
+        if (
+            not database_host
+            or database_host not in allowed_local_hosts
+        ):
+            errors.append(
+                "development DATABASE_URL must target local infrastructure"
+            )
+
+        if (
+            not supabase_host
+            or supabase_host not in allowed_local_hosts
+        ):
+            errors.append(
+                "development SUPABASE_URL must target local infrastructure"
+            )
+
+        if errors:
+            raise RuntimeError(
+                "Development configuration isolation failed for: "
+                + "; ".join(errors)
+            )
+
+        return
+
+    validate_production_config(cfg)
 
 
 settings = Settings()

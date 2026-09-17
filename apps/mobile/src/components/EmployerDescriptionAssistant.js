@@ -102,6 +102,7 @@ export default function EmployerDescriptionAssistant({
   const [error, setError] = useState(null);
 
   const keyRef = useRef(null);
+  const generateInFlightRef = useRef(false);
 
   const canGenerate = (
     typeof title === 'string'
@@ -111,6 +112,8 @@ export default function EmployerDescriptionAssistant({
   );
 
   async function handleGenerate() {
+    if (generateInFlightRef.current) return;
+
     if (!canGenerate) {
       setError(
         t('employerProduct.description.minimumInput')
@@ -118,6 +121,7 @@ export default function EmployerDescriptionAssistant({
       return;
     }
 
+    generateInFlightRef.current = true;
     setLoading(true);
     setError(null);
 
@@ -180,6 +184,7 @@ export default function EmployerDescriptionAssistant({
         );
       }
     } finally {
+      generateInFlightRef.current = false;
       setLoading(false);
     }
   }

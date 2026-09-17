@@ -30,6 +30,7 @@ export function SavedInternshipsProvider({ children, enabled = true }) {
   const currentUserIdRef = useRef(null);
   const mutatingIdsRef = useRef(new Set());
   const refreshGenerationRef = useRef(0);
+  const refreshInFlightUserIdRef = useRef(null);
   const [mutatingIds, setMutatingIds] = useState(() => new Set());
 
   const isMutating = useCallback((internshipId) => {
@@ -39,6 +40,7 @@ export function SavedInternshipsProvider({ children, enabled = true }) {
   const clearSavedInternships = useCallback(() => {
     currentUserIdRef.current = null;
     refreshGenerationRef.current += 1;
+    refreshInFlightUserIdRef.current = null;
     mutatingIdsRef.current.clear();
     setMutatingIds(new Set());
     setSavedIds(new Set());
@@ -55,7 +57,14 @@ export function SavedInternshipsProvider({ children, enabled = true }) {
     }
 
     if (mutatingIdsRef.current.size > 0) return;
+
     const activeUserId = currentUserIdRef.current;
+
+    if (refreshInFlightUserIdRef.current === activeUserId) {
+      return;
+    }
+
+    refreshInFlightUserIdRef.current = activeUserId;
     const requestGeneration = ++refreshGenerationRef.current;
 
     if (isInitial) {
@@ -85,6 +94,10 @@ export function SavedInternshipsProvider({ children, enabled = true }) {
       setError('SAVED_LOAD_FAILED');
       throw err;
     } finally {
+      if (refreshInFlightUserIdRef.current === activeUserId) {
+        refreshInFlightUserIdRef.current = null;
+      }
+
       if (currentUserIdRef.current === activeUserId && refreshGenerationRef.current === requestGeneration) {
         if (isInitial) {
           setLoading(false);

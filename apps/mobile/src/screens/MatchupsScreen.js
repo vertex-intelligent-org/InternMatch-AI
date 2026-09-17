@@ -327,9 +327,21 @@ export default function MatchupsScreen({ navigation }) {
               <TouchableOpacity
                 style={styles.cancelCalcBtn}
                 onPress={handleStopChecking}
+                disabled={isCancelling}
                 accessibilityRole="button"
                 accessibilityLabel={t('matchups.stopChecking')}
+                accessibilityState={{
+                  disabled: isCancelling,
+                  busy: isCancelling,
+                }}
               >
+                {isCancelling && (
+                  <ActivityIndicator
+                    size="small"
+                    color={colors.accent || colors.teal}
+                    style={{ marginRight: spacing.sm }}
+                  />
+                )}
                 <Text style={styles.cancelCalcText}>{t('matchups.stopChecking')}</Text>
               </TouchableOpacity>
             </Card>

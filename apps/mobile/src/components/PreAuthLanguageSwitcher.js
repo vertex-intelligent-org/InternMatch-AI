@@ -36,6 +36,7 @@ export default function PreAuthLanguageSwitcher({
 
   const [expanded, setExpanded] = useState(false);
   const [changingLocale, setChangingLocale] = useState(null);
+  const localeChangeInFlightRef = useRef(false);
 
   const expansion = useRef(
     new Animated.Value(0)
@@ -67,6 +68,7 @@ export default function PreAuthLanguageSwitcher({
 
   const handleChange = async (nextLocale) => {
     if (
+      localeChangeInFlightRef.current ||
       disabled ||
       changingLocale
     ) {
@@ -79,6 +81,7 @@ export default function PreAuthLanguageSwitcher({
       return;
     }
 
+    localeChangeInFlightRef.current = true;
     setChangingLocale(nextLocale);
 
     try {
@@ -103,6 +106,7 @@ export default function PreAuthLanguageSwitcher({
         t('settings.languagePicker.changeFailedMessage')
       );
     } finally {
+      localeChangeInFlightRef.current = false;
       setChangingLocale(null);
     }
   };

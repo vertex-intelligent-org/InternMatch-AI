@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -35,6 +35,7 @@ export default function CoverLetterScreen({ route, navigation }) {
   const [currentStatus, setCurrentStatus] = useState(initialStatus);
   const [isUpdating, setIsUpdating] = useState(false);
   const [updateError, setUpdateError] = useState(null);
+  const submitInFlightRef = useRef(false);
 
   const handleSubmitApplication = async () => {
     if (!applicationId) {
@@ -45,6 +46,11 @@ export default function CoverLetterScreen({ route, navigation }) {
       return;
     }
 
+    if (submitInFlightRef.current || isUpdating) {
+      return;
+    }
+
+    submitInFlightRef.current = true;
     setIsUpdating(true);
     setUpdateError(null);
 
@@ -76,6 +82,7 @@ export default function CoverLetterScreen({ route, navigation }) {
         : t('errors.applicationStatusUpdateFailed', 'Failed to submit application. Please try again.');
       Alert.alert(t('common.error', 'Error'), msg);
     } finally {
+      submitInFlightRef.current = false;
       setIsUpdating(false);
     }
   };
@@ -172,6 +179,8 @@ export default function CoverLetterScreen({ route, navigation }) {
                   size="small"
                   color={colors.accent || colors.teal}
                   style={{ marginTop: spacing.lg }}
+                  accessibilityRole="progressbar"
+                  accessibilityLabel={t('coverLetter.submitApplication', 'Submit Application')}
                 />
               ) : (
                 <GradientButton

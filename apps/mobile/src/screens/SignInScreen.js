@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator } from 'react-native';
 import {
   View,
@@ -64,6 +64,8 @@ export default function SignInScreen({ navigation, route }) {
   const [pendingConfirmationEmail, setPendingConfirmationEmail] = useState(initialConfirmationEmail || '');
   const [resendLoading, setResendLoading] = useState(false);
   const [resendCooldownSeconds, setResendCooldownSeconds] = useState(0);
+  const authActionInFlightRef = useRef(false);
+  const resendInFlightRef = useRef(false);
   const { refreshProfile, setProfile } = useProfile();
 
   const rejectMissingCanonicalAccount = async () => {
@@ -109,10 +111,18 @@ export default function SignInScreen({ navigation, route }) {
 
   const handleResendConfirmation = async () => {
     const targetEmail = pendingConfirmationEmail.trim().toLowerCase();
-    if (!targetEmail || resendLoading || resendCooldownSeconds > 0) {
+    if (
+      !targetEmail ||
+      resendInFlightRef.current ||
+      authActionInFlightRef.current ||
+      resendLoading ||
+      loading ||
+      resendCooldownSeconds > 0
+    ) {
       return;
     }
 
+    resendInFlightRef.current = true;
     setResendLoading(true);
     try {
       const { error } = await resendSignupConfirmation(targetEmail);
@@ -139,6 +149,7 @@ export default function SignInScreen({ navigation, route }) {
         Alert.alert(t('common.error'), t('auth.emailConfirmation.resendFailed'));
       }
     } finally {
+      resendInFlightRef.current = false;
       setResendLoading(false);
     }
   };
@@ -152,8 +163,16 @@ export default function SignInScreen({ navigation, route }) {
       return;
     }
 
-    if (loading) return;
+    if (
+      authActionInFlightRef.current ||
+      resendInFlightRef.current ||
+      loading ||
+      resendLoading
+    ) {
+      return;
+    }
 
+    authActionInFlightRef.current = true;
     setLoading(true);
     setLoadingSource('email');
 
@@ -226,14 +245,23 @@ export default function SignInScreen({ navigation, route }) {
       }
       Alert.alert(t('common.error'), t(errorKey));
     } finally {
+      authActionInFlightRef.current = false;
       setLoading(false);
       setLoadingSource(null);
     }
   };
 
   const handleGoogle = async () => {
-    if (loading) return;
+    if (
+      authActionInFlightRef.current ||
+      resendInFlightRef.current ||
+      loading ||
+      resendLoading
+    ) {
+      return;
+    }
 
+    authActionInFlightRef.current = true;
     setLoading(true);
     setLoadingSource('google');
 
@@ -266,13 +294,22 @@ export default function SignInScreen({ navigation, route }) {
         t('errors.authSignInFailed')
       );
     } finally {
+      authActionInFlightRef.current = false;
       setLoading(false);
       setLoadingSource(null);
     }
   };
   const handleApple = async () => {
-    if (loading) return;
+    if (
+      authActionInFlightRef.current ||
+      resendInFlightRef.current ||
+      loading ||
+      resendLoading
+    ) {
+      return;
+    }
 
+    authActionInFlightRef.current = true;
     setLoading(true);
     setLoadingSource('apple');
 
@@ -313,6 +350,7 @@ export default function SignInScreen({ navigation, route }) {
         t('errors.authSignInFailed')
       );
     } finally {
+      authActionInFlightRef.current = false;
       setLoading(false);
       setLoadingSource(null);
     }
@@ -397,9 +435,13 @@ export default function SignInScreen({ navigation, route }) {
                     (resendLoading || resendCooldownSeconds > 0) && styles.resendBtnDisabled,
                   ]}
                   onPress={handleResendConfirmation}
-                  disabled={resendLoading || resendCooldownSeconds > 0}
+                  disabled={resendLoading || resendCooldownSeconds > 0 || loading}
                   activeOpacity={0.7}
                   accessibilityRole="button"
+                  accessibilityState={{
+                    disabled: resendLoading || resendCooldownSeconds > 0 || loading,
+                    busy: resendLoading,
+                  }}
                   accessibilityLabel={
                     resendLoading
                       ? t('auth.emailConfirmation.resending')
@@ -577,6 +619,8 @@ export default function SignInScreen({ navigation, route }) {
                   cornerRadius={24}
                   style={styles.appleAuthButton}
                   onPress={handleApple}
+                  pointerEvents={loading ? 'none' : 'auto'}
+                  accessibilityState={{ disabled: loading }}
                 />
               )
             )}

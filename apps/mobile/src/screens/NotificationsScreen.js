@@ -28,7 +28,13 @@ import {
 import {
   useNotifications,
 } from '../context/NotificationContext';
+import ScreenContainer from '../components/ScreenContainer';
+import ScreenHeader from '../components/ScreenHeader';
 
+
+import colors from '../theme/colors';
+import { spacing } from '../theme/spacing';
+import { typography } from '../theme/typography';
 
 function eventCopy(
   notification,
@@ -151,7 +157,7 @@ function eventCopy(
 }
 
 
-export default function NotificationsScreen() {
+export default function NotificationsScreen({ navigation }) {
   const {
     t,
   } = useTranslation();
@@ -188,51 +194,37 @@ export default function NotificationsScreen() {
 
 
   return (
-    <View style={styles.root}>
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.title}>
-            {t(
-              'notifications.title'
-            )}
-          </Text>
-
-          <Text style={styles.subtitle}>
-            {t(
-              'notifications.unreadCount',
-              {
-                count:
-                  unreadCount,
+    <ScreenContainer edges={['top', 'bottom']}>
+      <ScreenHeader
+        title={t('notifications.title')}
+        subtitle={t(
+          'notifications.unreadCount',
+          { count: unreadCount }
+        )}
+        showBack
+        navigation={navigation}
+        bordered
+        rightAction={
+          unreadCount > 0 ? (
+            <Pressable
+              accessibilityRole="button"
+              onPress={() =>
+                markAllRead()
+                  .catch(() => {})
               }
-            )}
-          </Text>
-        </View>
-
-        {unreadCount > 0 ? (
-          <Pressable
-            accessibilityRole="button"
-            onPress={() =>
-              markAllRead()
-                .catch(() => {})
-            }
-            style={styles.markAllButton}
-          >
-            <Text
-              style={
-                styles.markAllText
-              }
+              style={styles.markAllButton}
             >
-              {t(
-                'notifications.markAllRead'
-              )}
-            </Text>
-          </Pressable>
-        ) : null}
-      </View>
+              <Text style={styles.markAllText}>
+                {t('notifications.markAllRead')}
+              </Text>
+            </Pressable>
+          ) : null
+        }
+      />
 
       {loading && items.length === 0 ? (
         <View style={styles.center}>
-          <ActivityIndicator />
+          <ActivityIndicator color={colors.accent || colors.teal} />
         </View>
       ) : (
         <ScrollView
@@ -258,7 +250,7 @@ export default function NotificationsScreen() {
               <Ionicons
                 name="notifications-outline"
                 size={34}
-                color="#667085"
+                color={colors.textSecondary || colors.textMuted}
               />
 
               <Text
@@ -312,7 +304,7 @@ export default function NotificationsScreen() {
                       <Ionicons
                         name={copy.icon}
                         size={21}
-                        color="#0B5F70"
+                        color={colors.accentStrong || colors.tealDark}
                       />
                     </View>
 
@@ -368,7 +360,7 @@ export default function NotificationsScreen() {
           )}
         </ScrollView>
       )}
-    </View>
+    </ScreenContainer>
   );
 }
 
@@ -376,42 +368,42 @@ export default function NotificationsScreen() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: colors.background || colors.screenBg,
   },
 
   header: {
-    paddingHorizontal: 20,
-    paddingTop: 18,
-    paddingBottom: 14,
-    backgroundColor: '#FFFFFF',
+    minHeight: spacing.headerContentHeight + spacing.lg,
+    paddingHorizontal: spacing.screenHorizontalPadding,
+    paddingVertical: spacing.md,
+    backgroundColor: colors.background || colors.screenBg,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#E4E7EC',
+    borderBottomColor: colors.borderSubtle || colors.border,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
 
   title: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#101828',
+    ...typography.screenTitle,
+    color: colors.textPrimary || colors.textDark,
   },
 
   subtitle: {
-    marginTop: 3,
-    fontSize: 13,
-    color: '#667085',
+    ...typography.caption,
+    marginTop: spacing.xxs,
+    color: colors.textSecondary || colors.textMuted,
   },
 
   markAllButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 10,
+    minHeight: spacing.minimumTouchTarget,
+    justifyContent: 'center',
+    paddingHorizontal: spacing.sm,
   },
 
   markAllText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#0B5F70',
+    ...typography.caption,
+    fontWeight: '700',
+    color: colors.accentStrong || colors.tealDark,
   },
 
   center: {
@@ -421,24 +413,25 @@ const styles = StyleSheet.create({
   },
 
   content: {
-    padding: 16,
-    paddingBottom: 36,
-    gap: 10,
+    paddingHorizontal: spacing.screenHorizontalPadding,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.xxxl,
+    gap: spacing.sm,
   },
 
   card: {
     flexDirection: 'row',
-    gap: 12,
-    padding: 14,
-    borderRadius: 16,
-    backgroundColor: '#FFFFFF',
+    gap: spacing.md,
+    padding: spacing.lg,
+    borderRadius: spacing.radii.lg,
+    backgroundColor: colors.surface || colors.cardBg,
     borderWidth: 1,
-    borderColor: '#EAECF0',
+    borderColor: colors.borderSubtle || colors.border,
   },
 
   unreadCard: {
-    borderColor: '#98D5DC',
-    backgroundColor: '#F2FBFC',
+    borderColor: colors.accent || colors.teal,
+    backgroundColor: colors.accentSoft || '#E6F4F6',
   },
 
   iconCircle: {
@@ -447,7 +440,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#E8F5F6',
+    backgroundColor: colors.accentSoft || '#E6F4F6',
   },
 
   cardBody: {
@@ -457,54 +450,50 @@ const styles = StyleSheet.create({
   titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 7,
+    gap: spacing.sm,
   },
 
   cardTitle: {
+    ...typography.cardTitle,
     flex: 1,
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#101828',
+    color: colors.textPrimary || colors.textDark,
   },
 
   cardText: {
-    marginTop: 4,
-    fontSize: 14,
-    lineHeight: 20,
-    color: '#475467',
+    ...typography.body,
+    marginTop: spacing.xs,
+    color: colors.textSecondary || colors.textMuted,
   },
 
   timestamp: {
-    marginTop: 8,
-    fontSize: 11,
-    color: '#98A2B3',
+    ...typography.caption,
+    marginTop: spacing.sm,
+    color: colors.textTertiary || colors.textMuted,
   },
 
   unreadDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#0B5F70',
+    backgroundColor: colors.accent || colors.teal,
   },
 
   emptyCard: {
-    marginTop: 70,
+    marginTop: spacing.xxxl,
     alignItems: 'center',
-    padding: 28,
+    padding: spacing.xxl,
   },
 
   emptyTitle: {
-    marginTop: 12,
-    fontSize: 17,
-    fontWeight: '700',
-    color: '#101828',
+    ...typography.cardTitle,
+    marginTop: spacing.md,
+    color: colors.textPrimary || colors.textDark,
   },
 
   emptyBody: {
-    marginTop: 6,
+    ...typography.body,
+    marginTop: spacing.sm,
     textAlign: 'center',
-    fontSize: 14,
-    lineHeight: 20,
-    color: '#667085',
+    color: colors.textSecondary || colors.textMuted,
   },
 });

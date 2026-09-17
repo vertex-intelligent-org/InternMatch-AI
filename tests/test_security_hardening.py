@@ -22,6 +22,7 @@ if str(worker_dir) not in sys.path:
 from app.core.config import (  # noqa: E402
     Settings,
     validate_production_config,
+    validate_runtime_config,
 )
 from app.db.models import (  # noqa: E402
     InternshipListing,
@@ -98,6 +99,40 @@ def test_development_config_validation_is_noop():
     )
     # Must not raise in development
     validate_production_config(dev_cfg)
+
+
+def test_development_runtime_config_rejects_hosted_supabase():
+    """Development runtime must fail closed against hosted Supabase."""
+    cfg = Settings(
+        ENVIRONMENT="development",
+        SUPABASE_URL="https://example-project.supabase.co",
+        DATABASE_URL=(
+            "postgresql://user:password@"
+            "aws-0-region.pooler.supabase.com:5432/postgres"
+        ),
+        REDIS_URL="redis://127.0.0.1:6379/0",
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match="Development configuration isolation failed",
+    ):
+        validate_runtime_config(cfg)
+
+
+def test_development_runtime_config_accepts_local_infrastructure():
+    """Development runtime accepts the local Supabase/Redis targets."""
+    cfg = Settings(
+        ENVIRONMENT="development",
+        SUPABASE_URL="http://127.0.0.1:54321",
+        DATABASE_URL=(
+            "postgresql://postgres:local@"
+            "127.0.0.1:54322/postgres"
+        ),
+        REDIS_URL="redis://127.0.0.1:6379/0",
+    )
+
+    validate_runtime_config(cfg)
 
 
 def test_production_config_with_placeholder_supabase_url_fails():
@@ -737,6 +772,14 @@ def test_worker_redis_connection_failure_exits_and_protects_credentials(monkeypa
     sensitive_pass = "SUPER_SECRET_REDIS_PASSWORD_999"
     sensitive_url = f"redis://default:{sensitive_pass}@internal-redis:6379/0"
     sensitive_exc = f"Authentication failure for password '{sensitive_pass}'"
+
+    # This test isolates Redis connection failure/log sanitization.
+    # Runtime-environment isolation is covered independently by the
+    # validate_runtime_config regression tests above.
+    monkeypatch.setattr(
+        "worker.validate_runtime_config",
+        lambda _settings: None,
+    )
 
     monkeypatch.setattr(
         "worker.worker_settings.REDIS_URL",

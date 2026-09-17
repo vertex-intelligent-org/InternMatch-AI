@@ -13,7 +13,7 @@ from fastapi.responses import JSONResponse
 
 from app.api.router import api_router
 from app.api.v1.endpoints.health import HealthResponse, get_liveness
-from app.core.config import settings, validate_production_config
+from app.core.config import settings, validate_runtime_config
 from app.core.logging import logger
 from app.services.ai_quota import (
     AIQuotaExceededError,
@@ -28,7 +28,7 @@ from app.services.ai_quota_integration import (
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifecycle events manager for application startup and shutdown."""
-    validate_production_config(settings)
+    validate_runtime_config(settings)
     logger.info(
         f"Starting {settings.PROJECT_NAME} backend v{settings.VERSION} "
         f"[{settings.ENVIRONMENT}]"

@@ -59,6 +59,7 @@ export default function SignUpScreen({ navigation }) {
   const emailRef = useRef(null);
   const passwordRef = useRef(null);
   const fieldPositions = useRef({});
+  const authActionInFlightRef = useRef(false);
 
   const { refreshProfile, setProfile } = useProfile();
 
@@ -218,8 +219,9 @@ export default function SignUpScreen({ navigation }) {
       return;
     }
 
-    if (loading) return;
+    if (authActionInFlightRef.current || loading) return;
 
+    authActionInFlightRef.current = true;
     setLoading(true);
     setLoadingSource('email');
 
@@ -281,14 +283,17 @@ export default function SignUpScreen({ navigation }) {
       }
       Alert.alert(t('common.error'), t(errorKey));
     } finally {
+      authActionInFlightRef.current = false;
       setLoading(false);
       setLoadingSource(null);
     }
   };
 
   const handleGoogle = async () => {
-    if (loading || !ensureSocialSignupReady()) return;
+    if (authActionInFlightRef.current || loading) return;
+    if (!ensureSocialSignupReady()) return;
 
+    authActionInFlightRef.current = true;
     setLoading(true);
     setLoadingSource('google');
 
@@ -313,13 +318,16 @@ export default function SignUpScreen({ navigation }) {
         t('errors.authSignUpFailed')
       );
     } finally {
+      authActionInFlightRef.current = false;
       setLoading(false);
       setLoadingSource(null);
     }
   };
   const handleApple = async () => {
-    if (loading || !ensureSocialSignupReady()) return;
+    if (authActionInFlightRef.current || loading) return;
+    if (!ensureSocialSignupReady()) return;
 
+    authActionInFlightRef.current = true;
     setLoading(true);
     setLoadingSource('apple');
 
@@ -354,6 +362,7 @@ export default function SignUpScreen({ navigation }) {
         t('errors.authSignUpFailed')
       );
     } finally {
+      authActionInFlightRef.current = false;
       setLoading(false);
       setLoadingSource(null);
     }
@@ -741,6 +750,8 @@ export default function SignUpScreen({ navigation }) {
                   cornerRadius={24}
                   style={styles.appleAuthButton}
                   onPress={handleApple}
+                  pointerEvents={loading ? 'none' : 'auto'}
+                  accessibilityState={{ disabled: loading }}
                 />
               )
             )}

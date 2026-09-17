@@ -120,6 +120,7 @@ export default function ApplicationDetailScreen({ route, navigation }) {
   const [savingNotes, setSavingNotes] = useState(false);
   const requestGenerationRef = useRef(0);
   const mutationLockRef = useRef(false);
+  const fetchActionInFlightRef = useRef(false);
   const interviewPrepCancelPromptVisibleRef =
     useRef(false);
   const interviewPrepAllowNavigationRef =
@@ -174,14 +175,58 @@ export default function ApplicationDetailScreen({ route, navigation }) {
   }, [fetchDetail]);
 
   const handleRefresh = async () => {
-    if (mutationLockRef.current) return;
+    if (
+      mutationLockRef.current ||
+      fetchActionInFlightRef.current ||
+      loading ||
+      refreshing
+    ) {
+      return;
+    }
+
+    fetchActionInFlightRef.current = true;
     setRefreshing(true);
-    await fetchDetail(true);
+
+    try {
+      await fetchDetail(true);
+    } finally {
+      fetchActionInFlightRef.current = false;
+    }
+  };
+
+  const handleRetry = async () => {
+    if (
+      mutationLockRef.current ||
+      fetchActionInFlightRef.current ||
+      loading ||
+      refreshing
+    ) {
+      return;
+    }
+
+    fetchActionInFlightRef.current = true;
+
+    try {
+      await fetchDetail();
+    } finally {
+      fetchActionInFlightRef.current = false;
+    }
   };
 
 
   const handleSaveNotes = async () => {
-    if (!detail || !applicationId || savingNotes || mutatingStatus || refreshing || loading || mutationLockRef.current) return;
+    if (
+      !detail ||
+      !applicationId ||
+      savingNotes ||
+      mutatingStatus ||
+      refreshing ||
+      loading ||
+      mutationLockRef.current ||
+      fetchActionInFlightRef.current
+    ) {
+      return;
+    }
 
     setSavingNotes(true);
     mutationLockRef.current = true;
@@ -702,8 +747,13 @@ export default function ApplicationDetailScreen({ route, navigation }) {
               </Text>
               <TouchableOpacity
                 style={styles.retryBtn}
-                onPress={() => fetchDetail()}
+                onPress={handleRetry}
+                disabled={loading || refreshing}
                 accessibilityRole="button"
+                accessibilityState={{
+                  disabled: loading || refreshing,
+                  busy: loading,
+                }}
                 accessibilityLabel={t('common.tryAgain')}
               >
                 <Text style={[styles.retryBtnText, isRTL && styles.rtlText]}>{t('common.tryAgain')}</Text>

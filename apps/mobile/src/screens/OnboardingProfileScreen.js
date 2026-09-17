@@ -55,6 +55,7 @@ export default function OnboardingProfileScreen({ navigation, route }) {
 
   const scrollRef = useRef(null);
   const fullNameRef = useRef(null);
+  const completeInFlightRef = useRef(false);
 
   const { setProfile } = useProfile();
 
@@ -95,8 +96,9 @@ export default function OnboardingProfileScreen({ navigation, route }) {
 
     setFieldErrors({});
 
-    if (saving) return;
+    if (completeInFlightRef.current || saving) return;
 
+    completeInFlightRef.current = true;
     setSaving(true);
 
     try {
@@ -126,6 +128,7 @@ export default function OnboardingProfileScreen({ navigation, route }) {
         t('errors.profileSaveFailed')
       );
     } finally {
+      completeInFlightRef.current = false;
       setSaving(false);
     }
   };
@@ -411,6 +414,7 @@ export default function OnboardingProfileScreen({ navigation, route }) {
               color={colors.accent || colors.teal}
               onPress={handleComplete}
               disabled={saving}
+              loading={saving}
               style={styles.primaryCta}
             />
           </AuthGlassPanel>
