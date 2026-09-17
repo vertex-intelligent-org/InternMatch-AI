@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "339890739972",
+    "project_id": "internmatch-ai-344af",
+    "storage_bucket": "internmatch-ai-344af.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:339890739972:android:3a06d8b9a43058da80ce51",
+        "android_client_info": {
+          "package_name": "com.aissclub.internmatchai"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBdasUTPM-eJQq4LqK_Y62bpcuqNiLEGhY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

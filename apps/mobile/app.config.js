@@ -31,6 +31,9 @@ module.exports = ({ config }) => {
       package: isDevelopment
         ? "com.aissclub.internmatchai.dev"
         : config.android.package,
+      ...(isProduction
+        ? { googleServicesFile: "./google-services.json" }
+        : {}),
     },
     ios: {
       ...config.ios,
