@@ -1,6 +1,6 @@
 """Server-authorized internship listing administration tests."""
 
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from app.core.config import settings
 from app.db.models import InternshipListing
@@ -126,6 +126,192 @@ def test_admin_listing_routes_require_admin(
         },
     )
     assert response.status_code == 403
+
+
+def _admin_create_payload(**overrides):
+    payload = {
+        "title": "Platform Engineering Intern",
+        "company": "InternMatch AI Team",
+        "location": "Istanbul, Turkiye",
+        "work_type": "hybrid",
+        "description": (
+            "Build reliable platform services and internal tooling."
+        ),
+        "required_skills": ["Python", "Git"],
+        "preferred_skills": ["Docker"],
+        "language": "English",
+        "education_requirements": (
+            "Currently enrolled in a relevant degree."
+        ),
+        "experience_requirements": (
+            "Academic or personal software projects."
+        ),
+        "publication_status": "published",
+    }
+    payload.update(overrides)
+    return payload
+
+
+def _mock_admin_embedding(monkeypatch):
+    monkeypatch.setattr(
+        (
+            "app.api.v1.endpoints."
+            "admin_internships.generate_embedding"
+        ),
+        lambda _text: [
+            0.0
+            for _ in range(
+                settings.EMBEDDING_DIMENSION
+            )
+        ],
+    )
+
+
+def test_admin_create_opportunity_requires_admin(
+    client: TestClient,
+    mock_supabase_auth,
+    monkeypatch,
+):
+    _mock_admin_embedding(monkeypatch)
+
+    response = client.post(
+        "/api/v1/admin/internships",
+        json=_admin_create_payload(),
+    )
+    assert response.status_code == 401
+
+    user_id = uuid4()
+    token = f"non-admin-create-{user_id}"
+
+    _register_token(
+        mock_supabase_auth,
+        token=token,
+        user_id=user_id,
+        email="user@internmatch.college",
+    )
+
+    monkeypatch.setattr(
+        settings,
+        "ADMIN_USER_IDS",
+        "",
+    )
+
+    response = client.post(
+        "/api/v1/admin/internships",
+        headers={
+            "Authorization": f"Bearer {token}",
+        },
+        json=_admin_create_payload(),
+    )
+    assert response.status_code == 403
+
+
+def test_admin_can_create_published_curated_opportunity(
+    client: TestClient,
+    mock_supabase_auth,
+    monkeypatch,
+):
+    _mock_admin_embedding(monkeypatch)
+
+    headers = _admin_headers(
+        mock_supabase_auth,
+        monkeypatch,
+    )
+
+    response = client.post(
+        "/api/v1/admin/internships",
+        headers=headers,
+        json=_admin_create_payload(),
+    )
+
+    assert response.status_code == 201
+
+    body = response.json()
+
+    assert body["company"] == "InternMatch AI Team"
+    assert body["publication_status"] == "published"
+    assert body["is_active"] is True
+
+    db = TestingSessionLocal()
+    try:
+        listing = db.get(
+            InternshipListing,
+            UUID(body["id"]),
+        )
+
+        assert listing is not None
+        assert listing.listing_source == "curated"
+        assert listing.employer_user_id is None
+        assert (
+            listing.employer_organization_id
+            is None
+        )
+        assert (
+            listing.metadata_json[
+                "created_via"
+            ]
+            == "admin_console"
+        )
+        assert (
+            listing.metadata_json[
+                "created_by_admin_user_id"
+            ]
+            is not None
+        )
+    finally:
+        db.close()
+
+    public_response = client.get(
+        "/api/v1/internships"
+    )
+
+    assert public_response.status_code == 200
+    assert body["id"] in {
+        item["id"]
+        for item in public_response.json()["items"]
+    }
+
+
+def test_admin_can_create_hidden_draft_with_default_company(
+    client: TestClient,
+    mock_supabase_auth,
+    monkeypatch,
+):
+    _mock_admin_embedding(monkeypatch)
+
+    headers = _admin_headers(
+        mock_supabase_auth,
+        monkeypatch,
+    )
+
+    payload = _admin_create_payload(
+        publication_status="draft"
+    )
+    payload.pop("company")
+
+    response = client.post(
+        "/api/v1/admin/internships",
+        headers=headers,
+        json=payload,
+    )
+
+    assert response.status_code == 201
+
+    body = response.json()
+
+    assert body["company"] == "InternMatch AI Team"
+    assert body["publication_status"] == "draft"
+    assert body["is_active"] is False
+
+    public_response = client.get(
+        "/api/v1/internships"
+    )
+
+    assert public_response.status_code == 200
+    assert body["id"] not in {
+        item["id"]
+        for item in public_response.json()["items"]
+    }
 
 
 def test_admin_can_list_and_filter_all_states(

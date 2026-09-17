@@ -96,6 +96,20 @@ export type AdminInternshipListResponse = {
   offset: number;
 };
 
+export type AdminInternshipCreatePayload = {
+  title: string;
+  company: string;
+  location: string;
+  work_type: 'remote' | 'onsite' | 'hybrid';
+  description: string;
+  required_skills: string[];
+  preferred_skills: string[];
+  language: string | null;
+  education_requirements: string | null;
+  experience_requirements: string | null;
+  publication_status: 'draft' | 'published';
+};
+
 export type AdminUserRole =
   | 'student'
   | 'employer';

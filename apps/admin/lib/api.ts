@@ -3,6 +3,7 @@ import type {
   AdminApprovalPayload,
   AdminRejectionPayload,
   AdminSuspensionPayload,
+  AdminInternshipCreatePayload,
   AdminInternshipDetail,
   AdminInternshipListResponse,
   PublicationStatus,
@@ -301,6 +302,18 @@ export async function suspendOrganization(
     }
   );
 }
+export async function createAdminInternship(
+  payload: AdminInternshipCreatePayload
+): Promise<AdminInternshipDetail> {
+  return adminApiRequest<AdminInternshipDetail>(
+    '/admin/internships',
+    {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }
+  );
+}
+
 export async function listAdminInternships(
   publicationStatus?: PublicationStatus,
   limit = 20,

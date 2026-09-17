@@ -3,16 +3,19 @@
 from typing import Literal, Optional
 from uuid import UUID
 
+from app.core.config import settings
 from app.core.security import AuthenticatedUser, require_admin_user
 from app.db.session import get_db
 from app.repositories.employer_organization import EmployerOrganizationRepository
 from app.repositories.internship import InternshipRepository
 from app.repositories.notification import NotificationRepository
 from app.schemas.internship import (
+    AdminInternshipCreateRequest,
     InternshipDetailResponse,
     InternshipListResponse,
     InternshipSummaryResponse,
 )
+from app.services.embeddings import generate_embedding
 from app.services.employer_product_policy import (
     EmployerListingLimitError,
     require_employer_listing_capacity,
@@ -66,6 +69,78 @@ def list_admin_internships(
         total=total,
         limit=limit,
         offset=offset,
+    )
+
+
+@router.post(
+    "",
+    response_model=InternshipDetailResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_admin_internship(
+    payload: AdminInternshipCreateRequest,
+    admin_user: AuthenticatedUser = Depends(require_admin_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Create an administrator-curated internship opportunity.
+
+    The listing is never attributed to an employer account. Administrators
+    may create either a hidden draft or an immediately public curated
+    opportunity.
+    """
+    try:
+        embedding = generate_embedding(payload.description)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=(
+                "Opportunity creation is temporarily unavailable."
+            ),
+        ) from exc
+
+    if (
+        not embedding
+        or not isinstance(embedding, (list, tuple))
+        or len(embedding) != settings.EMBEDDING_DIMENSION
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=(
+                "Opportunity creation is temporarily unavailable."
+            ),
+        )
+
+    try:
+        listing = InternshipRepository.create_curated_listing(
+            db=db,
+            title=payload.title,
+            company=payload.company,
+            location=payload.location,
+            work_type=payload.work_type,
+            description=payload.description,
+            required_skills=payload.required_skills,
+            preferred_skills=payload.preferred_skills,
+            language=payload.language,
+            education_requirements=payload.education_requirements,
+            experience_requirements=payload.experience_requirements,
+            publication_status=payload.publication_status,
+            description_embedding=list(embedding),
+            metadata={
+                "created_via": "admin_console",
+                "created_by_admin_user_id": str(
+                    admin_user.user_id
+                ),
+            },
+        )
+        db.commit()
+        db.refresh(listing)
+    except Exception:
+        db.rollback()
+        raise
+
+    return InternshipDetailResponse.from_orm_model(
+        listing
     )
 
 

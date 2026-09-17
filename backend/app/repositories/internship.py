@@ -3,7 +3,7 @@ Internship Catalog Repository Foundation
 Provides read-only database access for internship listings.
 """
 
-from typing import List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 from uuid import UUID
 
 from app.db.models import EmployerOrganization, InternshipListing
@@ -193,6 +193,57 @@ class InternshipRepository:
             experience_requirements=experience_requirements,
             description_embedding=description_embedding,
         )
+        db.add(listing)
+        db.flush()
+        return listing
+
+    @staticmethod
+    def create_curated_listing(
+        db: Session,
+        *,
+        title: str,
+        company: str,
+        location: str,
+        work_type: str,
+        description: str,
+        required_skills: List[str],
+        preferred_skills: List[str],
+        publication_status: str,
+        language: Optional[str] = "English",
+        education_requirements: Optional[str] = None,
+        experience_requirements: Optional[str] = None,
+        description_embedding: Optional[List[float]] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> InternshipListing:
+        """
+        Create a server-authorized curated listing.
+
+        Curated listings are never represented as employer-authored:
+        both employer ownership fields remain NULL and provenance is
+        retained in metadata_json for internal auditability.
+        """
+        is_published = publication_status == "published"
+
+        listing = InternshipListing(
+            employer_user_id=None,
+            employer_organization_id=None,
+            listing_source="curated",
+            publication_status=publication_status,
+            is_active=is_published,
+            title=title,
+            company=company,
+            location=location,
+            work_type=work_type,
+            description=description,
+            required_skills=required_skills or [],
+            preferred_skills=preferred_skills or [],
+            language=language or "English",
+            education_requirements=education_requirements,
+            experience_requirements=experience_requirements,
+            description_embedding=description_embedding,
+            metadata_json=metadata or {},
+        )
+
         db.add(listing)
         db.flush()
         return listing

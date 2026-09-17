@@ -693,6 +693,13 @@ export default function AdminListingsPage() {
           </div>
 
           <div className="topbarActions">
+            <Link
+              className="button buttonPrimary"
+              href="/listings/new"
+            >
+              Create opportunity
+            </Link>
+
             <label className="statusFilter">
               <span>Status</span>
 

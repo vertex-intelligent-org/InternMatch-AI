@@ -88,6 +88,34 @@ class InternshipUpdateRequest(InternshipCreateRequest):
 
 
 
+class AdminInternshipCreateRequest(InternshipCreateRequest):
+    """
+    Server-authorized curated opportunity creation payload.
+
+    Admin-created opportunities intentionally remain distinct from
+    employer-owned listings. The company label is explicit and defaults
+    to the InternMatch AI team identity for first-party opportunities.
+    """
+
+    company: str = Field(
+        default="InternMatch AI Team",
+        min_length=1,
+        max_length=200,
+        description="Public company or organization display name",
+    )
+    publication_status: Literal["draft", "published"] = Field(
+        default="published",
+        description="Create hidden draft or publish immediately",
+    )
+
+    @field_validator("company", mode="before")
+    @classmethod
+    def validate_admin_company(cls, v: Any) -> str:
+        if not isinstance(v, str) or not v.strip():
+            raise ValueError("Company must be a non-empty string.")
+        return v.strip()
+
+
 class InternshipSummaryResponse(BaseModel):
     """Schema for individual internship item in catalog listing endpoint."""
 
