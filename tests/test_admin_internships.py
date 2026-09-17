@@ -3,7 +3,11 @@
 from uuid import UUID, uuid4
 
 from app.core.config import settings
-from app.db.models import InternshipListing
+from app.db.models import (
+    Application,
+    InternshipListing,
+    StudentProfile,
+)
 from fastapi.testclient import TestClient
 
 from tests.db import TestingSessionLocal
@@ -448,3 +452,251 @@ def test_admin_listing_detail_returns_404(
     )
 
     assert response.status_code == 404
+
+def test_admin_can_manage_listing_applicants(
+    client: TestClient,
+    mock_supabase_auth,
+    monkeypatch,
+):
+    listing_id = _create_listing()
+
+    candidate_a_user_id = uuid4()
+    candidate_b_user_id = uuid4()
+
+    with TestingSessionLocal() as db:
+        candidate_a = StudentProfile(
+            id=uuid4(),
+            user_id=candidate_a_user_id,
+            full_name="Admin Candidate A",
+            preferences={
+                "account_type": "intern",
+                "department": "Computer Science",
+            },
+        )
+        candidate_b = StudentProfile(
+            id=uuid4(),
+            user_id=candidate_b_user_id,
+            full_name="Admin Candidate B",
+            preferences={
+                "account_type": "intern",
+                "department": "Engineering",
+            },
+        )
+
+        db.add_all([
+            candidate_a,
+            candidate_b,
+        ])
+        db.flush()
+
+        application_a = Application(
+            id=uuid4(),
+            student_id=candidate_a.id,
+            internship_id=listing_id,
+            status="applied",
+            generated_cover_letter=(
+                "Candidate A cover letter."
+            ),
+        )
+        application_b = Application(
+            id=uuid4(),
+            student_id=candidate_b.id,
+            internship_id=listing_id,
+            status="applied",
+            generated_cover_letter=(
+                "Candidate B cover letter."
+            ),
+        )
+
+        db.add_all([
+            application_a,
+            application_b,
+        ])
+        db.commit()
+
+        application_a_id = application_a.id
+        application_b_id = application_b.id
+
+    headers = _admin_headers(
+        mock_supabase_auth,
+        monkeypatch,
+    )
+
+    applicants = client.get(
+        (
+            f"/api/v1/admin/internships/"
+            f"{listing_id}/applicants"
+        ),
+        headers=headers,
+    )
+
+    assert applicants.status_code == 200
+    assert applicants.json()["total"] == 2
+
+    interview = client.post(
+        (
+            f"/api/v1/admin/internships/"
+            f"{listing_id}/applicants/"
+            f"{application_a_id}/interview"
+        ),
+        headers=headers,
+        json={
+            "scheduled_at": (
+                "2099-01-15T10:30:00+03:00"
+            ),
+            "mode": "online",
+            "location": (
+                "https://meet.example.com/interview"
+            ),
+            "message": "See you then.",
+        },
+    )
+
+    assert interview.status_code == 200
+    assert (
+        interview.json()["status"]
+        == "interviewing"
+    )
+
+    accepted = client.patch(
+        (
+            f"/api/v1/admin/internships/"
+            f"{listing_id}/applicants/"
+            f"{application_a_id}/status"
+        ),
+        headers=headers,
+        json={
+            "status": "accepted",
+        },
+    )
+
+    assert accepted.status_code == 200
+    assert (
+        accepted.json()["status"]
+        == "accepted"
+    )
+
+    rejected = client.patch(
+        (
+            f"/api/v1/admin/internships/"
+            f"{listing_id}/applicants/"
+            f"{application_b_id}/status"
+        ),
+        headers=headers,
+        json={
+            "status": "rejected",
+        },
+    )
+
+    assert rejected.status_code == 200
+    assert (
+        rejected.json()["status"]
+        == "rejected"
+    )
+
+    with TestingSessionLocal() as db:
+        persisted_a = db.get(
+            Application,
+            application_a_id,
+        )
+        persisted_b = db.get(
+            Application,
+            application_b_id,
+        )
+
+        assert persisted_a.status == "accepted"
+        assert (
+            persisted_a.interview_location
+            == "https://meet.example.com/interview"
+        )
+        assert persisted_b.status == "rejected"
+
+
+def test_admin_can_delete_listing_without_applications(
+    client: TestClient,
+    mock_supabase_auth,
+    monkeypatch,
+):
+    listing_id = _create_listing()
+
+    headers = _admin_headers(
+        mock_supabase_auth,
+        monkeypatch,
+    )
+
+    response = client.delete(
+        (
+            f"/api/v1/admin/internships/"
+            f"{listing_id}"
+        ),
+        headers=headers,
+    )
+
+    assert response.status_code == 204
+
+    with TestingSessionLocal() as db:
+        assert (
+            db.get(
+                InternshipListing,
+                listing_id,
+            )
+            is None
+        )
+
+
+def test_admin_delete_fails_closed_when_any_application_exists(
+    client: TestClient,
+    mock_supabase_auth,
+    monkeypatch,
+):
+    listing_id = _create_listing()
+    candidate_user_id = uuid4()
+
+    with TestingSessionLocal() as db:
+        candidate = StudentProfile(
+            id=uuid4(),
+            user_id=candidate_user_id,
+            full_name="Draft Candidate",
+            preferences={
+                "account_type": "intern",
+            },
+        )
+        db.add(candidate)
+        db.flush()
+
+        db.add(
+            Application(
+                id=uuid4(),
+                student_id=candidate.id,
+                internship_id=listing_id,
+                status="saved",
+                generated_cover_letter=(
+                    "Candidate draft must be preserved."
+                ),
+            )
+        )
+        db.commit()
+
+    headers = _admin_headers(
+        mock_supabase_auth,
+        monkeypatch,
+    )
+
+    response = client.delete(
+        (
+            f"/api/v1/admin/internships/"
+            f"{listing_id}"
+        ),
+        headers=headers,
+    )
+
+    assert response.status_code == 409
+
+    with TestingSessionLocal() as db:
+        assert (
+            db.get(
+                InternshipListing,
+                listing_id,
+            )
+            is not None
+        )

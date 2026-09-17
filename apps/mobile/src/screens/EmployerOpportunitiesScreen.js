@@ -27,7 +27,13 @@ import PressableCard from '../components/PressableCard';
 import Chip from '../components/Chip';
 import GradientButton from '../components/GradientButton';
 import Reveal from '../components/motion/Reveal';
-import { ApiError, getEmployerInternships, closeEmployerOpportunity, getEmployerOrganization } from '../services/api';
+import {
+  ApiError,
+  getEmployerInternships,
+  closeEmployerOpportunity,
+  deleteEmployerOpportunity,
+  getEmployerOrganization,
+} from '../services/api';
 
 export default function EmployerOpportunitiesScreen({ navigation }) {
   const { t } = useTranslation();
@@ -35,6 +41,7 @@ export default function EmployerOpportunitiesScreen({ navigation }) {
   const insets = useSafeAreaInsets();
 
   const scrollViewRef = useRef(null);
+  const deleteInFlightRef = useRef(false);
   useTabScroll('Opportunities', scrollViewRef);
   useScrollToTop(scrollViewRef);
   const onScroll = useTabScrollReporter(20);
@@ -44,6 +51,7 @@ export default function EmployerOpportunitiesScreen({ navigation }) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [closingId, setClosingId] = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
   const [error, setError] = useState(null);
   const [createGateLoading, setCreateGateLoading] = useState(false);
 
@@ -138,6 +146,104 @@ export default function EmployerOpportunitiesScreen({ navigation }) {
       ]
     );
   }, [t]);
+
+  const handleDeleteOpportunity =
+    useCallback(
+      (item) => {
+        Alert.alert(
+          t(
+            'employerOpportunities.deleteAlertTitle',
+            'Delete Opportunity?'
+          ),
+          t(
+            'employerOpportunities.deleteAlertMessage',
+            'This permanently deletes the opportunity. Deletion is allowed only when no candidate has started an application. This action cannot be undone.'
+          ),
+          [
+            {
+              text: t(
+                'common.cancel',
+                'Cancel'
+              ),
+              style: 'cancel',
+            },
+            {
+              text: t(
+                'employerOpportunities.deleteConfirmBtn',
+                'Delete Permanently'
+              ),
+              style: 'destructive',
+              onPress: async () => {
+                if (
+                  deleteInFlightRef.current
+                ) {
+                  return;
+                }
+
+                deleteInFlightRef.current =
+                  true;
+
+                setDeletingId(item.id);
+
+                try {
+                  await deleteEmployerOpportunity(
+                    item.id
+                  );
+
+                  setOpportunities(
+                    (previous) =>
+                      previous.filter(
+                        (opportunity) =>
+                          opportunity.id
+                          !== item.id
+                      )
+                  );
+
+                  setTotalCount(
+                    (previous) =>
+                      Math.max(
+                        0,
+                        previous - 1
+                      )
+                  );
+                } catch (err) {
+                  console.warn(
+                    'Failed to delete opportunity:',
+                    err
+                  );
+
+                  const message =
+                    err instanceof ApiError
+                    && err.status === 409
+                      ? t(
+                          'employerOpportunities.deleteBlocked',
+                          'This opportunity already has candidate application activity. Close it instead to preserve candidate history.'
+                        )
+                      : t(
+                          'employerOpportunities.deleteError',
+                          'Failed to delete opportunity. Please try again.'
+                        );
+
+                  Alert.alert(
+                    t(
+                      'common.error',
+                      'Error'
+                    ),
+                    message
+                  );
+                } finally {
+                  deleteInFlightRef.current =
+                    false;
+
+                  setDeletingId(null);
+                }
+              },
+            },
+          ]
+        );
+      },
+      [t]
+    );
 
   useFocusEffect(
     useCallback(() => {
@@ -591,6 +697,58 @@ export default function EmployerOpportunitiesScreen({ navigation }) {
                         )}
 
                         <TouchableOpacity
+                          style={[
+                            styles.deleteOpportunityBtn,
+                            isRTL && styles.rowRTL,
+                          ]}
+                          onPress={() =>
+                            handleDeleteOpportunity(
+                              item
+                            )
+                          }
+                          disabled={
+                            deletingId === item.id
+                          }
+                          accessibilityRole="button"
+                          accessibilityLabel={`${t(
+                            'employerOpportunities.deleteBtn',
+                            'Delete'
+                          )} ${item.title}`}
+                        >
+                          {deletingId === item.id ? (
+                            <ActivityIndicator
+                              size="small"
+                              color={
+                                colors.danger
+                                || '#EF4444'
+                              }
+                            />
+                          ) : (
+                            <>
+                              <Ionicons
+                                name="trash-outline"
+                                size={15}
+                                color={
+                                  colors.danger
+                                  || '#EF4444'
+                                }
+                              />
+                              <Text
+                                style={[
+                                  styles.deleteOpportunityBtnText,
+                                  isRTL && styles.rtlText,
+                                ]}
+                              >
+                                {t(
+                                  'employerOpportunities.deleteBtn',
+                                  'Delete'
+                                )}
+                              </Text>
+                            </>
+                          )}
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
                           style={[styles.viewApplicantsBtn, isRTL && styles.rowRTL]}
                           onPress={() =>
                             navigation.navigate('EmployerApplicants', {
@@ -860,7 +1018,8 @@ const styles = StyleSheet.create({
   cardActionGroup: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.md,
+    flexWrap: 'wrap',
+    gap: spacing.xs,
   },
   closeOpportunityBtn: {
     paddingVertical: spacing.xxs,
@@ -871,6 +1030,20 @@ const styles = StyleSheet.create({
   closeOpportunityBtnText: {
     ...typography.button,
     color: colors.textSecondary || '#6B7280',
+    fontSize: 12,
+  },
+  deleteOpportunityBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: spacing.xxs,
+    paddingHorizontal: spacing.xs,
+    minHeight: spacing.minimumTouchTarget,
+    justifyContent: 'center',
+  },
+  deleteOpportunityBtnText: {
+    ...typography.button,
+    color: colors.danger || '#EF4444',
     fontSize: 12,
   },
   postedDate: {

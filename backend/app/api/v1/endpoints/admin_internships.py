@@ -6,9 +6,17 @@ from uuid import UUID
 from app.core.config import settings
 from app.core.security import AuthenticatedUser, require_admin_user
 from app.db.session import get_db
+from app.repositories.application import ApplicationRepository
 from app.repositories.employer_organization import EmployerOrganizationRepository
 from app.repositories.internship import InternshipRepository
+from app.repositories.matching_data import MatchingDataRepository
 from app.repositories.notification import NotificationRepository
+from app.schemas.application import (
+    EmployerApplicantListResponse,
+    EmployerApplicantResponse,
+    EmployerApplicantStatusUpdateRequest,
+    EmployerInterviewScheduleRequest,
+)
 from app.schemas.internship import (
     AdminInternshipCreateRequest,
     InternshipDetailResponse,
@@ -20,7 +28,7 @@ from app.services.employer_product_policy import (
     EmployerListingLimitError,
     require_employer_listing_capacity,
 )
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
 
 router = APIRouter()
@@ -141,6 +149,409 @@ def create_admin_internship(
 
     return InternshipDetailResponse.from_orm_model(
         listing
+    )
+
+
+def _admin_applicant_response(
+    db: Session,
+    application,
+    profile,
+) -> EmployerApplicantResponse:
+    skills = (
+        MatchingDataRepository
+        .get_skill_names_for_student(
+            db,
+            profile.id,
+        )
+    )
+
+    skill_evidence = (
+        MatchingDataRepository
+        .get_skill_evidence_for_student(
+            db,
+            profile.id,
+        )
+    )
+
+    # Deliberately omit recruiter ranking/match scoring from the admin
+    # workflow. Admin actions operate on candidate status and evidence,
+    # not automated ranking.
+    return EmployerApplicantResponse.from_orm_data(
+        application=application,
+        profile=profile,
+        match=None,
+        skills=skills,
+        skill_evidence=skill_evidence,
+        ai_rank=None,
+    )
+
+
+@router.get(
+    "/{id}/applicants",
+    response_model=EmployerApplicantListResponse,
+)
+def list_admin_internship_applicants(
+    id: UUID,
+    _admin_user: AuthenticatedUser = Depends(
+        require_admin_user
+    ),
+    db: Session = Depends(get_db),
+):
+    listing = InternshipRepository.get_by_id(
+        db=db,
+        internship_id=id,
+    )
+
+    if listing is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Internship listing not found.",
+        )
+
+    records = (
+        ApplicationRepository
+        .list_applicants_for_admin_internship(
+            db=db,
+            internship_id=id,
+        )
+    )
+
+    items = [
+        _admin_applicant_response(
+            db,
+            application,
+            profile,
+        )
+        for application, profile
+        in records
+    ]
+
+    return EmployerApplicantListResponse(
+        items=items,
+        total=len(items),
+        internship_id=id,
+    )
+
+
+@router.get(
+    "/{id}/applicants/{application_id}",
+    response_model=EmployerApplicantResponse,
+)
+def get_admin_internship_applicant(
+    id: UUID,
+    application_id: UUID,
+    _admin_user: AuthenticatedUser = Depends(
+        require_admin_user
+    ),
+    db: Session = Depends(get_db),
+):
+    record = (
+        ApplicationRepository
+        .get_applicant_detail_for_admin(
+            db=db,
+            internship_id=id,
+            application_id=application_id,
+        )
+    )
+
+    if record is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Applicant record not found.",
+        )
+
+    application, profile = record
+
+    return _admin_applicant_response(
+        db,
+        application,
+        profile,
+    )
+
+
+@router.patch(
+    "/{id}/applicants/{application_id}/status",
+    response_model=EmployerApplicantResponse,
+)
+def update_admin_internship_applicant_status(
+    id: UUID,
+    application_id: UUID,
+    payload: EmployerApplicantStatusUpdateRequest,
+    _admin_user: AuthenticatedUser = Depends(
+        require_admin_user
+    ),
+    db: Session = Depends(get_db),
+):
+    record = (
+        ApplicationRepository
+        .get_applicant_detail_for_admin(
+            db=db,
+            internship_id=id,
+            application_id=application_id,
+        )
+    )
+
+    if record is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Applicant record not found.",
+        )
+
+    application, profile = record
+
+    current_status = application.status
+    target_status = payload.status
+
+    if current_status in (
+        "accepted",
+        "rejected",
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "Application is already in terminal "
+                f"'{current_status}' status."
+            ),
+        )
+
+    valid_transitions = {
+        "applied": {
+            "interviewing",
+            "accepted",
+            "rejected",
+        },
+        "interviewing": {
+            "accepted",
+            "rejected",
+        },
+    }
+
+    if (
+        target_status
+        not in valid_transitions.get(
+            current_status,
+            set(),
+        )
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "Invalid status transition from "
+                f"'{current_status}' to "
+                f"'{target_status}'."
+            ),
+        )
+
+    try:
+        updated = (
+            ApplicationRepository
+            .update_status(
+                db=db,
+                application=application,
+                status=target_status,
+                notes=payload.notes,
+                notes_provided=(
+                    payload.notes is not None
+                ),
+            )
+        )
+        db.commit()
+        db.refresh(updated)
+    except Exception:
+        db.rollback()
+        raise
+
+    return _admin_applicant_response(
+        db,
+        updated,
+        profile,
+    )
+
+
+@router.post(
+    "/{id}/applicants/{application_id}/interview",
+    response_model=EmployerApplicantResponse,
+)
+def schedule_admin_internship_applicant_interview(
+    id: UUID,
+    application_id: UUID,
+    payload: EmployerInterviewScheduleRequest,
+    _admin_user: AuthenticatedUser = Depends(
+        require_admin_user
+    ),
+    db: Session = Depends(get_db),
+):
+    record = (
+        ApplicationRepository
+        .get_applicant_detail_for_admin(
+            db=db,
+            internship_id=id,
+            application_id=application_id,
+        )
+    )
+
+    if record is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Applicant record not found.",
+        )
+
+    application, profile = record
+
+    if application.status in (
+        "accepted",
+        "rejected",
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "A terminal application cannot "
+                "be scheduled for interview."
+            ),
+        )
+
+    if application.status not in (
+        "applied",
+        "interviewing",
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "Only applied or interviewing "
+                "applications can be scheduled."
+            ),
+        )
+
+    if (
+        payload.scheduled_at.tzinfo is None
+        or payload.scheduled_at.utcoffset()
+        is None
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "Interview scheduled_at must "
+                "include a timezone offset."
+            ),
+        )
+
+    normalized_location = (
+        payload.location.strip()
+    )
+
+    if not normalized_location:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "Interview location or meeting "
+                "URL is required."
+            ),
+        )
+
+    normalized_message = (
+        payload.message.strip()
+        if (
+            payload.message
+            and payload.message.strip()
+        )
+        else None
+    )
+
+    try:
+        application.interview_scheduled_at = (
+            payload.scheduled_at
+        )
+        application.interview_mode = (
+            payload.mode
+        )
+        application.interview_location = (
+            normalized_location
+        )
+        application.interview_message = (
+            normalized_message
+        )
+
+        if application.status == "applied":
+            ApplicationRepository.update_status(
+                db=db,
+                application=application,
+                status="interviewing",
+            )
+
+        db.commit()
+        db.refresh(application)
+    except Exception:
+        db.rollback()
+        raise
+
+    return _admin_applicant_response(
+        db,
+        application,
+        profile,
+    )
+
+
+@router.delete(
+    "/{id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_admin_internship(
+    id: UUID,
+    _admin_user: AuthenticatedUser = Depends(
+        require_admin_user
+    ),
+    db: Session = Depends(get_db),
+):
+    """
+    Permanently delete a listing only when no candidate has started an
+    application. Otherwise the admin must close the listing instead.
+    """
+    listing = (
+        InternshipRepository
+        .get_by_id_for_update(
+            db=db,
+            internship_id=id,
+        )
+    )
+
+    if listing is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Internship listing not found.",
+        )
+
+    application_count = (
+        ApplicationRepository
+        .count_for_internship(
+            db=db,
+            internship_id=id,
+        )
+    )
+
+    if application_count > 0:
+        db.rollback()
+
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "This opportunity cannot be permanently deleted "
+                "because a candidate has already started an "
+                "application. Close the opportunity instead."
+            ),
+        )
+
+    try:
+        InternshipRepository.delete_listing(
+            db=db,
+            listing=listing,
+        )
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+
+    return Response(
+        status_code=status.HTTP_204_NO_CONTENT
     )
 
 

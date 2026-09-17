@@ -1403,6 +1403,17 @@ export async function closeEmployerOpportunity(
   );
 }
 
+export async function deleteEmployerOpportunity(
+  id: string
+): Promise<void> {
+  await apiRequest<void>(
+    `/internships/${encodeURIComponent(id)}`,
+    {
+      method: 'DELETE',
+    }
+  );
+}
+
 export type EmployerInterviewSchedulePayload = {
   scheduled_at: string;
   mode: 'online' | 'onsite';

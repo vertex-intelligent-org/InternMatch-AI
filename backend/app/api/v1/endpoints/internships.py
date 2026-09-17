@@ -688,6 +688,79 @@ def download_employer_applicant_cv_content(
     )
 
 
+@router.delete(
+    "/{id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_internship_opportunity(
+    id: UUID,
+    current_user: AuthenticatedUser = Depends(
+        require_employer_user
+    ),
+    db: Session = Depends(get_db),
+):
+    """
+    Permanently delete an employer-owned opportunity only before any
+    candidate has started an application.
+
+    Once an Application exists, the opportunity must be closed instead so
+    candidate-authored history and tracker context are preserved.
+    """
+    listing = (
+        InternshipRepository
+        .get_by_id_and_owner_for_update(
+            db=db,
+            internship_id=id,
+            employer_user_id=(
+                current_user.user_id
+            ),
+        )
+    )
+
+    if listing is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=(
+                "Internship opportunity not found "
+                "or not owned by current user."
+            ),
+        )
+
+    application_count = (
+        ApplicationRepository
+        .count_for_internship(
+            db=db,
+            internship_id=id,
+        )
+    )
+
+    if application_count > 0:
+        db.rollback()
+
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "This opportunity cannot be permanently deleted "
+                "because a candidate has already started an "
+                "application. Close the opportunity instead."
+            ),
+        )
+
+    try:
+        InternshipRepository.delete_listing(
+            db=db,
+            listing=listing,
+        )
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+
+    return Response(
+        status_code=status.HTTP_204_NO_CONTENT
+    )
+
+
 @router.post("/{id}/close", response_model=InternshipDetailResponse)
 def close_internship_opportunity(
     id: UUID,

@@ -3096,3 +3096,170 @@ def test_a4b_migration_defines_authoritative_publication_lifecycle():
         in migration
     )
     assert "CREATE TRIGGER" in migration
+
+def test_employer_can_permanently_delete_owned_listing_without_applications(
+    client: TestClient,
+):
+    employer_user_id = uuid4()
+
+    _create_profile(
+        employer_user_id,
+        "Delete Employer",
+        account_type="employer",
+    )
+
+    headers = {
+        "Authorization":
+        f"Bearer valid-user-{employer_user_id}"
+    }
+
+    created = client.post(
+        "/api/v1/internships",
+        headers=headers,
+        json={
+            "title": "Delete Me Internship",
+            "location": "Remote",
+            "work_type": "remote",
+            "description": "Temporary listing.",
+            "required_skills": ["Python"],
+        },
+    )
+
+    assert created.status_code == 201
+
+    listing_id = created.json()["id"]
+
+    deleted = client.delete(
+        f"/api/v1/internships/{listing_id}",
+        headers=headers,
+    )
+
+    assert deleted.status_code == 204
+
+    with TestingSessionLocal() as db:
+        assert (
+            db.get(
+                InternshipListing,
+                UUID(listing_id),
+            )
+            is None
+        )
+
+
+def test_employer_delete_fails_closed_when_application_exists(
+    client: TestClient,
+):
+    employer_user_id = uuid4()
+    candidate_user_id = uuid4()
+
+    _create_profile(
+        employer_user_id,
+        "Protected Employer",
+        account_type="employer",
+    )
+
+    candidate = _create_profile(
+        candidate_user_id,
+        "Protected Candidate",
+        account_type="intern",
+    )
+
+    headers = {
+        "Authorization":
+        f"Bearer valid-user-{employer_user_id}"
+    }
+
+    created = client.post(
+        "/api/v1/internships",
+        headers=headers,
+        json={
+            "title": "Protected Internship",
+            "location": "Remote",
+            "work_type": "remote",
+            "description": "Must preserve candidate work.",
+            "required_skills": [],
+        },
+    )
+
+    assert created.status_code == 201
+    listing_id = UUID(created.json()["id"])
+
+    with TestingSessionLocal() as db:
+        db.add(
+            Application(
+                id=uuid4(),
+                student_id=candidate.id,
+                internship_id=listing_id,
+                status="saved",
+                generated_cover_letter=(
+                    "Candidate authored draft."
+                ),
+            )
+        )
+        db.commit()
+
+    deleted = client.delete(
+        f"/api/v1/internships/{listing_id}",
+        headers=headers,
+    )
+
+    assert deleted.status_code == 409
+
+    with TestingSessionLocal() as db:
+        assert (
+            db.get(
+                InternshipListing,
+                listing_id,
+            )
+            is not None
+        )
+
+
+def test_employer_cannot_delete_other_employer_listing(
+    client: TestClient,
+):
+    owner_user_id = uuid4()
+    other_user_id = uuid4()
+
+    _create_profile(
+        owner_user_id,
+        "Listing Owner",
+        account_type="employer",
+    )
+    _create_profile(
+        other_user_id,
+        "Other Employer",
+        account_type="employer",
+    )
+
+    headers = {
+        "Authorization":
+        f"Bearer valid-user-{owner_user_id}"
+    }
+
+    created = client.post(
+        "/api/v1/internships",
+        headers=headers,
+        json={
+            "title": "Owner Only Internship",
+            "location": "Remote",
+            "work_type": "remote",
+            "description": "Tenant isolation.",
+            "required_skills": [],
+        },
+    )
+
+    assert created.status_code == 201
+
+    attempted = client.delete(
+        (
+            "/api/v1/internships/"
+            + created.json()["id"]
+        ),
+        headers={
+            "Authorization":
+            f"Bearer valid-user-{other_user_id}"
+        },
+    )
+
+    assert attempted.status_code == 404

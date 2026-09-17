@@ -17,6 +17,10 @@ import type {
   AdminUserRole,
   AdminUserListResponse,
   AdminUserDetail,
+  AdminApplicantItem,
+  AdminApplicantListResponse,
+  AdminApplicantStatusPayload,
+  AdminInterviewSchedulePayload,
 } from './types';
 
 type JsonRecord = Record<string, unknown>;
@@ -632,6 +636,75 @@ export async function requestChangesAdminInternship(
     ),
     {
       method: 'POST',
+    }
+  );
+}
+
+export async function listAdminInternshipApplicants(
+  internshipId: string
+): Promise<AdminApplicantListResponse> {
+  return adminApiRequest<AdminApplicantListResponse>(
+    (
+      '/admin/internships/'
+      + encodeURIComponent(internshipId)
+      + '/applicants'
+    ),
+    {
+      method: 'GET',
+    }
+  );
+}
+
+export async function updateAdminInternshipApplicantStatus(
+  internshipId: string,
+  applicationId: string,
+  payload: AdminApplicantStatusPayload
+): Promise<AdminApplicantItem> {
+  return adminApiRequest<AdminApplicantItem>(
+    (
+      '/admin/internships/'
+      + encodeURIComponent(internshipId)
+      + '/applicants/'
+      + encodeURIComponent(applicationId)
+      + '/status'
+    ),
+    {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    }
+  );
+}
+
+export async function scheduleAdminInternshipApplicantInterview(
+  internshipId: string,
+  applicationId: string,
+  payload: AdminInterviewSchedulePayload
+): Promise<AdminApplicantItem> {
+  return adminApiRequest<AdminApplicantItem>(
+    (
+      '/admin/internships/'
+      + encodeURIComponent(internshipId)
+      + '/applicants/'
+      + encodeURIComponent(applicationId)
+      + '/interview'
+    ),
+    {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }
+  );
+}
+
+export async function deleteAdminInternship(
+  internshipId: string
+): Promise<void> {
+  await adminApiRequest<void>(
+    (
+      '/admin/internships/'
+      + encodeURIComponent(internshipId)
+    ),
+    {
+      method: 'DELETE',
     }
   );
 }

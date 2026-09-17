@@ -321,6 +321,30 @@ class InternshipRepository:
         return db.scalar(stmt)
 
     @staticmethod
+    def get_by_id_and_owner_for_update(
+        db: Session,
+        internship_id: UUID,
+        employer_user_id: UUID,
+    ) -> Optional[InternshipListing]:
+        """
+        Fetch and lock one listing while enforcing employer ownership.
+        """
+        stmt = (
+            select(InternshipListing)
+            .where(
+                InternshipListing.id
+                == internship_id,
+                InternshipListing.employer_user_id
+                == employer_user_id,
+            )
+            .with_for_update()
+            .execution_options(
+                populate_existing=True
+            )
+        )
+        return db.scalar(stmt)
+
+    @staticmethod
     def update_employer_listing(
         db: Session,
         listing: InternshipListing,
@@ -438,3 +462,17 @@ class InternshipRepository:
         listing.is_active = False
         db.flush()
         return listing
+
+    @staticmethod
+    def delete_listing(
+        db: Session,
+        listing: InternshipListing,
+    ) -> None:
+        """
+        Permanently delete a listing.
+
+        Callers must first enforce ownership/authorization and verify that
+        no Application rows reference the listing.
+        """
+        db.delete(listing)
+        db.flush()

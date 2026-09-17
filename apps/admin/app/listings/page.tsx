@@ -3,6 +3,7 @@
 import {
   useCallback,
   useEffect,
+  useRef,
   useState,
 } from 'react';
 import Link from 'next/link';
@@ -11,6 +12,7 @@ import { useRouter } from 'next/navigation';
 import {
   ApiError,
   closeAdminInternship,
+  deleteAdminInternship,
   getAdminInternship,
   listAdminInternships,
   reopenAdminInternship,
@@ -116,6 +118,9 @@ function statusClass(
 
 export default function AdminListingsPage() {
   const router = useRouter();
+
+  const deleteMutationRef =
+    useRef(false);
 
   const [pageState, setPageState] =
     useState<PageState>('loading');
@@ -452,6 +457,72 @@ export default function AdminListingsPage() {
     );
   }
 
+  async function deleteListing() {
+    if (
+      !selected
+      || mutating
+      || deleteMutationRef.current
+    ) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      (
+        'Permanently delete '
+        + selected.title
+        + '?\n\n'
+        + 'Deletion is allowed only when no '
+        + 'candidate has started an application. '
+        + 'This action cannot be undone.'
+      )
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    deleteMutationRef.current = true;
+    setMutating(true);
+    setPageError(null);
+    setSuccess(null);
+
+    try {
+      const deletedTitle =
+        selected.title;
+
+      await deleteAdminInternship(
+        selected.id
+      );
+
+      setSelected(null);
+      setSelectedId(null);
+
+      await loadListings(
+        selectedStatus,
+        null
+      );
+
+      setSuccess(
+        deletedTitle
+        + ' was permanently deleted.'
+      );
+    } catch (error) {
+      const handled =
+        await handleProtectedFailure(
+          error
+        );
+
+      if (!handled) {
+        setPageError(
+          errorMessage(error)
+        );
+      }
+    } finally {
+      deleteMutationRef.current = false;
+      setMutating(false);
+    }
+  }
+
   if (pageState === 'loading') {
     return (
       <main className="centeredState">
@@ -494,14 +565,14 @@ export default function AdminListingsPage() {
     if (
       !selected
       || selected.publication_status
-        !== 'closed'
+        !== 'under_review'
     ) {
       return;
     }
 
     const confirmed = window.confirm(
       (
-        'Reopen '
+        'Approve and publish '
         + selected.title
         + '?'
       )
@@ -515,7 +586,8 @@ export default function AdminListingsPage() {
       () => approveAdminInternship(
         selected.id
       ),
-      selected.title + ' was approve and published.'
+      selected.title
+      + ' was approved and published.'
     );
   }
 
@@ -524,16 +596,16 @@ export default function AdminListingsPage() {
     if (
       !selected
       || selected.publication_status
-        === 'closed'
+        !== 'under_review'
     ) {
       return;
     }
 
     const confirmed = window.confirm(
       (
-        'Close '
+        'Request changes for '
         + selected.title
-        + '? It will no longer be publicly available.'
+        + '?'
       )
     );
 
@@ -545,7 +617,8 @@ export default function AdminListingsPage() {
       () => requestChangesAdminInternship(
         selected.id
       ),
-      selected.title + ' was returned for changes.'
+      selected.title
+      + ' was returned for changes.'
     );
   }
 
@@ -1031,6 +1104,32 @@ export default function AdminListingsPage() {
                         selected.work_type
                       )}
                     </p>
+                  </div>
+
+                  <div className="listingQuickActions">
+                    <Link
+                      className="button buttonSecondary"
+                      href={
+                        '/listings/'
+                        + selected.id
+                        + '/applicants'
+                      }
+                    >
+                      Manage applicants
+                    </Link>
+
+                    <button
+                      className="button buttonDanger"
+                      type="button"
+                      disabled={mutating}
+                      onClick={() => {
+                        void deleteListing();
+                      }}
+                    >
+                      {mutating
+                        ? 'Working...'
+                        : 'Delete permanently'}
+                    </button>
                   </div>
                 </div>
 

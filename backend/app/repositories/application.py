@@ -16,7 +16,7 @@ from app.db.models import (
     StudentProfile,
 )
 from app.repositories.notification import NotificationRepository
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 
@@ -281,3 +281,106 @@ class ApplicationRepository:
             )
         )
         return db.execute(stmt).tuples().first()
+
+    @staticmethod
+    def count_for_internship(
+        db: Session,
+        internship_id: UUID,
+    ) -> int:
+        """
+        Count every application associated with a listing.
+
+        Includes saved drafts intentionally. Permanent listing deletion
+        must not destroy or orphan candidate-authored application work.
+        """
+        stmt = (
+            select(func.count())
+            .select_from(Application)
+            .where(
+                Application.internship_id
+                == internship_id
+            )
+        )
+        return int(db.scalar(stmt) or 0)
+
+    @staticmethod
+    def list_applicants_for_admin_internship(
+        db: Session,
+        internship_id: UUID,
+    ) -> List[
+        Tuple[
+            Application,
+            StudentProfile,
+        ]
+    ]:
+        """
+        Return submitted applicants for a server-authorized admin.
+
+        Saved application drafts remain private to the candidate and are
+        deliberately excluded from the admin applicant workflow.
+        """
+        stmt = (
+            select(
+                Application,
+                StudentProfile,
+            )
+            .join(
+                StudentProfile,
+                Application.student_id
+                == StudentProfile.id,
+            )
+            .where(
+                Application.internship_id
+                == internship_id,
+                Application.status != "saved",
+            )
+            .order_by(
+                Application.applied_date
+                .desc()
+                .nullslast(),
+                Application.created_at.desc(),
+            )
+        )
+
+        return list(
+            db.execute(stmt).tuples().all()
+        )
+
+    @staticmethod
+    def get_applicant_detail_for_admin(
+        db: Session,
+        internship_id: UUID,
+        application_id: UUID,
+    ) -> Optional[
+        Tuple[
+            Application,
+            StudentProfile,
+        ]
+    ]:
+        """
+        Return one submitted applicant for a server-authorized admin.
+
+        Candidate saved drafts are not exposed to the admin workspace.
+        """
+        stmt = (
+            select(
+                Application,
+                StudentProfile,
+            )
+            .join(
+                StudentProfile,
+                Application.student_id
+                == StudentProfile.id,
+            )
+            .where(
+                Application.id
+                == application_id,
+                Application.internship_id
+                == internship_id,
+                Application.status != "saved",
+            )
+        )
+
+        return db.execute(
+            stmt
+        ).tuples().first()

@@ -2039,3 +2039,104 @@ body {
     width: 100%;
   }
 }
+
+/* Admin applicant management workspace */
+
+.listingQuickActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.adminApplicantsPage {
+  width: min(1180px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 28px 0 48px;
+}
+
+.adminApplicantsGrid {
+  display: grid;
+  gap: 18px;
+}
+
+.adminApplicantCard {
+  overflow: hidden;
+}
+
+.adminApplicantBody {
+  padding: 0 20px 20px;
+}
+
+.adminApplicantDetailGrid {
+  margin: 0 0 16px;
+}
+
+.adminCoverLetter {
+  white-space: pre-wrap;
+  line-height: 1.6;
+}
+
+.adminApplicantActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.adminInterviewForm {
+  display: grid;
+  grid-template-columns:
+    repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 18px;
+  padding: 18px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.adminInterviewWide {
+  grid-column: 1 / -1;
+}
+
+.adminInterviewActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+@media (max-width: 760px) {
+  .listingQuickActions,
+  .adminApplicantActions,
+  .adminInterviewActions {
+    width: 100%;
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .listingQuickActions .button,
+  .adminApplicantActions .button,
+  .adminInterviewActions .button {
+    width: 100%;
+  }
+
+  .adminApplicantsPage {
+    width: calc(100% - 22px);
+    padding-top: 18px;
+  }
+
+  .adminApplicantBody {
+    padding: 0 14px 14px;
+  }
+
+  .adminInterviewForm {
+    grid-template-columns: 1fr;
+    padding: 14px;
+  }
+
+  .adminInterviewWide {
+    grid-column: auto;
+  }
+}

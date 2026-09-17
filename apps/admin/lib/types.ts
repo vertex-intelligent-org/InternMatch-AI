@@ -110,6 +110,71 @@ export type AdminInternshipCreatePayload = {
   publication_status: 'draft' | 'published';
 };
 
+export type AdminApplicationStatus =
+  | 'applied'
+  | 'interviewing'
+  | 'accepted'
+  | 'rejected';
+
+export type AdminApplicantCandidate = {
+  student_id: string;
+  full_name: string;
+  headline: string | null;
+  department: string | null;
+  skills: string[];
+};
+
+export type AdminApplicantSkillEvidence = {
+  name: string;
+  cv_evidenced: boolean;
+  self_declared: boolean;
+  cv_provenance_known: boolean;
+};
+
+export type AdminApplicantItem = {
+  application_id: string;
+  internship_id: string;
+  status: AdminApplicationStatus;
+  applied_date: string | null;
+  generated_cover_letter: string | null;
+  match_score: number | null;
+  skill_score: number | null;
+  vector_score: number | null;
+  attribute_score: number | null;
+  ai_rank: number | null;
+  matching_skills: string[];
+  missing_skills: string[];
+  skill_evidence: AdminApplicantSkillEvidence[];
+  interview_scheduled_at: string | null;
+  interview_mode: 'online' | 'onsite' | null;
+  interview_location: string | null;
+  interview_message: string | null;
+  created_at: string;
+  updated_at: string;
+  candidate: AdminApplicantCandidate;
+};
+
+export type AdminApplicantListResponse = {
+  items: AdminApplicantItem[];
+  total: number;
+  internship_id: string;
+};
+
+export type AdminApplicantStatusPayload = {
+  status:
+    | 'interviewing'
+    | 'accepted'
+    | 'rejected';
+  notes?: string;
+};
+
+export type AdminInterviewSchedulePayload = {
+  scheduled_at: string;
+  mode: 'online' | 'onsite';
+  location: string;
+  message?: string | null;
+};
+
 export type AdminUserRole =
   | 'student'
   | 'employer';
