@@ -18,7 +18,7 @@ import {
   getCurrentSession,
   signOut,
 } from '../services/auth';
-import { ApiError, deleteAccount } from '../services/api';
+import { ApiError, completeSignup, deleteAccount } from '../services/api';
 import { useProfile } from '../context/ProfileContext';
 import useReducedMotion from '../hooks/useReducedMotion';
 import SplashBowArrowAnimation from '../components/motion/SplashBowArrowAnimation';
@@ -164,9 +164,74 @@ export default function SplashScreen({ navigation }) {
           return;
         }
 
-        // A Supabase identity without a canonical InternMatch profile is not
-        // an authenticated InternMatch account. Remove an orphan Auth identity
-        // rather than turning restored login state into implicit sign-up.
+        // EMAIL_CONFIRMATION_AUTO_BOOTSTRAP
+        // A confirmed email sign-up can restore a valid Supabase session
+        // before its canonical InternMatch profile exists. Explicit email
+        // provider + sign-up metadata is sufficient evidence to finish the
+        // already-started registration, but not to create a social-login
+        // account implicitly from the Sign In flow.
+        const sessionUser = data.session?.user;
+        const appMetadata = sessionUser?.app_metadata || {};
+        const signupMetadata = sessionUser?.user_metadata || {};
+
+        const providerList = Array.isArray(appMetadata.providers)
+          ? appMetadata.providers
+          : [];
+
+        const isEmailIdentity =
+          appMetadata.provider === 'email'
+          || providerList.includes('email');
+
+        const signupName =
+          typeof signupMetadata.full_name === 'string'
+            ? signupMetadata.full_name.trim()
+            : '';
+
+        const signupDepartment =
+          typeof signupMetadata.department === 'string'
+            ? signupMetadata.department.trim()
+            : '';
+
+        const signupAccountType =
+          signupMetadata.account_type === 'intern'
+          || signupMetadata.account_type === 'employer'
+            ? signupMetadata.account_type
+            : null;
+
+        if (isEmailIdentity && signupName && signupAccountType) {
+          try {
+            await completeSignup({
+              full_name: signupName,
+              department: signupDepartment || null,
+              account_type: signupAccountType,
+            });
+          } catch (error) {
+            // A concurrent callback/session restoration may have completed
+            // the profile already. Only tolerate the idempotent conflict.
+            if (!(error instanceof ApiError && error.status === 409)) {
+              throw error;
+            }
+          }
+
+          const completedProfile = await refreshProfile();
+
+          if (!completedProfile) {
+            throw new Error(
+              'Canonical profile missing after confirmed email sign-up.'
+            );
+          }
+
+          if (isMounted) {
+            pendingDestinationRef.current = 'MainTabs';
+            performNavigationIfReady();
+          }
+
+          return;
+        }
+
+        // Preserve the existing fail-closed behavior for a real orphan Auth
+        // identity such as a social identity created through Sign In without
+        // an existing canonical InternMatch account.
         await deleteAccount();
         await clearLocalSessionAfterAccountDeletion();
         clearProfile();

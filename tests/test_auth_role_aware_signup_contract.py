@@ -126,3 +126,39 @@ def test_signup_role_has_no_implicit_student_default():
 
     assert "const [accountType, setAccountType] = useState(null)" in source
     assert "if (!ensureAccountTypeSelected())" in source
+
+
+
+def test_confirmed_email_callback_bootstraps_profile_before_orphan_cleanup():
+    source = _read("apps/mobile/src/screens/SplashScreen.js")
+    root = _read("apps/mobile/src/navigation/RootNavigator.js")
+    auth = _read("apps/mobile/src/services/auth.ts")
+
+    # Cold-start and warm-app confirmation callbacks are both consumed.
+    assert "Linking.getInitialURL()" in root
+    assert "Linking.addEventListener('url'" in root
+    assert "establishSessionFromAuthCallbackUrl" in root
+
+    # The callback helper can persist a Supabase session from all supported
+    # confirmation callback credential forms.
+    assert "supabase.auth.verifyOtp" in auth
+    assert "supabase.auth.setSession" in auth
+    assert "supabase.auth.exchangeCodeForSession" in auth
+
+    # Only an explicit email identity with sign-up metadata may bootstrap the
+    # canonical account. Social orphan cleanup remains present and later.
+    assert "EMAIL_CONFIRMATION_AUTO_BOOTSTRAP" in source
+    assert "appMetadata.provider === 'email'" in source
+    assert "providerList.includes('email')" in source
+    assert "signupMetadata.full_name" in source
+    assert "signupMetadata.account_type" in source
+    assert "await completeSignup({" in source
+    assert "const completedProfile = await refreshProfile();" in source
+    assert "pendingDestinationRef.current = 'MainTabs';" in source
+    assert "await deleteAccount();" in source
+
+    bootstrap_index = source.index("EMAIL_CONFIRMATION_AUTO_BOOTSTRAP")
+    complete_index = source.index("await completeSignup({", bootstrap_index)
+    cleanup_index = source.index("await deleteAccount();", bootstrap_index)
+
+    assert bootstrap_index < complete_index < cleanup_index
