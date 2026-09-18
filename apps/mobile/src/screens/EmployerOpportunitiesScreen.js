@@ -572,12 +572,14 @@ export default function EmployerOpportunitiesScreen({ navigation }) {
                   <PressableCard
                     style={styles.oppCard}
                     padding="md"
-                    onPress={() =>
-                      navigation.navigate('EmployerApplicants', {
-                        internshipId: item.id,
-                        title: item.title,
-                      })
-                    }
+                    onPress={() => {
+                      if (item.publication_status === 'published') {
+                        navigation.navigate('EmployerApplicants', {
+                          internshipId: item.id,
+                          title: item.title,
+                        });
+                      }
+                    }}
                     accessibilityLabel={`${item.title} at ${item.company}`}
                   >
                     {/* Header: Title and Badges */}
@@ -589,26 +591,52 @@ export default function EmployerOpportunitiesScreen({ navigation }) {
                         <View
                           style={[
                             styles.statusBadge,
-                            item.is_active === false ? styles.closedBadge : styles.publishedBadge,
+                            item.publication_status === 'published'
+                              ? styles.publishedBadge
+                              : item.publication_status === 'under_review'
+                                ? styles.pendingBadge
+                                : styles.closedBadge,
                           ]}
                         >
                           <View
                             style={[
                               styles.statusDot,
-                              item.is_active === false ? styles.closedDot : styles.publishedDot,
+                              item.publication_status === 'published'
+                                ? styles.publishedDot
+                                : item.publication_status === 'under_review'
+                                  ? styles.pendingDot
+                                  : styles.closedDot,
                             ]}
                           />
                           <Text
                             style={[
                               styles.statusBadgeText,
-                              item.is_active === false
-                                ? styles.closedBadgeText
-                                : styles.publishedBadgeText,
+                              item.publication_status === 'published'
+                                ? styles.publishedBadgeText
+                                : item.publication_status === 'under_review'
+                                  ? styles.pendingBadgeText
+                                  : styles.closedBadgeText,
                             ]}
                           >
-                            {item.is_active === false
-                              ? t('employerOpportunities.statusClosed', 'Closed')
-                              : t('employerOpportunities.statusPublished', 'Published')}
+                            {item.publication_status === 'published'
+                              ? t(
+                                  'employerOpportunities.statusPublished',
+                                  'Published'
+                                )
+                              : item.publication_status === 'under_review'
+                                ? t(
+                                    'employerOpportunities.statusPending',
+                                    'Under review'
+                                  )
+                                : item.publication_status === 'closed'
+                                  ? t(
+                                      'employerOpportunities.statusClosed',
+                                      'Closed'
+                                    )
+                                  : t(
+                                      'employerOpportunities.statusDraft',
+                                      'Changes required'
+                                    )}
                           </Text>
                         </View>
                         <View style={styles.workTypeBadge}>
@@ -678,7 +706,7 @@ export default function EmployerOpportunitiesScreen({ navigation }) {
                           </TouchableOpacity>
                         )}
 
-                        {item.is_active !== false && (
+                        {item.publication_status === 'published' && (
                           <TouchableOpacity
                             style={[styles.closeOpportunityBtn, isRTL && styles.rowRTL]}
                             onPress={() => handleCloseOpportunity(item)}
@@ -748,27 +776,36 @@ export default function EmployerOpportunitiesScreen({ navigation }) {
                           )}
                         </TouchableOpacity>
 
-                        <TouchableOpacity
-                          style={[styles.viewApplicantsBtn, isRTL && styles.rowRTL]}
-                          onPress={() =>
-                            navigation.navigate('EmployerApplicants', {
-                              internshipId: item.id,
-                              title: item.title,
-                            })
-                          }
-                          accessibilityRole="button"
-                          accessibilityLabel={`${t('employerOpportunities.viewApplicants')} for ${item.title}`}
-                        >
-                          <Text style={[styles.viewApplicantsBtnText, isRTL && styles.rtlText]}>
-                            {t('employerOpportunities.viewApplicants')}
+                        {item.publication_status === 'published' ? (
+                          <TouchableOpacity
+                            style={[styles.viewApplicantsBtn, isRTL && styles.rowRTL]}
+                            onPress={() =>
+                              navigation.navigate('EmployerApplicants', {
+                                internshipId: item.id,
+                                title: item.title,
+                              })
+                            }
+                            accessibilityRole="button"
+                            accessibilityLabel={`${t('employerOpportunities.viewApplicants')} for ${item.title}`}
+                          >
+                            <Text style={[styles.viewApplicantsBtnText, isRTL && styles.rtlText]}>
+                              {t('employerOpportunities.viewApplicants')}
+                            </Text>
+                            <Ionicons
+                              name={isRTL ? 'arrow-back' : 'arrow-forward'}
+                              size={14}
+                              color={colors.accentStrong || colors.tealDark}
+                              style={[styles.browseIcon, isRTL && styles.browseIconRTL]}
+                            />
+                          </TouchableOpacity>
+                        ) : item.publication_status === 'under_review' ? (
+                          <Text style={[styles.metaText, isRTL && styles.rtlText]}>
+                            {t(
+                              'employerOpportunities.pendingReviewMessage',
+                              'Waiting for InternMatch team approval'
+                            )}
                           </Text>
-                          <Ionicons
-                            name={isRTL ? 'arrow-back' : 'arrow-forward'}
-                            size={14}
-                            color={colors.accentStrong || colors.tealDark}
-                            style={[styles.browseIcon, isRTL && styles.browseIconRTL]}
-                          />
-                        </TouchableOpacity>
+                        ) : null}
                       </View>
                     </View>
                   </PressableCard>
@@ -953,6 +990,18 @@ const styles = StyleSheet.create({
     ...typography.badge,
     fontSize: 10,
     color: '#065F46',
+    fontWeight: '600',
+  },
+  pendingBadge: {
+    backgroundColor: '#FFFBEB',
+  },
+  pendingDot: {
+    backgroundColor: '#F59E0B',
+  },
+  pendingBadgeText: {
+    ...typography.badge,
+    fontSize: 10,
+    color: '#92400E',
     fontWeight: '600',
   },
   closedBadge: {

@@ -172,7 +172,9 @@ export default function HomeScreen({ navigation }) {
       const res = await getEmployerInternships({ limit: 50 });
       const items = res.items || [];
       setEmployerOpportunities(items.slice(0, 5));
-      const publishedCount = items.filter((i) => i.is_active !== false).length;
+      const publishedCount = items.filter(
+        (i) => i.publication_status === 'published'
+      ).length;
       setEmployerTotal(publishedCount);
     } catch (err) {
       console.warn('Failed to load employer data on Home:', err);
@@ -413,7 +415,9 @@ export default function HomeScreen({ navigation }) {
                 </Card>
               )}
 
-              {!employerLoading && !employerError && employerTotal === 0 && (
+              {!employerLoading
+                && !employerError
+                && employerOpportunities.length === 0 && (
                 <Card style={styles.emptyMatchesCard} padding="lg">
                   <Ionicons name="briefcase-outline" size={36} color={colors.accent || colors.teal} />
                   <Text style={[styles.emptyMatchesTitle, isRTL && styles.rtlWriting]}>
@@ -458,12 +462,14 @@ export default function HomeScreen({ navigation }) {
                       key={opp.id}
                       style={styles.employerOppCard}
                       padding="md"
-                      onPress={() =>
-                        navigation.navigate('EmployerApplicants', {
-                          internshipId: opp.id,
-                          title: opp.title,
-                        })
-                      }
+                      onPress={() => {
+                        if (opp.publication_status === 'published') {
+                          navigation.navigate('EmployerApplicants', {
+                            internshipId: opp.id,
+                            title: opp.title,
+                          });
+                        }
+                      }}
                       accessibilityLabel={`${opp.title} at ${opp.company}`}
                     >
                       <View style={[styles.oppCardHeader, isRTL && styles.rowRTL]}>
@@ -474,26 +480,52 @@ export default function HomeScreen({ navigation }) {
                           <View
                             style={[
                               styles.statusBadge,
-                              opp.is_active === false ? styles.closedBadge : styles.publishedBadge,
+                              opp.publication_status === 'published'
+                                ? styles.publishedBadge
+                                : opp.publication_status === 'under_review'
+                                  ? styles.pendingBadge
+                                  : styles.closedBadge,
                             ]}
                           >
                             <View
                               style={[
                                 styles.statusDot,
-                                opp.is_active === false ? styles.closedDot : styles.publishedDot,
+                                opp.publication_status === 'published'
+                                  ? styles.publishedDot
+                                  : opp.publication_status === 'under_review'
+                                    ? styles.pendingDot
+                                    : styles.closedDot,
                               ]}
                             />
                             <Text
                               style={[
                                 styles.statusBadgeText,
-                                opp.is_active === false
-                                  ? styles.closedBadgeText
-                                  : styles.publishedBadgeText,
+                                opp.publication_status === 'published'
+                                  ? styles.publishedBadgeText
+                                  : opp.publication_status === 'under_review'
+                                    ? styles.pendingBadgeText
+                                    : styles.closedBadgeText,
                               ]}
                             >
-                              {opp.is_active === false
-                                ? t('employerOpportunities.statusClosed', 'Closed')
-                                : t('employerOpportunities.statusPublished', 'Published')}
+                              {opp.publication_status === 'published'
+                                ? t(
+                                    'employerOpportunities.statusPublished',
+                                    'Published'
+                                  )
+                                : opp.publication_status === 'under_review'
+                                  ? t(
+                                      'employerOpportunities.statusPending',
+                                      'Under review'
+                                    )
+                                  : opp.publication_status === 'closed'
+                                    ? t(
+                                        'employerOpportunities.statusClosed',
+                                        'Closed'
+                                      )
+                                    : t(
+                                        'employerOpportunities.statusDraft',
+                                        'Changes required'
+                                      )}
                             </Text>
                           </View>
                           <View style={styles.workTypePill}>
@@ -505,27 +537,36 @@ export default function HomeScreen({ navigation }) {
                         {opp.company} {'\u00b7'} {opp.location}
                       </Text>
                       <View style={[styles.oppFooter, isRTL && styles.rowRTL]}>
-                        <TouchableOpacity
-                          style={[styles.viewApplicantsBtn, isRTL && styles.rowRTL]}
-                          onPress={() =>
-                            navigation.navigate('EmployerApplicants', {
-                              internshipId: opp.id,
-                              title: opp.title,
-                            })
-                          }
-                          accessibilityRole="button"
-                          accessibilityLabel={`${t('home.employer.viewApplicants')} for ${opp.title}`}
-                        >
-                          <Text style={[styles.viewApplicantsBtnText, isRTL && styles.rtlText]}>
-                            {t('home.employer.viewApplicants')}
+                        {opp.publication_status === 'published' ? (
+                          <TouchableOpacity
+                            style={[styles.viewApplicantsBtn, isRTL && styles.rowRTL]}
+                            onPress={() =>
+                              navigation.navigate('EmployerApplicants', {
+                                internshipId: opp.id,
+                                title: opp.title,
+                              })
+                            }
+                            accessibilityRole="button"
+                            accessibilityLabel={`${t('home.employer.viewApplicants')} for ${opp.title}`}
+                          >
+                            <Text style={[styles.viewApplicantsBtnText, isRTL && styles.rtlText]}>
+                              {t('home.employer.viewApplicants')}
+                            </Text>
+                            <Ionicons
+                              name={isRTL ? 'arrow-back' : 'arrow-forward'}
+                              size={14}
+                              color={colors.accentStrong || colors.tealDark}
+                              style={[styles.browseIcon, isRTL && styles.browseIconRTL]}
+                            />
+                          </TouchableOpacity>
+                        ) : opp.publication_status === 'under_review' ? (
+                          <Text style={[styles.oppMeta, isRTL && styles.rtlText]}>
+                            {t(
+                              'employerOpportunities.pendingReviewMessage',
+                              'Waiting for InternMatch team approval'
+                            )}
                           </Text>
-                          <Ionicons
-                            name={isRTL ? 'arrow-back' : 'arrow-forward'}
-                            size={14}
-                            color={colors.accentStrong || colors.tealDark}
-                            style={[styles.browseIcon, isRTL && styles.browseIconRTL]}
-                          />
-                        </TouchableOpacity>
+                        ) : null}
                       </View>
                     </PressableCard>
                   ))}
@@ -1296,6 +1337,18 @@ const styles = StyleSheet.create({
     ...typography.badge,
     fontSize: 10,
     color: '#065F46',
+    fontWeight: '600',
+  },
+  pendingBadge: {
+    backgroundColor: '#FFFBEB',
+  },
+  pendingDot: {
+    backgroundColor: '#F59E0B',
+  },
+  pendingBadgeText: {
+    ...typography.badge,
+    fontSize: 10,
+    color: '#92400E',
     fontWeight: '600',
   },
   closedBadge: {

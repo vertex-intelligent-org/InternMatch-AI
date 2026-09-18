@@ -1,5 +1,6 @@
 """Server-authorized administration of internship listings."""
 
+from datetime import datetime, timezone
 from typing import Literal, Optional
 from uuid import UUID
 
@@ -947,6 +948,10 @@ def approve_admin_internship(
             )
         )
 
+        approval_decided_at = datetime.now(
+            timezone.utc
+        ).isoformat()
+
         NotificationRepository.create(
             db,
             recipient_user_id=employer_user_id,
@@ -962,7 +967,7 @@ def approve_admin_internship(
             dedupe_key=(
                 f"internship:{listing.id}:"
                 "published:"
-                f"{listing.updated_at}"
+                f"{approval_decided_at}"
             ),
         )
 
@@ -1029,6 +1034,10 @@ def request_changes_admin_internship(
         listing.publication_status = "draft"
         listing.is_active = False
 
+        changes_requested_at = datetime.now(
+            timezone.utc
+        ).isoformat()
+
         if listing.employer_user_id is not None:
             NotificationRepository.create(
                 db,
@@ -1043,7 +1052,7 @@ def request_changes_admin_internship(
                 dedupe_key=(
                     f"internship:{listing.id}:"
                     "changes-requested:"
-                    f"{listing.updated_at}"
+                    f"{changes_requested_at}"
                 ),
             )
 

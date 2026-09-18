@@ -278,6 +278,27 @@ def test_gate5_admin_review_and_visibility_integrity_contract():
         not in approve_block
     )
 
+    # Moderation notification dedupe must never depend on a
+    # nonexistent InternshipListing.updated_at attribute.
+    assert "listing.updated_at" not in admin_source
+
+    assert (
+        "approval_decided_at = datetime.now("
+        in approve_block
+    )
+
+    request_changes_start = admin_source.index(
+        "def request_changes_admin_internship("
+    )
+    request_changes_block = admin_source[
+        request_changes_start:
+    ]
+
+    assert (
+        "changes_requested_at = datetime.now("
+        in request_changes_block
+    )
+
 
     list_start = admin_source.index(
         "def list_admin_internships("
