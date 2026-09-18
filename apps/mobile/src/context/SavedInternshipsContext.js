@@ -205,6 +205,9 @@ export function SavedInternshipsProvider({ children, enabled = true }) {
         );
         setTotal((prev) => Math.max(0, prev - 1));
 
+        // Let React Native paint the optimistic state before network work.
+        await new Promise((resolve) => requestAnimationFrame(resolve));
+
         try {
           await unsaveInternship(id);
         } catch (err) {
@@ -269,6 +272,9 @@ export function SavedInternshipsProvider({ children, enabled = true }) {
           setSavedItems((prev) => [optimisticItem, ...prev]);
           setTotal((prev) => prev + 1);
         }
+
+        // Let React Native paint the optimistic state before network work.
+        await new Promise((resolve) => requestAnimationFrame(resolve));
 
         try {
           const response = await saveInternship(id);
