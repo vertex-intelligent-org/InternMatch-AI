@@ -1106,31 +1106,33 @@ export default function AdminListingsPage() {
                     </p>
                   </div>
 
-                  <div className="listingQuickActions">
-                    <Link
-                      className="button buttonSecondary"
-                      href={
-                        '/listings/'
-                        + selected.id
-                        + '/applicants'
-                      }
-                    >
-                      Manage applicants
-                    </Link>
+                  {selected.admin_managed ? (
+                    <div className="listingQuickActions">
+                      <Link
+                        className="button buttonSecondary"
+                        href={
+                          '/listings/'
+                          + selected.id
+                          + '/applicants'
+                        }
+                      >
+                        Manage applicants
+                      </Link>
 
-                    <button
-                      className="button buttonDanger"
-                      type="button"
-                      disabled={mutating}
-                      onClick={() => {
-                        void deleteListing();
-                      }}
-                    >
-                      {mutating
-                        ? 'Working...'
-                        : 'Delete permanently'}
-                    </button>
-                  </div>
+                      <button
+                        className="button buttonDanger"
+                        type="button"
+                        disabled={mutating}
+                        onClick={() => {
+                          void deleteListing();
+                        }}
+                      >
+                        {mutating
+                          ? 'Working...'
+                          : 'Delete permanently'}
+                      </button>
+                    </div>
+                  ) : null}
                 </div>
 
                 <div className="detailGrid">

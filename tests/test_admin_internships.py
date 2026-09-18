@@ -88,6 +88,21 @@ def _create_listing(
                     publication_status
                     == "published"
                 ),
+                metadata_json=(
+                    {
+                        "created_via":
+                            "admin_console",
+                        "created_by_admin_user_id":
+                            str(uuid4()),
+                    }
+                    if (
+                        listing_source
+                        == "curated"
+                        and employer_user_id
+                        is None
+                    )
+                    else {}
+                ),
             )
         )
         db.commit()
@@ -387,6 +402,7 @@ def test_admin_can_read_close_and_reopen_curated_listing(
         headers=headers,
     )
     assert response.status_code == 200
+    assert response.json()["admin_managed"] is True
     assert (
         response.json()["publication_status"]
         == "published"
@@ -700,3 +716,156 @@ def test_admin_delete_fails_closed_when_any_application_exists(
             )
             is not None
         )
+
+def test_admin_recruiter_actions_reject_employer_owned_listing(
+    client: TestClient,
+    mock_supabase_auth,
+    monkeypatch,
+):
+    employer_user_id = uuid4()
+
+    listing_id = _create_listing(
+        listing_source="employer",
+        employer_user_id=employer_user_id,
+    )
+
+    clean_listing_id = _create_listing(
+        listing_source="employer",
+        employer_user_id=employer_user_id,
+    )
+
+    candidate_user_id = uuid4()
+
+    with TestingSessionLocal() as db:
+        candidate = StudentProfile(
+            id=uuid4(),
+            user_id=candidate_user_id,
+            full_name="Employer Candidate",
+            preferences={
+                "account_type": "intern",
+            },
+        )
+
+        db.add(candidate)
+        db.flush()
+
+        application = Application(
+            id=uuid4(),
+            student_id=candidate.id,
+            internship_id=listing_id,
+            status="applied",
+            generated_cover_letter=(
+                "Employer-owned application."
+            ),
+        )
+
+        db.add(application)
+        db.commit()
+
+        application_id = application.id
+
+    headers = _admin_headers(
+        mock_supabase_auth,
+        monkeypatch,
+    )
+
+    detail = client.get(
+        (
+            f"/api/v1/admin/internships/"
+            f"{listing_id}"
+        ),
+        headers=headers,
+    )
+
+    assert detail.status_code == 200
+    assert detail.json()["admin_managed"] is False
+
+    applicants = client.get(
+        (
+            f"/api/v1/admin/internships/"
+            f"{listing_id}/applicants"
+        ),
+        headers=headers,
+    )
+
+    applicant_detail = client.get(
+        (
+            f"/api/v1/admin/internships/"
+            f"{listing_id}/applicants/"
+            f"{application_id}"
+        ),
+        headers=headers,
+    )
+
+    status_update = client.patch(
+        (
+            f"/api/v1/admin/internships/"
+            f"{listing_id}/applicants/"
+            f"{application_id}/status"
+        ),
+        headers=headers,
+        json={
+            "status": "accepted",
+        },
+    )
+
+    interview = client.post(
+        (
+            f"/api/v1/admin/internships/"
+            f"{listing_id}/applicants/"
+            f"{application_id}/interview"
+        ),
+        headers=headers,
+        json={
+            "scheduled_at":
+                "2099-01-15T10:30:00+03:00",
+            "mode": "online",
+            "location":
+                "https://example.invalid/interview",
+            "message": "Boundary test.",
+        },
+    )
+
+    delete_clean_employer_listing = (
+        client.delete(
+            (
+                f"/api/v1/admin/internships/"
+                f"{clean_listing_id}"
+            ),
+            headers=headers,
+        )
+    )
+
+    assert applicants.status_code == 409
+    assert applicant_detail.status_code == 409
+    assert status_update.status_code == 409
+    assert interview.status_code == 409
+
+    assert (
+        delete_clean_employer_listing.status_code
+        == 409
+    )
+
+    with TestingSessionLocal() as db:
+        persisted_application = db.get(
+            Application,
+            application_id,
+        )
+
+        persisted_listing = db.get(
+            InternshipListing,
+            clean_listing_id,
+        )
+
+        assert (
+            persisted_application.status
+            == "applied"
+        )
+
+        assert (
+            persisted_application
+            .interview_scheduled_at
+            is None
+        )
+
+        assert persisted_listing is not None

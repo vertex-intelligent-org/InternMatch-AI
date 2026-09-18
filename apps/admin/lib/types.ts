@@ -83,6 +83,7 @@ export type AdminInternshipSummary = {
 
 export type AdminInternshipDetail =
   AdminInternshipSummary & {
+    admin_managed: boolean;
     description: string;
     languages: string[];
     min_education: string | null;

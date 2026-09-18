@@ -217,3 +217,50 @@ class InternshipDetailResponse(BaseModel):
             ),
             posted_at=model.created_at,
         )
+
+class AdminInternshipDetailResponse(
+    InternshipDetailResponse
+):
+    """
+    Admin-only listing detail with recruiter ownership boundary.
+
+    admin_managed=True means the opportunity was created by the
+    InternMatch admin console and has no employer ownership.
+    """
+
+    admin_managed: bool
+
+    @classmethod
+    def from_orm_model(
+        cls,
+        model: Any,
+    ) -> "AdminInternshipDetailResponse":
+        base = (
+            InternshipDetailResponse
+            .from_orm_model(model)
+        )
+
+        metadata = (
+            model.metadata_json
+            if isinstance(
+                model.metadata_json,
+                dict,
+            )
+            else {}
+        )
+
+        admin_managed = (
+            model.listing_source
+            == "curated"
+            and model.employer_user_id
+            is None
+            and model.employer_organization_id
+            is None
+            and metadata.get("created_via")
+            == "admin_console"
+        )
+
+        return cls(
+            **base.model_dump(),
+            admin_managed=admin_managed,
+        )

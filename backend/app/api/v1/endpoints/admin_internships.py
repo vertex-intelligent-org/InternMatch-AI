@@ -19,6 +19,7 @@ from app.schemas.application import (
 )
 from app.schemas.internship import (
     AdminInternshipCreateRequest,
+    AdminInternshipDetailResponse,
     InternshipDetailResponse,
     InternshipListResponse,
     InternshipSummaryResponse,
@@ -152,6 +153,79 @@ def create_admin_internship(
     )
 
 
+def _get_admin_managed_listing(
+    db: Session,
+    internship_id: UUID,
+    *,
+    for_update: bool = False,
+):
+    """
+    Return only a first-party admin-console curated listing.
+
+    Admin moderation remains allowed elsewhere for employer listings,
+    but recruiter actions must never cross the employer ownership
+    boundary.
+    """
+    if for_update:
+        listing = (
+            InternshipRepository
+            .get_by_id_for_update(
+                db=db,
+                internship_id=internship_id,
+            )
+        )
+    else:
+        listing = (
+            InternshipRepository
+            .get_by_id(
+                db=db,
+                internship_id=internship_id,
+            )
+        )
+
+    if listing is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Internship listing not found.",
+        )
+
+    metadata = (
+        listing.metadata_json
+        if isinstance(
+            listing.metadata_json,
+            dict,
+        )
+        else {}
+    )
+
+    admin_managed = (
+        listing.listing_source
+        == "curated"
+        and listing.employer_user_id
+        is None
+        and listing.employer_organization_id
+        is None
+        and metadata.get("created_via")
+        == "admin_console"
+    )
+
+    if not admin_managed:
+        db.rollback()
+
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Admin recruiter actions are limited "
+                "to opportunities created by the "
+                "admin console. Employer-owned "
+                "opportunities must be managed by "
+                "their employer."
+            ),
+        )
+
+    return listing
+
+
 def _admin_applicant_response(
     db: Session,
     application,
@@ -197,16 +271,10 @@ def list_admin_internship_applicants(
     ),
     db: Session = Depends(get_db),
 ):
-    listing = InternshipRepository.get_by_id(
+    _get_admin_managed_listing(
         db=db,
         internship_id=id,
     )
-
-    if listing is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Internship listing not found.",
-        )
 
     records = (
         ApplicationRepository
@@ -245,6 +313,11 @@ def get_admin_internship_applicant(
     ),
     db: Session = Depends(get_db),
 ):
+    _get_admin_managed_listing(
+        db=db,
+        internship_id=id,
+    )
+
     record = (
         ApplicationRepository
         .get_applicant_detail_for_admin(
@@ -282,6 +355,11 @@ def update_admin_internship_applicant_status(
     ),
     db: Session = Depends(get_db),
 ):
+    _get_admin_managed_listing(
+        db=db,
+        internship_id=id,
+    )
+
     record = (
         ApplicationRepository
         .get_applicant_detail_for_admin(
@@ -381,6 +459,11 @@ def schedule_admin_internship_applicant_interview(
     ),
     db: Session = Depends(get_db),
 ):
+    _get_admin_managed_listing(
+        db=db,
+        internship_id=id,
+    )
+
     record = (
         ApplicationRepository
         .get_applicant_detail_for_admin(
@@ -506,19 +589,11 @@ def delete_admin_internship(
     Permanently delete a listing only when no candidate has started an
     application. Otherwise the admin must close the listing instead.
     """
-    listing = (
-        InternshipRepository
-        .get_by_id_for_update(
-            db=db,
-            internship_id=id,
-        )
+    listing = _get_admin_managed_listing(
+        db=db,
+        internship_id=id,
+        for_update=True,
     )
-
-    if listing is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Internship listing not found.",
-        )
 
     application_count = (
         ApplicationRepository
@@ -557,7 +632,7 @@ def delete_admin_internship(
 
 @router.get(
     "/{id}",
-    response_model=InternshipDetailResponse,
+    response_model=AdminInternshipDetailResponse,
 )
 def get_admin_internship(
     id: UUID,
@@ -576,7 +651,7 @@ def get_admin_internship(
             detail="Internship listing not found.",
         )
 
-    return InternshipDetailResponse.from_orm_model(listing)
+    return AdminInternshipDetailResponse.from_orm_model(listing)
 
 
 @router.post(
