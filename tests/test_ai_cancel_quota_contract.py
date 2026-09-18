@@ -6,7 +6,6 @@ from app.services import (
     processing_job_cancellation as cancellation,
 )
 
-
 ROOT = Path(__file__).resolve().parents[1]
 
 
