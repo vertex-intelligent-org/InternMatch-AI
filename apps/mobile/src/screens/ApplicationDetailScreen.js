@@ -540,6 +540,10 @@ export default function ApplicationDetailScreen({ route, navigation }) {
                       false
                     );
 
+                    refreshAIUsage().catch(
+                      () => {}
+                    );
+
                     if (
                       leaveAfterCancellation
                     ) {

@@ -111,6 +111,15 @@ export default function CoverLetterDraftScreen({ route, navigation }) {
                 );
               }
 
+              refreshAIUsage().catch(
+                (usageError) => {
+                  console.warn(
+                    'AI usage refresh after application cancellation failed:',
+                    usageError
+                  );
+                }
+              );
+
               if (leaveAfterCancellation) {
                 allowNavigationRef.current = true;
 

@@ -187,16 +187,159 @@ export function useApplicationGeneration() {
             return;
           }
 
-          // Timeout check (210s)
+          // A client timeout must never abandon a server-side
+          // quota reservation. Reconcile the durable job first.
           if (Date.now() - startTimeRef.current > TIMEOUT_MS) {
-            clearPolling();
-            clearVisualProgress();
-            isGeneratingRef.current = false;
-            if (isMountedRef.current) {
-              setIsGenerating(false);
-              setGenerationError('APPLICATION_GENERATION_TIMEOUT');
+            let terminalJob = null;
+
+            try {
+              terminalJob =
+                await getProcessingJob(
+                  activeJobId
+                );
+            } catch (timeoutReconcileError) {
+              console.warn(
+                'Application timeout reconciliation failed:',
+                timeoutReconcileError
+              );
             }
-            return;
+
+            if (
+              terminalJob?.status ===
+              'completed'
+            ) {
+              clearPolling();
+              clearVisualProgress();
+              isGeneratingRef.current = false;
+              activeJobIdRef.current = null;
+
+              if (isMountedRef.current) {
+                setProgressPercent(100);
+                setIsGenerating(false);
+                setGenerationError(null);
+              }
+
+              if (onComplete) {
+                onComplete(
+                  terminalJob.result
+                );
+              }
+
+              return;
+            }
+
+            if (
+              terminalJob?.status ===
+              'failed'
+            ) {
+              clearPolling();
+              clearVisualProgress();
+              isGeneratingRef.current = false;
+              activeJobIdRef.current = null;
+
+              if (isMountedRef.current) {
+                setIsGenerating(false);
+                setGenerationError(
+                  'APPLICATION_GENERATION_FAILED'
+                );
+              }
+
+              return;
+            }
+
+            try {
+              // Still active after the client wait ceiling:
+              // cancel authoritatively so the reserved
+              // application_support quota is released.
+              await cancelProcessingJob(
+                activeJobId
+              );
+
+              clearPolling();
+              clearVisualProgress();
+              isGeneratingRef.current = false;
+              activeJobIdRef.current = null;
+
+              if (isMountedRef.current) {
+                setIsGenerating(false);
+                setGenerationError(
+                  'APPLICATION_GENERATION_TIMEOUT'
+                );
+              }
+
+              return;
+            } catch (timeoutCancelError) {
+              // Cancellation may lose a race with completion.
+              // Reconcile one final time before deciding.
+              let racedJob = null;
+
+              try {
+                racedJob =
+                  await getProcessingJob(
+                    activeJobId
+                  );
+              } catch (finalReconcileError) {
+                console.warn(
+                  'Application timeout final reconciliation failed:',
+                  finalReconcileError
+                );
+              }
+
+              if (
+                racedJob?.status ===
+                'completed'
+              ) {
+                clearPolling();
+                clearVisualProgress();
+                isGeneratingRef.current = false;
+                activeJobIdRef.current = null;
+
+                if (isMountedRef.current) {
+                  setProgressPercent(100);
+                  setIsGenerating(false);
+                  setGenerationError(null);
+                }
+
+                if (onComplete) {
+                  onComplete(
+                    racedJob.result
+                  );
+                }
+
+                return;
+              }
+
+              if (
+                racedJob?.status ===
+                'failed'
+              ) {
+                clearPolling();
+                clearVisualProgress();
+                isGeneratingRef.current = false;
+                activeJobIdRef.current = null;
+
+                if (isMountedRef.current) {
+                  setIsGenerating(false);
+                  setGenerationError(
+                    'APPLICATION_GENERATION_FAILED'
+                  );
+                }
+
+                return;
+              }
+
+              // No authoritative terminal proof yet.
+              // Keep polling the same durable job instead
+              // of abandoning a possible reservation.
+              console.warn(
+                'Application timeout cancellation is not terminal yet:',
+                timeoutCancelError
+              );
+
+              isPollingRef.current = false;
+              scheduleNextPoll();
+              return;
+            }
           }
 
           isPollingRef.current = true;

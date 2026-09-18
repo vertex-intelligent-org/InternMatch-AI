@@ -29,6 +29,7 @@ const SubscriptionContext = createContext({
 export function SubscriptionProvider({ children, enabled = true }) {
   const [backendSubscription, setBackendSubscription] = useState(null);
   const [aiUsage, setAIUsage] = useState(null);
+  const aiUsageRef = useRef(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -114,6 +115,10 @@ export function SubscriptionProvider({ children, enabled = true }) {
     [loadAllForUser]
   );
 
+  useEffect(() => {
+    aiUsageRef.current = aiUsage;
+  }, [aiUsage]);
+
   const refreshAIUsage = useCallback(async () => {
     const userId = currentUserIdRef.current;
 
@@ -144,7 +149,7 @@ export function SubscriptionProvider({ children, enabled = true }) {
   const checkAIQuotaAvailable = useCallback(
     async (featureKey) => {
       const cachedFeature =
-        aiUsage?.features?.find(
+        aiUsageRef.current?.features?.find(
           (feature) =>
             feature.feature_key ===
             featureKey
@@ -196,10 +201,7 @@ export function SubscriptionProvider({ children, enabled = true }) {
         return true;
       }
     },
-    [
-      aiUsage,
-      refreshAIUsage,
-    ]
+    [refreshAIUsage]
   );
 
   const reconcileSubscription = useCallback(async () => {

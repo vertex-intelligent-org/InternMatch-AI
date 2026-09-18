@@ -356,10 +356,130 @@ export default function CVUploadScreen({ route, navigation }) {
       console.info(
         `[CV_TIMING] timeout elapsed=${Date.now() - startTimeRef.current}ms`
       );
-      setStatus('timeout');
-      setErrorMessage('CV_TIMEOUT');
-      clearPolling();
-      return;
+
+      // A UI timeout must not abandon a durable CV quota
+      // reservation. Reconcile the authoritative job first.
+      let terminalJob = null;
+
+      try {
+        terminalJob =
+          await getProcessingJob(
+            activeJobId
+          );
+      } catch (timeoutReconcileError) {
+        console.warn(
+          'CV timeout reconciliation failed:',
+          timeoutReconcileError
+        );
+      }
+
+      if (
+        terminalJob?.status ===
+        'completed'
+      ) {
+        // Let exactly one normal poll consume the authoritative
+        // completed payload. Reset the client wait clock first,
+        // otherwise the next poll would immediately re-enter
+        // this timeout branch forever.
+        startTimeRef.current = Date.now();
+        isPollingRef.current = false;
+        scheduleNextPoll(activeJobId);
+        return;
+      }
+
+      if (
+        terminalJob?.status ===
+        'failed'
+      ) {
+        clearPolling();
+        setStatus('failed');
+        setProgressPercent(100);
+        setErrorMessage(
+          getCVJobErrorCode(
+            terminalJob.error
+          )
+        );
+        refreshAIUsageInBackground();
+        return;
+      }
+
+      try {
+        // Still queued/processing after the client ceiling.
+        // Specialized CV cancellation releases cv_analysis
+        // quota before returning success.
+        await cancelCVAnalysis(
+          activeJobId
+        );
+
+        cancelledJobIdRef.current =
+          activeJobId;
+
+        clearPolling();
+        clearVisualProgress();
+        setStatus('timeout');
+        setErrorMessage('CV_TIMEOUT');
+        setProgressPercent(0);
+        setJobId(null);
+
+        refreshAIUsageInBackground();
+        return;
+      } catch (timeoutCancelError) {
+        // Cancellation can lose a race with completion.
+        let racedJob = null;
+
+        try {
+          racedJob =
+            await getProcessingJob(
+              activeJobId
+            );
+        } catch (finalReconcileError) {
+          console.warn(
+            'CV timeout final reconciliation failed:',
+            finalReconcileError
+          );
+        }
+
+        if (
+          racedJob?.status ===
+          'completed'
+        ) {
+          // Cancellation lost to successful completion.
+          // Reset the timeout clock so the next normal poll
+          // can publish the completed benefit exactly once.
+          startTimeRef.current = Date.now();
+          isPollingRef.current = false;
+          scheduleNextPoll(activeJobId);
+          return;
+        }
+
+        if (
+          racedJob?.status ===
+          'failed'
+        ) {
+          clearPolling();
+          setStatus('failed');
+          setProgressPercent(100);
+          setErrorMessage(
+            getCVJobErrorCode(
+              racedJob.error
+            )
+          );
+          refreshAIUsageInBackground();
+          return;
+        }
+
+        // No terminal server proof: keep the same job alive
+        // and continue reconciliation instead of silently
+        // abandoning a possible quota reservation.
+        console.warn(
+          'CV timeout cancellation is not terminal yet:',
+          timeoutCancelError
+        );
+
+        isPollingRef.current = false;
+        scheduleNextPoll(activeJobId);
+        return;
+      }
     }
 
     isPollingRef.current = true;
@@ -623,6 +743,12 @@ export default function CVUploadScreen({ route, navigation }) {
               // It marks the durable job terminal and releases
               // the reserved AI allowance before returning.
               await cancelCVAnalysis(activeJobId);
+
+              // Server cancellation is authoritative and has
+              // already released any still-reserved allowance.
+              // Refresh the displayed quota without blocking
+              // the cancellation UX.
+              refreshAIUsageInBackground();
 
               if (isMountedRef.current) {
                 resetAfterCancellation(activeJobId);

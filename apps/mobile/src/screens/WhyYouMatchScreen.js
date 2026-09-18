@@ -369,6 +369,10 @@ export default function WhyYouMatchScreen({ route, navigation }) {
                     setLoading(false);
                     setError(null);
 
+                    refreshAIUsage().catch(
+                      () => {}
+                    );
+
                     if (
                       leaveAfterCancellation
                     ) {

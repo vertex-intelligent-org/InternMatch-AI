@@ -276,3 +276,108 @@ def test_employer_pro_only_ai_routes_directly():
         "navigation.navigate('Plans')"
         in shortlist
     )
+
+
+def test_student_quota_gate_callback_is_stable_across_usage_refresh():
+    provider = _read(
+        "apps/mobile/src/context/"
+        "SubscriptionProvider.js"
+    )
+
+    gate = _block(
+        provider,
+        "const checkAIQuotaAvailable",
+        "const reconcileSubscription",
+    )
+
+    assert (
+        "aiUsageRef.current?.features?.find("
+        in gate
+    )
+
+    assert (
+        "aiUsage,"
+        not in gate
+    )
+
+    assert (
+        "[refreshAIUsage]"
+        in gate
+    )
+
+
+def test_cancelled_student_ai_jobs_refresh_usage_immediately():
+    why = _read(
+        "apps/mobile/src/screens/"
+        "WhyYouMatchScreen.js"
+    )
+
+    interview = _read(
+        "apps/mobile/src/screens/"
+        "ApplicationDetailScreen.js"
+    )
+
+    why_cancel = _block(
+        why,
+        "if (\n"
+        "                    outcome.status ===\n"
+        "                    'cancelled'",
+        "if (\n"
+        "                    outcome.status ===\n"
+        "                    'failed'",
+    )
+
+    interview_cancel = _block(
+        interview,
+        "if (\n"
+        "                    outcome.status ===\n"
+        "                    'cancelled'",
+        "if (\n"
+        "                    outcome.status ===\n"
+        "                    'failed'",
+    )
+
+    assert (
+        "refreshAIUsage().catch("
+        in why_cancel
+    )
+
+    assert (
+        "refreshAIUsage().catch("
+        in interview_cancel
+    )
+
+
+def test_why_you_match_effect_cannot_be_driven_by_ai_usage_identity():
+    screen = _read(
+        "apps/mobile/src/screens/"
+        "WhyYouMatchScreen.js"
+    )
+
+    provider = _read(
+        "apps/mobile/src/context/"
+        "SubscriptionProvider.js"
+    )
+
+    assert (
+        "useEffect(() => {\n"
+        "    fetchExplanationData();\n"
+        "  }, [fetchExplanationData]);"
+        in screen
+    )
+
+    gate = _block(
+        provider,
+        "const checkAIQuotaAvailable",
+        "const reconcileSubscription",
+    )
+
+    assert (
+        "aiUsageRef.current"
+        in gate
+    )
+
+    assert (
+        "      aiUsage,\n"
+        not in gate
+    )
