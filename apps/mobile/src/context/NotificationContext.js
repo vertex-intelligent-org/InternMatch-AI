@@ -86,6 +86,11 @@ export function NotificationProvider({
   const [pushPermission, setPushPermission] =
     useState('unknown');
 
+  const [
+    pendingNotificationResponse,
+    setPendingNotificationResponse,
+  ] = useState(null);
+
   const registeredTokenRef =
     useRef(null);
 
@@ -365,11 +370,20 @@ export function NotificationProvider({
     const responded =
       Notifications
         .addNotificationResponseReceivedListener(
-          () => {
-            // Covers background/tapped push.
-            // Navigation remains user-controlled,
-            // while unread state becomes authoritative
-            // immediately on app activation.
+          (response) => {
+            const data =
+              response?.notification?.request
+                ?.content?.data;
+
+            if (
+              data
+              && typeof data === 'object'
+            ) {
+              setPendingNotificationResponse(
+                data
+              );
+            }
+
             refreshUnread();
           }
         );
@@ -415,12 +429,22 @@ export function NotificationProvider({
   }, [enabled]);
 
 
+  const clearPendingNotificationResponse =
+    useCallback(() => {
+      setPendingNotificationResponse(
+        null
+      );
+    }, []);
+
+
   const value = useMemo(
     () => ({
       items,
       unreadCount,
       loading,
       pushPermission,
+      pendingNotificationResponse,
+      clearPendingNotificationResponse,
       refreshUnread,
       refreshNotifications,
       markRead,
@@ -431,6 +455,8 @@ export function NotificationProvider({
       unreadCount,
       loading,
       pushPermission,
+      pendingNotificationResponse,
+      clearPendingNotificationResponse,
       refreshUnread,
       refreshNotifications,
       markRead,

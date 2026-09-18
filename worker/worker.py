@@ -40,6 +40,7 @@ _PRELOAD_JOB_MODULES = (
     "tasks.interview_prep_generation",
     "tasks.notification_delivery",
     "tasks.notification_email_delivery",
+    "tasks.notification_user_email_delivery",
 )
 
 

@@ -27,6 +27,10 @@ PENDING_ADMIN_EMAIL_IDS_KEY = (
     "internmatch_pending_admin_email_ids"
 )
 
+PENDING_USER_EMAIL_IDS_KEY = (
+    "internmatch_pending_user_email_ids"
+)
+
 
 def _configured_admin_user_ids() -> list[UUID]:
     values: list[UUID] = []
@@ -88,15 +92,24 @@ def _enqueue_committed_notification_deliveries(
         )
     )
 
+    pending_user_email = list(
+        session.info.pop(
+            PENDING_USER_EMAIL_IDS_KEY,
+            [],
+        )
+    )
+
     if not (
         pending_push
         or pending_email
+        or pending_user_email
     ):
         return
 
     from app.services.notification_enqueue import (
         enqueue_admin_alert_email_delivery,
         enqueue_notification_delivery,
+        enqueue_user_notification_email_delivery,
     )
 
     for notification_id in pending_push:
@@ -110,6 +123,14 @@ def _enqueue_committed_notification_deliveries(
     for notification_id in pending_email:
         try:
             enqueue_admin_alert_email_delivery(
+                notification_id
+            )
+        except Exception:
+            continue
+
+    for notification_id in pending_user_email:
+        try:
+            enqueue_user_notification_email_delivery(
                 notification_id
             )
         except Exception:
@@ -129,6 +150,10 @@ def _clear_rolled_back_notification_deliveries(
     )
     session.info.pop(
         PENDING_ADMIN_EMAIL_IDS_KEY,
+        None,
+    )
+    session.info.pop(
+        PENDING_USER_EMAIL_IDS_KEY,
         None,
     )
 
@@ -325,6 +350,35 @@ class NotificationRepository:
             if notification_id not in pending:
                 pending.append(
                     notification_id
+                )
+
+        from app.services.notification_user_email_delivery import (
+            is_user_notification_email_event,
+            user_email_delivery_configured,
+        )
+
+        if (
+            user_email_delivery_configured()
+            and is_user_notification_email_event(
+                event_type=event_type,
+                data=data or {},
+            )
+        ):
+            pending_email = db.info.setdefault(
+                PENDING_USER_EMAIL_IDS_KEY,
+                [],
+            )
+
+            email_notification_id = str(
+                notification.id
+            )
+
+            if (
+                email_notification_id
+                not in pending_email
+            ):
+                pending_email.append(
+                    email_notification_id
                 )
 
         return notification
@@ -614,6 +668,11 @@ class NotificationRepository:
             if recipient is None:
                 return None
 
+            profile = db.get(
+                StudentProfile,
+                application.student_id,
+            )
+
             return NotificationRepository.create(
                 db,
                 recipient_user_id=recipient,
@@ -626,6 +685,21 @@ class NotificationRepository:
                     ),
                     "internship_id": str(
                         application.internship_id
+                    ),
+                    "listing_title": (
+                        listing.title
+                        if listing is not None
+                        else ""
+                    ),
+                    "company": (
+                        listing.company
+                        if listing is not None
+                        else ""
+                    ),
+                    "candidate_name": (
+                        profile.full_name
+                        if profile is not None
+                        else "Candidate"
                     ),
                     "status": status,
                 },
@@ -652,6 +726,16 @@ class NotificationRepository:
 
         recipient = profile.user_id
 
+        listing = (
+            db.get(
+                InternshipListing,
+                application.internship_id,
+            )
+            if application.internship_id
+            is not None
+            else None
+        )
+
         return NotificationRepository.create(
             db,
             recipient_user_id=recipient,
@@ -666,6 +750,16 @@ class NotificationRepository:
                 ),
                 "internship_id": str(
                     application.internship_id
+                ),
+                "listing_title": (
+                    listing.title
+                    if listing is not None
+                    else ""
+                ),
+                "company": (
+                    listing.company
+                    if listing is not None
+                    else ""
                 ),
                 "status": status,
             },

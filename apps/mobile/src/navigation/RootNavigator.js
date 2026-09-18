@@ -40,6 +40,12 @@ import {
   establishSessionFromAuthCallbackUrl,
 } from '../services/auth';
 import { useProfile } from '../context/ProfileContext';
+import {
+  useNotifications,
+} from '../context/NotificationContext';
+import {
+  resolveNotificationDestination,
+} from '../services/notificationRouting';
 
 import AccountDeletionReauthScreen from '../screens/AccountDeletionReauthScreen';
 
@@ -68,7 +74,16 @@ function isEmailConfirmationUrl(url) {
 export default function RootNavigator() {
   const lastProcessedUrlRef = useRef(null);
   const currentProcessingIdRef = useRef(0);
-  const { clearProfile } = useProfile();
+  const {
+    clearProfile,
+    profile,
+  } = useProfile();
+
+  const {
+    pendingNotificationResponse,
+    clearPendingNotificationResponse,
+  } = useNotifications();
+
   const [initialRecoveryParams, setInitialRecoveryParams] = useState(null);
   const [initialEmailConfirmationResult, setInitialEmailConfirmationResult] = useState(null);
   const [initialUrlResolved, setInitialUrlResolved] = useState(false);
@@ -262,6 +277,37 @@ export default function RootNavigator() {
       subscription?.remove?.();
     };
   }, [handleIncomingUrl]);
+
+  useEffect(() => {
+    if (
+      !profile?.user_id
+      || !pendingNotificationResponse
+      || !navigationRef.isReady()
+    ) {
+      return;
+    }
+
+    const destination =
+      resolveNotificationDestination(
+        pendingNotificationResponse
+      );
+
+    clearPendingNotificationResponse();
+
+    if (!destination) {
+      return;
+    }
+
+    navigationRef.navigate(
+      destination.name,
+      destination.params
+    );
+  }, [
+    profile?.user_id,
+    pendingNotificationResponse,
+    clearPendingNotificationResponse,
+  ]);
+
 
   if (!initialUrlResolved) {
     return null;

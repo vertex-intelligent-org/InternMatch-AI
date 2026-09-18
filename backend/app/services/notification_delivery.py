@@ -310,6 +310,25 @@ def _message(
             notification.entity_id
         )
 
+    # Only explicit user-facing routing metadata is copied
+    # into the push payload. Internal/admin-only fields never
+    # cross this transport boundary.
+    for key in (
+        "application_id",
+        "internship_id",
+        "organization_id",
+        "claim_id",
+        "status",
+    ):
+        value = data.get(
+            key
+        )
+
+        if value is not None:
+            payload_data[key] = str(
+                value
+            )
+
     return {
         "to": device.expo_push_token,
         "title": title,

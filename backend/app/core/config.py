@@ -87,6 +87,7 @@ class Settings(BaseSettings):
     SMTP_FROM_EMAIL: str = ""
     SMTP_FROM_NAME: str = "InternMatch AI"
     SMTP_SECURITY: str = "starttls"
+    USER_NOTIFICATION_EMAILS_ENABLED: bool = False
 
     ALLOWED_ORIGINS: str = "http://localhost:3000,http://localhost:8000,http://localhost:19006"
 
@@ -215,6 +216,68 @@ def validate_production_config(cfg: Settings) -> None:
         ).strip():
             errors.append(
                 "SMTP_FROM_EMAIL (required when ADMIN_ALERT_EMAILS is configured)"
+            )
+
+        if cfg.SMTP_PORT <= 0:
+            errors.append(
+                "SMTP_PORT (must be positive)"
+            )
+
+        smtp_security = (
+            cfg.SMTP_SECURITY
+            or ""
+        ).strip().lower()
+
+        if smtp_security not in {
+            "starttls",
+            "ssl",
+            "none",
+        }:
+            errors.append(
+                "SMTP_SECURITY "
+                "(must be 'starttls', 'ssl', or 'none')"
+            )
+
+        smtp_username = (
+            cfg.SMTP_USERNAME
+            or ""
+        ).strip()
+
+        smtp_password = (
+            cfg.SMTP_PASSWORD
+            or ""
+        ).strip()
+
+        if bool(smtp_username) != bool(
+            smtp_password
+        ):
+            errors.append(
+                "SMTP_USERNAME/SMTP_PASSWORD "
+                "(must either both be configured or both be empty)"
+            )
+
+    # User-facing transactional notification email is opt-in.
+    # Local/test environments remain fail-safe until explicitly enabled.
+    if (
+        cfg.USER_NOTIFICATION_EMAILS_ENABLED
+        and not admin_alert_emails
+    ):
+        if not (
+            cfg.SMTP_HOST
+            or ""
+        ).strip():
+            errors.append(
+                "SMTP_HOST "
+                "(required when USER_NOTIFICATION_EMAILS_ENABLED=true)"
+            )
+
+        if not (
+            cfg.SMTP_FROM_EMAIL
+            or ""
+        ).strip():
+            errors.append(
+                "SMTP_FROM_EMAIL "
+                "(required when USER_NOTIFICATION_EMAILS_ENABLED=true)"
             )
 
         if cfg.SMTP_PORT <= 0:

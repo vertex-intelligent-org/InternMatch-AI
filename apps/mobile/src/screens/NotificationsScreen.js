@@ -28,6 +28,9 @@ import {
 import {
   useNotifications,
 } from '../context/NotificationContext';
+import {
+  resolveNotificationDestination,
+} from '../services/notificationRouting';
 import ScreenContainer from '../components/ScreenContainer';
 import ScreenHeader from '../components/ScreenHeader';
 
@@ -200,32 +203,16 @@ export default function NotificationsScreen({ navigation }) {
           ).catch(() => {});
         }
 
-        if (
-          item.event_type
-            === 'listing_changes_requested'
-        ) {
-          const dataInternshipId =
-            typeof item?.data?.internship_id
-              === 'string'
-              ? item.data.internship_id
-              : null;
+        const destination =
+          resolveNotificationDestination(
+            item
+          );
 
-          const internshipId =
-            dataInternshipId
-            || (
-              item.entity_type === 'internship'
-                ? item.entity_id
-                : null
-            );
-
-          if (internshipId) {
-            navigation.navigate(
-              'CreateOpportunity',
-              {
-                internshipId,
-              }
-            );
-          }
+        if (destination) {
+          navigation.navigate(
+            destination.name,
+            destination.params
+          );
         }
       },
       [markRead, navigation]
