@@ -37,19 +37,9 @@ const LOCALES = [
 export default function CoverLetterDraftScreen({ route, navigation }) {
   const { t } = useTranslation();
   const {
-    aiUsage,
     refreshAIUsage,
+    checkAIQuotaAvailable,
   } = useSubscription();
-
-  const applicationSupportUsage =
-    aiUsage?.features?.find(
-      (feature) =>
-        feature.feature_key ===
-        'application_support'
-    );
-
-  const isApplicationSupportExhausted =
-    applicationSupportUsage?.remaining === 0;
   const matchId = route?.params?.matchId;
   const internshipId = route?.params?.internshipId;
 
@@ -262,34 +252,15 @@ export default function CoverLetterDraftScreen({ route, navigation }) {
     setGenerationStarting(true);
 
     try {
-    if (isApplicationSupportExhausted) {
-      try {
-        const latestUsage =
-          await refreshAIUsage();
-
-        const latestSupportUsage =
-          latestUsage?.features?.find(
-            (feature) =>
-              feature.feature_key ===
-              'application_support'
-          );
-
-        if (
-          !latestSupportUsage ||
-          latestSupportUsage.remaining === 0
-        ) {
-          navigation.navigate('Plans');
-          return;
-        }
-      } catch (usageError) {
-        console.warn(
-          'AI usage refresh before application support failed:',
-          usageError
+      const canUseApplicationSupport =
+        await checkAIQuotaAvailable(
+          'application_support'
         );
+
+      if (!canUseApplicationSupport) {
         navigation.navigate('Plans');
         return;
       }
-    }
 
     if (!matchId) {
       setResolveError('MISSING_MATCH_REF');

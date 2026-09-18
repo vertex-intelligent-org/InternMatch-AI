@@ -129,9 +129,7 @@ export default function EmployerDescriptionAssistant({
       const policy = await getEmployerProductPolicy();
 
       if (!policy.internship_description_available) {
-        setError(
-          t('employerProduct.description.proOnly')
-        );
+        navigation.navigate('Plans');
         return;
       }
 
@@ -162,9 +160,8 @@ export default function EmployerDescriptionAssistant({
     } catch (generateError) {
       if (generateError instanceof ApiError) {
         if (generateError.status === 403) {
-          setError(
-            t('employerProduct.description.proOnly')
-          );
+          navigation.navigate('Plans');
+          return;
         } else if (generateError.status === 429) {
           setError(
             t('employerProduct.description.quotaUsed')

@@ -22,6 +22,7 @@ const SubscriptionContext = createContext({
   error: null,
   refreshSubscriptionState: async () => null,
   refreshAIUsage: async () => null,
+  checkAIQuotaAvailable: async () => true,
   reconcileSubscription: async () => null,
 });
 
@@ -139,6 +140,67 @@ export function SubscriptionProvider({ children, enabled = true }) {
       throw usageError;
     }
   }, [isCurrentGeneration]);
+
+  const checkAIQuotaAvailable = useCallback(
+    async (featureKey) => {
+      const cachedFeature =
+        aiUsage?.features?.find(
+          (feature) =>
+            feature.feature_key ===
+            featureKey
+        );
+
+      // Known zero quota is authoritative enough for
+      // UX routing. Do not open a picker or wait for
+      // another network round-trip before showing Plans.
+      if (
+        cachedFeature?.remaining === 0
+      ) {
+        return false;
+      }
+
+      try {
+        // Positive or unknown cached state can be stale,
+        // so refresh before starting expensive AI work.
+        const latestUsage =
+          await refreshAIUsage();
+
+        const latestFeature =
+          latestUsage?.features?.find(
+            (feature) =>
+              feature.feature_key ===
+              featureKey
+          );
+
+        if (
+          !latestFeature ||
+          typeof latestFeature.remaining !==
+            'number'
+        ) {
+          // Missing quota state is not proof of
+          // exhaustion. The feature endpoint remains
+          // the final authoritative boundary.
+          return true;
+        }
+
+        return latestFeature.remaining > 0;
+      } catch (usageError) {
+        console.warn(
+          'AI quota preflight refresh failed:',
+          usageError
+        );
+
+        // A network failure must not create a false
+        // paywall. Continue to the authoritative
+        // feature endpoint.
+        return true;
+      }
+    },
+    [
+      aiUsage,
+      refreshAIUsage,
+    ]
+  );
 
   const reconcileSubscription = useCallback(async () => {
     const userId = currentUserIdRef.current;
@@ -304,6 +366,7 @@ export function SubscriptionProvider({ children, enabled = true }) {
       error,
       refreshSubscriptionState,
       refreshAIUsage,
+      checkAIQuotaAvailable,
       reconcileSubscription,
     }),
     [
@@ -313,6 +376,7 @@ export function SubscriptionProvider({ children, enabled = true }) {
       error,
       refreshSubscriptionState,
       refreshAIUsage,
+      checkAIQuotaAvailable,
       reconcileSubscription,
     ]
   );

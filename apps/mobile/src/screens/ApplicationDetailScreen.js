@@ -94,6 +94,7 @@ export default function ApplicationDetailScreen({ route, navigation }) {
   const { t } = useTranslation();
   const {
     refreshAIUsage,
+    checkAIQuotaAvailable,
   } = useSubscription();
   const { locale, isRTL } = useLocalization();
   const applicationId =
@@ -124,6 +125,8 @@ export default function ApplicationDetailScreen({ route, navigation }) {
   const interviewPrepCancelPromptVisibleRef =
     useRef(false);
   const interviewPrepAllowNavigationRef =
+    useRef(false);
+  const interviewPrepActionInFlightRef =
     useRef(false);
 
   const {
@@ -308,16 +311,30 @@ export default function ApplicationDetailScreen({ route, navigation }) {
     async () => {
       if (
         !applicationId ||
+        interviewPrepActionInFlightRef.current ||
         interviewPrepLoading ||
         interviewPrepJobProcessing
       ) {
         return;
       }
 
+      interviewPrepActionInFlightRef.current =
+        true;
       setInterviewPrepLoading(true);
       setInterviewPrepError(false);
 
       try {
+        const canUseInterviewPrep =
+          await checkAIQuotaAvailable(
+            'interview_prep'
+          );
+
+        if (!canUseInterviewPrep) {
+          setInterviewPrepLoading(false);
+          navigation.navigate('Plans');
+          return;
+        }
+
         const outcome =
           await runInterviewPrepJob(
             () =>
@@ -403,6 +420,9 @@ export default function ApplicationDetailScreen({ route, navigation }) {
         setInterviewPrepLoading(false);
         setInterviewPrepError(true);
         haptics.error();
+      } finally {
+        interviewPrepActionInFlightRef.current =
+          false;
       }
     };
 

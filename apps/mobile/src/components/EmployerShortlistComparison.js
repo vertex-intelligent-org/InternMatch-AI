@@ -147,9 +147,7 @@ export default function EmployerShortlistComparison({
       const policy = await getEmployerProductPolicy();
 
       if (!policy.shortlist_comparison_available) {
-        setError(
-          t('employerProduct.shortlist.proOnly')
-        );
+        navigation.navigate('Plans');
         return;
       }
 
@@ -181,9 +179,8 @@ export default function EmployerShortlistComparison({
     } catch (compareError) {
       if (compareError instanceof ApiError) {
         if (compareError.status === 403) {
-          setError(
-            t('employerProduct.shortlist.proOnly')
-          );
+          navigation.navigate('Plans');
+          return;
         } else if (compareError.status === 409) {
           setError(
             t('employerProduct.shortlist.matchRequired')

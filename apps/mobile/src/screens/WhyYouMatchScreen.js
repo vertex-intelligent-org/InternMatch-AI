@@ -30,6 +30,7 @@ export default function WhyYouMatchScreen({ route, navigation }) {
   const { t } = useTranslation();
   const {
     refreshAIUsage,
+    checkAIQuotaAvailable,
   } = useSubscription();
   const { locale } = useLocalization();
   const matchId = route?.params?.matchId;
@@ -107,6 +108,27 @@ export default function WhyYouMatchScreen({ route, navigation }) {
 
         setIsNotFound(true);
         setLoading(false);
+        return;
+      }
+
+      const canUseMatchExplanation =
+        await checkAIQuotaAvailable(
+          'match_explanation'
+        );
+
+      if (
+        generation !==
+        requestGenerationRef.current
+      ) {
+        return;
+      }
+
+      if (!canUseMatchExplanation) {
+        setLoading(false);
+
+        navigation.navigate(
+          'Plans'
+        );
         return;
       }
 
@@ -234,6 +256,7 @@ export default function WhyYouMatchScreen({ route, navigation }) {
       matchId,
       navigation,
       refreshAIUsage,
+      checkAIQuotaAvailable,
       runExplanationJob,
     ]);
 

@@ -50,19 +50,9 @@ const getCVJobErrorCode = (jobError) =>
 export default function CVUploadScreen({ route, navigation }) {
   const { t } = useTranslation();
   const {
-    aiUsage,
     refreshAIUsage,
+    checkAIQuotaAvailable,
   } = useSubscription();
-
-  const cvAnalysisUsage =
-    aiUsage?.features?.find(
-      (feature) =>
-        feature.feature_key ===
-        'cv_analysis'
-    );
-
-  const isCVAnalysisExhausted =
-    cvAnalysisUsage?.remaining === 0;
   const [selectedFile, setSelectedFile] = useState(null);
   const [status, setStatus] = useState('idle'); // 'idle' | 'uploading' | 'queued' | 'processing' | 'pending_confirmation' | 'completed' | 'failed' | 'timeout'
   const [progressPercent, setProgressPercent] = useState(0);
@@ -209,36 +199,17 @@ export default function CVUploadScreen({ route, navigation }) {
     setIsUploadActionPending(true);
 
     try {
-    if (isCVAnalysisExhausted) {
-      try {
-        const latestUsage =
-          await refreshAIUsage();
-
-        const latestCVUsage =
-          latestUsage?.features?.find(
-            (feature) =>
-              feature.feature_key ===
-              'cv_analysis'
-          );
-
-        if (
-          !latestCVUsage ||
-          latestCVUsage.remaining === 0
-        ) {
-          navigation.navigate('Plans');
-          return;
-        }
-      } catch (usageError) {
-        console.warn(
-          'AI usage refresh before CV analysis failed:',
-          usageError
+      const canUseCVAnalysis =
+        await checkAIQuotaAvailable(
+          'cv_analysis'
         );
+
+      if (!canUseCVAnalysis) {
         navigation.navigate('Plans');
         return;
       }
-    }
 
-    clearPolling();
+      clearPolling();
     setErrorMessage(null);
 
     try {

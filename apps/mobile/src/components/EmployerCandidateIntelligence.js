@@ -160,11 +160,9 @@ export default function EmployerCandidateIntelligence({
   );
 
   async function ensurePolicy() {
-    if (policy !== null) {
-      return policy;
-    }
+    const nextPolicy =
+      await getEmployerProductPolicy();
 
-    const nextPolicy = await getEmployerProductPolicy();
     setPolicy(nextPolicy);
 
     return nextPolicy;
@@ -176,8 +174,11 @@ export default function EmployerCandidateIntelligence({
     setInsightLoading(true);
     setInsightError(null);
 
+    let currentPolicy = policy;
+
     try {
-      await ensurePolicy();
+      currentPolicy =
+        await ensurePolicy();
 
       if (!insightKeyRef.current) {
         insightKeyRef.current = createRequestKey(
@@ -200,7 +201,17 @@ export default function EmployerCandidateIntelligence({
       insightKeyRef.current = null;
     } catch (error) {
       if (error instanceof ApiError) {
-        if (error.status === 429) {
+        if (
+          error.status === 429 &&
+          error.code === 'AI_QUOTA_EXCEEDED'
+        ) {
+          if (
+            currentPolicy?.is_pro !== true
+          ) {
+            navigation.navigate('Plans');
+            return;
+          }
+
           setInsightError(
             'Your available AI candidate insights have been used for the current period.'
           );
@@ -236,9 +247,7 @@ export default function EmployerCandidateIntelligence({
       const nextPolicy = await ensurePolicy();
 
       if (!nextPolicy.interview_kit_available) {
-        setKitError(
-          'Interview Kit is available with Employer Pro.'
-        );
+        navigation.navigate('Plans');
         return;
       }
 
@@ -261,9 +270,8 @@ export default function EmployerCandidateIntelligence({
     } catch (error) {
       if (error instanceof ApiError) {
         if (error.status === 403) {
-          setKitError(
-            'Interview Kit is available with Employer Pro.'
-          );
+          navigation.navigate('Plans');
+          return;
         } else if (error.status === 429) {
           setKitError(
             'Your available Interview Kits have been used for the current period.'
