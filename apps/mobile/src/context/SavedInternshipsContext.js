@@ -30,6 +30,8 @@ export function SavedInternshipsProvider({ children, enabled = true }) {
   const currentUserIdRef = useRef(null);
   const mutatingIdsRef = useRef(new Set());
   const queuedSavedStateRef = useRef(new Map());
+  const desiredSavedStateRef = useRef(new Map());
+  const mutationTokensRef = useRef(new Map());
   const refreshGenerationRef = useRef(0);
   const refreshInFlightUserIdRef = useRef(null);
   const [mutatingIds, setMutatingIds] = useState(() => new Set());
@@ -43,6 +45,9 @@ export function SavedInternshipsProvider({ children, enabled = true }) {
     refreshGenerationRef.current += 1;
     refreshInFlightUserIdRef.current = null;
     mutatingIdsRef.current.clear();
+    queuedSavedStateRef.current.clear();
+    desiredSavedStateRef.current.clear();
+    mutationTokensRef.current.clear();
     setMutatingIds(new Set());
     setSavedIds(new Set());
     setSavedItems([]);
@@ -172,7 +177,18 @@ export function SavedInternshipsProvider({ children, enabled = true }) {
       // immediately and serialize the authoritative follow-up
       // behind the active request.
       if (mutatingIdsRef.current.has(id)) {
-        const desiredSaved = !savedIds.has(id);
+        const currentDesiredSaved =
+          desiredSavedStateRef.current.has(id)
+            ? desiredSavedStateRef.current.get(id)
+            : savedIds.has(id);
+
+        const desiredSaved =
+          !currentDesiredSaved;
+
+        desiredSavedStateRef.current.set(
+          id,
+          desiredSaved
+        );
 
         queuedSavedStateRef.current.set(
           id,
@@ -208,6 +224,18 @@ export function SavedInternshipsProvider({ children, enabled = true }) {
 
       const currentlySaved = savedIds.has(id);
       const activeUserId = currentUserIdRef.current;
+
+      const mutationToken = Symbol(id);
+
+      mutationTokensRef.current.set(
+        id,
+        mutationToken
+      );
+
+      desiredSavedStateRef.current.set(
+        id,
+        !currentlySaved
+      );
 
       if (currentlySaved) {
         // --- Optimistic UNSAVE ---
@@ -258,8 +286,21 @@ export function SavedInternshipsProvider({ children, enabled = true }) {
           }
         } finally {
           // A user may have reversed the bookmark while this
-          // request was in flight. Drain the latest desired state
-          // before releasing the mutation lock.
+          // request was in flight. First verify this async operation
+          // still owns the mutation for the same authenticated user.
+          // This prevents an old session/request from interfering
+          // with a newer user's bookmark mutation.
+          if (
+            mutationTokensRef.current.get(id)
+              !== mutationToken
+            || currentUserIdRef.current
+              !== activeUserId
+          ) {
+            return;
+          }
+
+          // Drain only the latest desired state. Multiple rapid taps
+          // collapse into one authoritative follow-up operation.
           while (
             queuedSavedStateRef.current.has(id)
           ) {
@@ -287,6 +328,10 @@ export function SavedInternshipsProvider({ children, enabled = true }) {
               break;
             }
           }
+
+          queuedSavedStateRef.current.delete(id);
+          desiredSavedStateRef.current.delete(id);
+          mutationTokensRef.current.delete(id);
 
           mutatingIdsRef.current.delete(id);
           setMutatingIds(
@@ -383,8 +428,21 @@ export function SavedInternshipsProvider({ children, enabled = true }) {
           }
         } finally {
           // A user may have reversed the bookmark while this
-          // request was in flight. Drain the latest desired state
-          // before releasing the mutation lock.
+          // request was in flight. First verify this async operation
+          // still owns the mutation for the same authenticated user.
+          // This prevents an old session/request from interfering
+          // with a newer user's bookmark mutation.
+          if (
+            mutationTokensRef.current.get(id)
+              !== mutationToken
+            || currentUserIdRef.current
+              !== activeUserId
+          ) {
+            return;
+          }
+
+          // Drain only the latest desired state. Multiple rapid taps
+          // collapse into one authoritative follow-up operation.
           while (
             queuedSavedStateRef.current.has(id)
           ) {
@@ -412,6 +470,10 @@ export function SavedInternshipsProvider({ children, enabled = true }) {
               break;
             }
           }
+
+          queuedSavedStateRef.current.delete(id);
+          desiredSavedStateRef.current.delete(id);
+          mutationTokensRef.current.delete(id);
 
           mutatingIdsRef.current.delete(id);
           setMutatingIds(
