@@ -1020,6 +1020,190 @@ class SavedInternship(Base):
     student_profile: Mapped["StudentProfile"] = relationship("StudentProfile")
     internship: Mapped["InternshipListing"] = relationship("InternshipListing")
 
+
+
+class PromoCampaign(Base):
+    """Admin-managed one-time promotional campaign."""
+
+    __tablename__ = "promo_campaigns"
+
+    __table_args__ = (
+        CheckConstraint(
+            "audience IN ('student', 'employer')",
+            name="ck_promo_campaigns_audience",
+        ),
+        CheckConstraint(
+            "status IN ('draft', 'published', 'retired')",
+            name="ck_promo_campaigns_status",
+        ),
+        CheckConstraint(
+            "duration_days = 7",
+            name="ck_promo_campaigns_duration",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid4,
+    )
+
+    audience: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+    )
+
+    # Only an HMAC digest and a masked display hint are persisted.
+    # The plaintext code never enters the database.
+    code_digest: Mapped[str] = mapped_column(
+        String(64),
+        nullable=False,
+        unique=True,
+    )
+
+    code_hint: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+    )
+
+    status: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        default="draft",
+    )
+
+    duration_days: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=7,
+    )
+
+    created_by_admin_user_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        nullable=False,
+    )
+
+    retired_by_admin_user_id: Mapped[Optional[UUID]] = mapped_column(
+        PG_UUID(as_uuid=True),
+        nullable=True,
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc),
+    )
+
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
+
+    retired_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
+
+class PromoRedemption(Base):
+    """
+    Durable one-time redemption ledger.
+
+    user_id + audience is unique forever. Rotating the campaign therefore
+    never allows the same account to claim another promotional week.
+    """
+
+    __tablename__ = "promo_redemptions"
+
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id",
+            "audience",
+            name="uq_promo_redemptions_user_audience",
+        ),
+        CheckConstraint(
+            "audience IN ('student', 'employer')",
+            name="ck_promo_redemptions_audience",
+        ),
+        CheckConstraint(
+            "status IN ('pending', 'redeemed', 'failed')",
+            name="ck_promo_redemptions_status",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid4,
+    )
+
+    campaign_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey(
+            "promo_campaigns.id",
+            ondelete="RESTRICT",
+        ),
+        nullable=False,
+    )
+
+    user_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        nullable=False,
+    )
+
+    audience: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+    )
+
+    status: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        default="pending",
+    )
+
+    requested_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc),
+    )
+
+    access_started_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
+    access_expires_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
+    provider_subscription_id: Mapped[Optional[str]] = mapped_column(
+        String(255),
+        nullable=True,
+    )
+
+    last_error_code: Mapped[Optional[str]] = mapped_column(
+        String(64),
+        nullable=True,
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc),
+    )
+
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
+
+
 class SubscriptionEntitlement(Base):
     """Server-authoritative RevenueCat entitlement state for an authenticated user."""
 

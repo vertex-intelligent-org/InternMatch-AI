@@ -14,6 +14,9 @@ from app.core.config import settings
 from app.db.models import RevenueCatWebhookEvent, SubscriptionEntitlement
 from app.repositories.subscription import SubscriptionRepository
 from app.services.account_deletion import is_account_deleted
+from app.services.promo_codes import (
+    record_verified_store_redemption,
+)
 from app.services.subscription import (
     PRO_EMPLOYER_ENTITLEMENT_ID,
     PRO_STUDENT_ENTITLEMENT_ID,
@@ -21,6 +24,7 @@ from app.services.subscription import (
 
 SUPPORTED_STATE_EVENTS = {
     "INITIAL_PURCHASE",
+    "NON_RENEWING_PURCHASE",
     "RENEWAL",
     "CANCELLATION",
     "UNCANCELLATION",
@@ -235,10 +239,17 @@ def _apply_state_event(
 
     expiration = _milliseconds_to_datetime(event.get("expiration_at_ms"))
 
-    if event_type in {"INITIAL_PURCHASE", "RENEWAL", "UNCANCELLATION"}:
+    if event_type in {
+        "INITIAL_PURCHASE",
+        "RENEWAL",
+        "UNCANCELLATION",
+        "NON_RENEWING_PURCHASE",
+    }:
         entitlement.status = "active"
         entitlement.is_active = _future_access(expiration)
-        entitlement.will_renew = True
+        entitlement.will_renew = (
+            event_type != "NON_RENEWING_PURCHASE"
+        )
         entitlement.cancellation_reason = None
         entitlement.expiration_reason = None
 
@@ -456,6 +467,20 @@ def process_revenuecat_webhook(
         event_id=event_id,
         event_timestamp_ms=event_timestamp_ms,
     )
+
+    if entitlement.is_active:
+        record_verified_store_redemption(
+            db,
+            user_id=user_id,
+            entitlement_id=entitlement_id,
+            event_id=event_id,
+            offer_code=event.get(
+                "offer_code"
+            ),
+            store=event.get(
+                "store"
+            ),
+        )
 
     ledger_event.outcome = "processed"
     ledger_event.processed_at = now

@@ -2175,3 +2175,58 @@ export async function disablePushDevice(
     }
   );
 }
+
+
+// ---------------------------------------------------------------------
+// Private one-time promotional access.
+// No promo secret or campaign list is exposed to the mobile client.
+// ---------------------------------------------------------------------
+
+export type PromoCodeAudience =
+  | 'student'
+  | 'employer';
+
+export type PromoCodeStatusResponse = {
+  audience: PromoCodeAudience;
+  used_once: boolean;
+  status:
+    | 'pending'
+    | 'redeemed'
+    | 'failed'
+    | null;
+  access_expires_at: string | null;
+};
+
+export type PromoCodeRedeemResponse = {
+  outcome:
+    | 'granted'
+    | 'granted_sync_pending';
+  audience: PromoCodeAudience;
+  plan:
+    | 'pro_student'
+    | 'employer_pro';
+  access_started_at: string;
+  access_expires_at: string;
+  sync_pending: boolean;
+};
+
+export async function getPromoCodeStatus():
+Promise<PromoCodeStatusResponse> {
+  return apiRequest<PromoCodeStatusResponse>(
+    '/promo-codes/status'
+  );
+}
+
+export async function redeemPromoCode(
+  code: string
+): Promise<PromoCodeRedeemResponse> {
+  return apiRequest<PromoCodeRedeemResponse>(
+    '/promo-codes/redeem',
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        code,
+      }),
+    }
+  );
+}

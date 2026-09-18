@@ -14,6 +14,7 @@ from app.api.v1.endpoints import (
     matches,
     notifications,
     profile,
+    promo_codes,
     saved_internships,
     subscriptions,
     webhooks,
@@ -40,6 +41,18 @@ api_v1_router.include_router(
     subscriptions.router,
     prefix="/me",
     tags=["Subscription Operations"],
+)
+
+api_v1_router.include_router(
+    promo_codes.user_router,
+    prefix="/promo-codes",
+    tags=["Promo Codes"],
+)
+
+api_v1_router.include_router(
+    promo_codes.admin_router,
+    prefix="/admin/promo-codes",
+    tags=["Admin Promo Codes"],
 )
 
 # External provider webhook ingress

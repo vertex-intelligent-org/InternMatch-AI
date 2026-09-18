@@ -657,6 +657,12 @@ export default function AdminCompliancePage() {
             >
               Users
             </Link>
+            <Link
+              className="sidebarLink"
+              href="/promo-codes"
+            >
+              Promo codes
+            </Link>
           </nav>
         </details>
 

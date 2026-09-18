@@ -285,3 +285,34 @@ export type ComplianceAdminRevocationPayload = {
   reason_code: string;
   internal_note?: string | null;
 };
+
+
+// Private promotional campaign responses never expose raw codes
+// or HMAC code digests.
+
+export type PromoAudience =
+  | "student"
+  | "employer";
+
+export type PromoCampaignStatus =
+  | "draft"
+  | "published"
+  | "retired";
+
+export type AdminPromoCampaign = {
+  id: string;
+  audience: PromoAudience;
+  code_hint: string;
+  status: PromoCampaignStatus;
+  duration_days: number;
+  redemption_count: number;
+  created_at: string;
+  updated_at: string;
+  retired_at: string | null;
+};
+
+export type AdminPromoCampaignCreatePayload = {
+  audience: PromoAudience;
+  code: string;
+  publish: boolean;
+};

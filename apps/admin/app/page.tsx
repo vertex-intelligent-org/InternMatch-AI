@@ -868,6 +868,12 @@ export default function AdminDashboardPage() {
             >
               Users
             </Link>
+            <Link
+              className="sidebarLink"
+              href="/promo-codes"
+            >
+              Promo codes
+            </Link>
           </nav>
         </details>
 

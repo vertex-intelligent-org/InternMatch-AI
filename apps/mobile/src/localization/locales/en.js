@@ -963,6 +963,27 @@ export default {
     }
   },
   plans: {
+    promo: {
+      title: "Have a promo code?",
+      subtitle: "Enter your private promotional code to check eligibility for temporary Pro access.",
+      placeholder: "Enter promo code",
+      inputLabel: "Promotional code",
+      submit: "Apply code",
+      redeeming: "Applying...",
+      studentHint: "Eligible student codes unlock Pro Student for 7 days. Each account can use this offer once.",
+      employerHint: "Eligible employer codes unlock Employer Pro for 7 days. Each account can use this offer once.",
+      usedMessage: "This account has already used its one-time promotional access.",
+      invalidTitle: "Invalid code",
+      invalid: "This promo code is invalid or unavailable.",
+      errorTitle: "Promo code unavailable",
+      alreadyUsed: "This account has already used its promotional access.",
+      activePro: "Pro access is already active on this account.",
+      inProgress: "A promo redemption is already being processed. Please try again shortly.",
+      unavailable: "Promotional access is temporarily unavailable. Please try again later.",
+      successTitle: "Pro access activated",
+      successMessage: "Your 7-day Pro access is now active.",
+      syncingMessage: "Your promo was accepted. Pro access is syncing and should appear shortly.",
+    },
     accessibility: {
       badgeHint: '{{plan}}, tap to view available plans',
       currentPlanBadge: 'Current active plan: {{plan}}',

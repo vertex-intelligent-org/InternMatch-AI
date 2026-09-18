@@ -21,6 +21,9 @@ import type {
   AdminApplicantListResponse,
   AdminApplicantStatusPayload,
   AdminInterviewSchedulePayload,
+  AdminPromoCampaign,
+  AdminPromoCampaignCreatePayload,
+  PromoAudience,
 } from './types';
 
 type JsonRecord = Record<string, unknown>;
@@ -711,6 +714,79 @@ export async function deleteAdminInternship(
     ),
     {
       method: 'DELETE',
+    }
+  );
+}
+
+
+// ---------------------------------------------------------------------
+// Private promotional campaign administration.
+// ---------------------------------------------------------------------
+
+export async function listAdminPromoCampaigns(
+  audience?: PromoAudience
+): Promise<AdminPromoCampaign[]> {
+  const suffix = audience
+    ? (
+        "?audience="
+        + encodeURIComponent(audience)
+      )
+    : "";
+
+  return adminApiRequest<
+    AdminPromoCampaign[]
+  >(
+    "/admin/promo-codes" + suffix,
+    {
+      method: "GET",
+    }
+  );
+}
+
+export async function createAdminPromoCampaign(
+  payload: AdminPromoCampaignCreatePayload
+): Promise<AdminPromoCampaign> {
+  return adminApiRequest<
+    AdminPromoCampaign
+  >(
+    "/admin/promo-codes",
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }
+  );
+}
+
+export async function publishAdminPromoCampaign(
+  campaignId: string
+): Promise<AdminPromoCampaign> {
+  return adminApiRequest<
+    AdminPromoCampaign
+  >(
+    (
+      "/admin/promo-codes/"
+      + encodeURIComponent(campaignId)
+      + "/publish"
+    ),
+    {
+      method: "POST",
+    }
+  );
+}
+
+export async function retireAdminPromoCampaign(
+  campaignId: string
+): Promise<AdminPromoCampaign> {
+  return adminApiRequest<
+    AdminPromoCampaign
+  >(
+    (
+      "/admin/promo-codes/"
+      + encodeURIComponent(campaignId)
+      + "/retire"
+    ),
+    {
+      method: "POST",
     }
   );
 }

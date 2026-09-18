@@ -306,6 +306,7 @@ export default function AdminUsersPage() {
             ["/listings", "Internship listings"],
             ["/compliance", "Compliance reviews"],
             ["/users", "Users"],
+            ["/promo-codes", "Promo codes"],
           ].map(([href, label]) => (
             <Link
               key={href}

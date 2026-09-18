@@ -16,6 +16,7 @@ import ScreenHeader from '../components/ScreenHeader';
 import GlassSurface from '../components/GlassSurface';
 import GradientButton from '../components/GradientButton';
 import PlanBadge from '../components/PlanBadge';
+import PromoCodePanel from '../components/PromoCodePanel';
 import { useProfile } from '../context/ProfileContext';
 import { useLocalization } from '../localization/LocalizationContext';
 import { useRevenueCat } from '../context/RevenueCatProvider';
@@ -671,6 +672,22 @@ export default function PlansScreen({ navigation }) {
         </View>
 
         {/* Restore Purchases CTA — supported platform stores only */}
+        <PromoCodePanel
+          isEmployer={isEmployer}
+          isRTL={isRTL}
+          activePro={
+            backendSubscription
+              ?.is_active === true
+          }
+          busy={
+            isPurchaseFlowBusy
+            || isRestoreFlowBusy
+          }
+          reconcileSubscription={
+            reconcileSubscription
+          }
+        />
+
         {runtimeState?.restorePurchasesSupported === true ? (
           <View style={styles.restoreContainer}>
             <GradientButton

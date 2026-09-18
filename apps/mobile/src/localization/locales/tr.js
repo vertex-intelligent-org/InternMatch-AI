@@ -963,6 +963,27 @@ export default {
     }
   },
   plans: {
+    promo: {
+      title: "Promosyon kodunuz var m\u0131?",
+      subtitle: "Ge\u00e7ici Pro eri\u015fimi i\u00e7in uygunlu\u011funuzu kontrol etmek \u00fczere \u00f6zel promosyon kodunuzu girin.",
+      placeholder: "Promosyon kodunu girin",
+      inputLabel: "Promosyon kodu",
+      submit: "Kodu uygula",
+      redeeming: "Uygulan\u0131yor...",
+      studentHint: "Uygun \u00f6\u011frenci kodlar\u0131 Pro \u00d6\u011frenci eri\u015fimini 7 g\u00fcn boyunca a\u00e7ar. Her hesap bu teklifi yaln\u0131zca bir kez kullanabilir.",
+      employerHint: "Uygun i\u015fveren kodlar\u0131 \u0130\u015fveren Pro eri\u015fimini 7 g\u00fcn boyunca a\u00e7ar. Her hesap bu teklifi yaln\u0131zca bir kez kullanabilir.",
+      usedMessage: "Bu hesap tek kullan\u0131ml\u0131k promosyon eri\u015fimini daha \u00f6nce kulland\u0131.",
+      invalidTitle: "Ge\u00e7ersiz kod",
+      invalid: "Bu promosyon kodu ge\u00e7ersiz veya kullan\u0131lam\u0131yor.",
+      errorTitle: "Promosyon kodu kullan\u0131lam\u0131yor",
+      alreadyUsed: "Bu hesap promosyon eri\u015fimini daha \u00f6nce kulland\u0131.",
+      activePro: "Bu hesapta Pro eri\u015fimi zaten aktif.",
+      inProgress: "Bir promosyon i\u015flemi zaten devam ediyor. L\u00fctfen k\u0131sa s\u00fcre sonra tekrar deneyin.",
+      unavailable: "Promosyon eri\u015fimi ge\u00e7ici olarak kullan\u0131lam\u0131yor. L\u00fctfen daha sonra tekrar deneyin.",
+      successTitle: "Pro eri\u015fimi etkinle\u015ftirildi",
+      successMessage: "7 g\u00fcnl\u00fck Pro eri\u015fiminiz art\u0131k aktif.",
+      syncingMessage: "Promosyonunuz kabul edildi. Pro eri\u015fimi e\u015fitleniyor ve k\u0131sa s\u00fcre i\u00e7inde g\u00f6r\u00fcnecek.",
+    },
     accessibility: {
       badgeHint: '{{plan}}, mevcut planları görmek için dokunun',
       currentPlanBadge: 'Geçerli aktif plan: {{plan}}',

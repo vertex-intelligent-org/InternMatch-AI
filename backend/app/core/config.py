@@ -61,6 +61,10 @@ class Settings(BaseSettings):
     REVENUECAT_SECRET_KEY: str = ""
     REVENUECAT_ENVIRONMENT: str = "sandbox"
 
+    # InternMatch-controlled promotional access.
+    # Raw codes are never persisted; grants are issued server-side.
+    REVENUECAT_PROMO_SECRET_KEY: str = ""
+
     # RevenueCat webhook security.
     # AUTH_TOKEN is the server-only token configured in RevenueCat's
     # webhook Authorization header.
@@ -88,6 +92,13 @@ class Settings(BaseSettings):
     SMTP_FROM_NAME: str = "InternMatch AI"
     SMTP_SECURITY: str = "starttls"
     USER_NOTIFICATION_EMAILS_ENABLED: bool = False
+
+    # Store-backed promotional access.
+    # Raw promo codes are never persisted. The server stores only
+    # an HMAC-SHA256 digest plus a short masked admin hint.
+    PROMO_CODES_ENABLED: bool = False
+    PROMO_CODE_HMAC_SECRET: str = ""
+    PROMO_CLAIM_TTL_MINUTES: int = 30
 
     ALLOWED_ORIGINS: str = "http://localhost:3000,http://localhost:8000,http://localhost:19006"
 
@@ -318,13 +329,77 @@ def validate_production_config(cfg: Settings) -> None:
                 "(must either both be configured or both be empty)"
             )
 
+    # Promo-code validation remains opt-in. Once enabled, the
+    # HMAC secret must be strong enough that a database leak cannot
+    # be used to recover or verify low-entropy codes offline.
+    if cfg.PROMO_CODES_ENABLED:
+        promo_secret = (
+            cfg.PROMO_CODE_HMAC_SECRET
+            or ""
+        ).strip()
+
+        if len(promo_secret) < 32:
+            errors.append(
+                "PROMO_CODE_HMAC_SECRET "
+                "(must contain at least 32 characters when "
+                "PROMO_CODES_ENABLED=true)"
+            )
+
+        if not (
+            5
+            <= cfg.PROMO_CLAIM_TTL_MINUTES
+            <= 120
+        ):
+            errors.append(
+                "PROMO_CLAIM_TTL_MINUTES "
+                "(must be between 5 and 120)"
+            )
+
+    # PROMO_RUNTIME_VALIDATION_V2
+    # Private promo redemption is explicitly opt-in.
+    # RevenueCat remains the authoritative Pro provider.
+    if cfg.PROMO_CODES_ENABLED:
+        promo_hmac_secret = (
+            cfg.PROMO_CODE_HMAC_SECRET
+            or ""
+        ).strip()
+
+        if len(promo_hmac_secret) < 32:
+            errors.append(
+                "PROMO_CODE_HMAC_SECRET "
+                "(must contain at least 32 characters "
+                "when PROMO_CODES_ENABLED=true)"
+            )
+
+        if not (
+            cfg.REVENUECAT_PROMO_SECRET_KEY
+            or ""
+        ).strip():
+            errors.append(
+                "REVENUECAT_PROMO_SECRET_KEY "
+                "(required when PROMO_CODES_ENABLED=true)"
+            )
+
+        if not (
+            cfg.REVENUECAT_PROJECT_ID
+            or ""
+        ).strip():
+            errors.append(
+                "REVENUECAT_PROJECT_ID "
+                "(required when PROMO_CODES_ENABLED=true)"
+            )
+
     # ALLOWED_ORIGINS
     origins = cfg.cors_origins_list
     if not origins:
-        errors.append("ALLOWED_ORIGINS (must specify at least one origin)")
+        errors.append(
+            "ALLOWED_ORIGINS "
+            "(must specify at least one origin)"
+        )
     else:
         for orig in origins:
             orig_lower = orig.lower()
+
             if (
                 "*" in orig
                 or "localhost" in orig_lower
@@ -332,13 +407,17 @@ def validate_production_config(cfg: Settings) -> None:
                 or not orig.startswith("https://")
             ):
                 errors.append(
-                    "ALLOWED_ORIGINS (must use https:// and cannot contain "
+                    "ALLOWED_ORIGINS "
+                    "(must use https:// and cannot contain "
                     "*, localhost, or 127.0.0.1)"
                 )
                 break
 
     if errors:
-        raise RuntimeError(f"Production configuration validation failed for: {', '.join(errors)}")
+        raise RuntimeError(
+            "Production configuration validation failed for: "
+            + ", ".join(errors)
+        )
 
 
 def validate_runtime_config(cfg: Settings) -> None:
