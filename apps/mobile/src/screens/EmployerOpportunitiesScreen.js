@@ -841,6 +841,7 @@ const styles = StyleSheet.create({
   headerTitleBlock: {
     flex: 1,
     marginEnd: spacing.sm,
+    paddingStart: spacing.md,
   },
   eyebrow: {
     ...typography.eyebrow,

@@ -29,6 +29,7 @@ export function SavedInternshipsProvider({ children, enabled = true }) {
 
   const currentUserIdRef = useRef(null);
   const mutatingIdsRef = useRef(new Set());
+  const queuedSavedStateRef = useRef(new Map());
   const refreshGenerationRef = useRef(0);
   const refreshInFlightUserIdRef = useRef(null);
   const [mutatingIds, setMutatingIds] = useState(() => new Set());
@@ -166,8 +167,30 @@ export function SavedInternshipsProvider({ children, enabled = true }) {
       const id = internship?.id || internship?.internship_id;
       if (!id) return;
 
-      // In-flight mutation race protection
+      // If a save/unsave request is already in flight, do not
+      // discard the user's newer intent. Flip the bookmark
+      // immediately and serialize the authoritative follow-up
+      // behind the active request.
       if (mutatingIdsRef.current.has(id)) {
+        const desiredSaved = !savedIds.has(id);
+
+        queuedSavedStateRef.current.set(
+          id,
+          desiredSaved
+        );
+
+        setSavedIds((prev) => {
+          const next = new Set(prev);
+
+          if (desiredSaved) {
+            next.add(id);
+          } else {
+            next.delete(id);
+          }
+
+          return next;
+        });
+
         return;
       }
 
@@ -234,8 +257,50 @@ export function SavedInternshipsProvider({ children, enabled = true }) {
             );
           }
         } finally {
+          // A user may have reversed the bookmark while this
+          // request was in flight. Drain the latest desired state
+          // before releasing the mutation lock.
+          while (
+            queuedSavedStateRef.current.has(id)
+          ) {
+            const desiredSaved =
+              queuedSavedStateRef.current.get(id);
+
+            queuedSavedStateRef.current.delete(id);
+
+            try {
+              if (desiredSaved) {
+                await saveInternship(id);
+              } else {
+                await unsaveInternship(id);
+              }
+            } catch (queuedError) {
+              console.warn(
+                'Queued bookmark reconciliation failed:',
+                queuedError
+              );
+
+              haptics.error();
+
+              // The local state was optimistic. Reconcile from
+              // the authoritative backend after unlocking below.
+              break;
+            }
+          }
+
           mutatingIdsRef.current.delete(id);
-          setMutatingIds(new Set(mutatingIdsRef.current));
+          setMutatingIds(
+            new Set(mutatingIdsRef.current)
+          );
+
+          refreshSavedInternships(false).catch(
+            (refreshError) => {
+              console.warn(
+                'Bookmark reconciliation refresh failed:',
+                refreshError
+              );
+            }
+          );
         }
       } else {
         // --- Optimistic SAVE ---
@@ -317,8 +382,50 @@ export function SavedInternshipsProvider({ children, enabled = true }) {
             );
           }
         } finally {
+          // A user may have reversed the bookmark while this
+          // request was in flight. Drain the latest desired state
+          // before releasing the mutation lock.
+          while (
+            queuedSavedStateRef.current.has(id)
+          ) {
+            const desiredSaved =
+              queuedSavedStateRef.current.get(id);
+
+            queuedSavedStateRef.current.delete(id);
+
+            try {
+              if (desiredSaved) {
+                await saveInternship(id);
+              } else {
+                await unsaveInternship(id);
+              }
+            } catch (queuedError) {
+              console.warn(
+                'Queued bookmark reconciliation failed:',
+                queuedError
+              );
+
+              haptics.error();
+
+              // The local state was optimistic. Reconcile from
+              // the authoritative backend after unlocking below.
+              break;
+            }
+          }
+
           mutatingIdsRef.current.delete(id);
-          setMutatingIds(new Set(mutatingIdsRef.current));
+          setMutatingIds(
+            new Set(mutatingIdsRef.current)
+          );
+
+          refreshSavedInternships(false).catch(
+            (refreshError) => {
+              console.warn(
+                'Bookmark reconciliation refresh failed:',
+                refreshError
+              );
+            }
+          );
         }
       }
     },

@@ -382,7 +382,6 @@ export default function InternshipsScreen({ navigation }) {
                 <View style={styles.cardTop}>
                   <BookmarkButton
                     isSaved={isSaved(item.id)}
-                    disabled={isMutating(item.id)}
                     onPress={(event) => {
                       event?.stopPropagation?.();
                       toggleSave(item);

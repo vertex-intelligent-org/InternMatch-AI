@@ -94,7 +94,7 @@ export default function InternshipDetailScreen({ route, navigation }) {
     return (
       <BookmarkButton
         isSaved={isSaved(internshipId)}
-        disabled={!internship || isMutating(internshipId)}
+        disabled={!internship}
         onPress={() => toggleSave(internship)}
         size={22}
       />

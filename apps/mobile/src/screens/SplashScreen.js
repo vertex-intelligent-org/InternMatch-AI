@@ -1,6 +1,5 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import Animated, {
@@ -12,7 +11,7 @@ import Animated, {
   cancelAnimation,
   Easing,
 } from 'react-native-reanimated';
-import { gradientColors, colors } from '../theme/colors';
+import { colors } from '../theme/colors';
 import {
   clearLocalSessionAfterAccountDeletion,
   getCurrentSession,
@@ -272,7 +271,16 @@ export default function SplashScreen({ navigation }) {
   }, [navigation, refreshProfile, clearProfile, retryNonce, performNavigationIfReady, stopTargetRotation]);
 
   return (
-    <LinearGradient colors={gradientColors} style={styles.container}>
+    <View
+      style={[
+        styles.container,
+        {
+          backgroundColor:
+            colors.accentStrong
+            || colors.tealDark,
+        },
+      ]}
+    >
       <View style={styles.center}>
         <View
           ref={brandHeroRef}
@@ -317,7 +325,7 @@ export default function SplashScreen({ navigation }) {
           </View>
         )}
       </View>
-    </LinearGradient>
+    </View>
   );
 }
 

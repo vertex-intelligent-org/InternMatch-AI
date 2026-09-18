@@ -914,13 +914,15 @@ export default function CreateOpportunityScreen({ navigation, route }) {
             style={styles.publishBtn}
           />
 
-        <EmployerDescriptionAssistant
-          title={title}
-          rawDescription={description}
-          onApplyDescription={setDescription}
-          navigation={navigation}
-          isRTL={typeof isRTL !== 'undefined' ? isRTL : false}
-        />
+        <View style={styles.aiAssistantSection}>
+          <EmployerDescriptionAssistant
+            title={title}
+            rawDescription={description}
+            onApplyDescription={setDescription}
+            navigation={navigation}
+            isRTL={typeof isRTL !== 'undefined' ? isRTL : false}
+          />
+        </View>
 
 </ScrollView>
       </KeyboardAvoidingView>
@@ -1055,6 +1057,9 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     marginTop: spacing.xxs,
     marginBottom: spacing.xs,
+  },
+  aiAssistantSection: {
+    marginTop: spacing.lg,
   },
   publishBtn: {
     marginTop: spacing.xl,
