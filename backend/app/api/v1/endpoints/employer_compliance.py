@@ -1039,6 +1039,34 @@ def submit_compliance_claim(
             new_status="pending",
         )
 
+        NotificationRepository.create_for_admins(
+            db,
+            event_type="compliance_review_requested",
+            entity_type="employer_compliance_claim",
+            entity_id=claim.id,
+            data={
+                "claim_id": str(
+                    claim.id
+                ),
+                "organization_id": str(
+                    organization.id
+                ),
+                "company":
+                    organization.display_name,
+                "claim_type":
+                    claim.claim_type,
+                "jurisdiction_country_code":
+                    claim.jurisdiction_country_code,
+                "status": "pending",
+            },
+            dedupe_key=(
+                f"compliance:"
+                f"{claim.id}:"
+                "review-requested:"
+                f"{now.isoformat()}"
+            ),
+        )
+
         db.commit()
         db.refresh(claim)
     except Exception:

@@ -73,6 +73,21 @@ class Settings(BaseSettings):
     # privileged InternMatch administrative endpoints.
     # Empty by default: administrative access fails closed.
     ADMIN_USER_IDS: str = ""
+
+    # Automated administrative alert delivery.
+    # ADMIN_ALERT_EMAILS is intentionally separate from ADMIN_USER_IDS:
+    # receiving operational mail does not grant administrative authority.
+    ADMIN_ALERT_EMAILS: str = ""
+    ADMIN_BASE_URL: str = "https://admin.internmatch.college"
+
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USERNAME: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_FROM_EMAIL: str = ""
+    SMTP_FROM_NAME: str = "InternMatch AI"
+    SMTP_SECURITY: str = "starttls"
+
     ALLOWED_ORIGINS: str = "http://localhost:3000,http://localhost:8000,http://localhost:19006"
 
     model_config = SettingsConfigDict(
@@ -172,6 +187,73 @@ def validate_production_config(cfg: Settings) -> None:
         errors.append(
             "COMPLIANCE_STORAGE_BUCKET (must be non-empty)"
         )
+
+    # Administrative email alerts are optional until recipients are
+    # configured. Once enabled, SMTP must be complete and internally
+    # consistent so production never silently accepts a broken mail setup.
+    admin_alert_emails = [
+        value.strip()
+        for value in (
+            cfg.ADMIN_ALERT_EMAILS
+            or ""
+        ).split(",")
+        if value.strip()
+    ]
+
+    if admin_alert_emails:
+        if not (
+            cfg.SMTP_HOST
+            or ""
+        ).strip():
+            errors.append(
+                "SMTP_HOST (required when ADMIN_ALERT_EMAILS is configured)"
+            )
+
+        if not (
+            cfg.SMTP_FROM_EMAIL
+            or ""
+        ).strip():
+            errors.append(
+                "SMTP_FROM_EMAIL (required when ADMIN_ALERT_EMAILS is configured)"
+            )
+
+        if cfg.SMTP_PORT <= 0:
+            errors.append(
+                "SMTP_PORT (must be positive)"
+            )
+
+        smtp_security = (
+            cfg.SMTP_SECURITY
+            or ""
+        ).strip().lower()
+
+        if smtp_security not in {
+            "starttls",
+            "ssl",
+            "none",
+        }:
+            errors.append(
+                "SMTP_SECURITY "
+                "(must be 'starttls', 'ssl', or 'none')"
+            )
+
+        smtp_username = (
+            cfg.SMTP_USERNAME
+            or ""
+        ).strip()
+
+        smtp_password = (
+            cfg.SMTP_PASSWORD
+            or ""
+        ).strip()
+
+        if bool(smtp_username) != bool(
+            smtp_password
+        ):
+            errors.append(
+                "SMTP_USERNAME/SMTP_PASSWORD "
+                "(must either both be configured or both be empty)"
+            )
 
     # ALLOWED_ORIGINS
     origins = cfg.cors_origins_list

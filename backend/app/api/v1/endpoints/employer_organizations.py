@@ -555,6 +555,35 @@ def submit_my_organization_for_review(
             new_status="pending",
         )
 
+        NotificationRepository.create_for_admins(
+            db,
+            event_type="organization_review_requested",
+            entity_type="employer_organization",
+            entity_id=organization.id,
+            data={
+                "organization_id": str(
+                    organization.id
+                ),
+                "display_name":
+                    organization.display_name,
+                "legal_name":
+                    organization.legal_name,
+                "business_email":
+                    organization.business_email,
+                "representative_name":
+                    organization.representative_name,
+                "country_code":
+                    organization.country_code,
+                "status": "pending",
+            },
+            dedupe_key=(
+                f"organization:"
+                f"{organization.id}:"
+                "review-requested:"
+                f"{now.isoformat()}"
+            ),
+        )
+
         db.commit()
         db.refresh(organization)
     except Exception:

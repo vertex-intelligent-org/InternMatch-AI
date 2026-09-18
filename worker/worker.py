@@ -39,6 +39,7 @@ _PRELOAD_JOB_MODULES = (
     "tasks.match_explanation_generation",
     "tasks.interview_prep_generation",
     "tasks.notification_delivery",
+    "tasks.notification_email_delivery",
 )
 
 

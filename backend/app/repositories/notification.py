@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID
 
+from app.core.config import settings
 from app.db.models import (
     EmployerOrganization,
     InternshipListing,
@@ -22,43 +23,114 @@ PENDING_PUSH_IDS_KEY = (
     "internmatch_pending_notification_push_ids"
 )
 
+PENDING_ADMIN_EMAIL_IDS_KEY = (
+    "internmatch_pending_admin_email_ids"
+)
+
+
+def _configured_admin_user_ids() -> list[UUID]:
+    values: list[UUID] = []
+
+    for raw_value in (
+        settings.ADMIN_USER_IDS
+        or ""
+    ).split(","):
+        candidate = raw_value.strip()
+
+        if not candidate:
+            continue
+
+        try:
+            value = UUID(candidate)
+        except (
+            TypeError,
+            ValueError,
+        ):
+            # Administrative authorization itself fails closed
+            # elsewhere. Alert creation must never break the
+            # user's successful business transaction.
+            continue
+
+        if value not in values:
+            values.append(value)
+
+    return sorted(
+        values,
+        key=str,
+    )
+
 
 @event.listens_for(
     Session,
     "after_commit",
 )
-def _enqueue_committed_notification_pushes(
+def _enqueue_committed_notification_deliveries(
     session: Session,
 ) -> None:
     """
-    Dispatch push work only after the notification transaction committed.
+    Dispatch asynchronous notification work only after commit.
 
-    Redis/RQ failure is deliberately isolated from the already-committed
-    durable inbox event.
+    Push/email transport failures must never roll back a successful
+    application, organization submission, listing submission, or
+    compliance submission.
     """
-    pending = list(
+    pending_push = list(
         session.info.pop(
             PENDING_PUSH_IDS_KEY,
             [],
         )
     )
 
-    if not pending:
+    pending_email = list(
+        session.info.pop(
+            PENDING_ADMIN_EMAIL_IDS_KEY,
+            [],
+        )
+    )
+
+    if not (
+        pending_push
+        or pending_email
+    ):
         return
 
     from app.services.notification_enqueue import (
+        enqueue_admin_alert_email_delivery,
         enqueue_notification_delivery,
     )
 
-    for notification_id in pending:
+    for notification_id in pending_push:
         try:
             enqueue_notification_delivery(
                 notification_id
             )
         except Exception:
-            # Durable inbox remains authoritative even if
-            # transient queue delivery is unavailable.
             continue
+
+    for notification_id in pending_email:
+        try:
+            enqueue_admin_alert_email_delivery(
+                notification_id
+            )
+        except Exception:
+            continue
+
+
+@event.listens_for(
+    Session,
+    "after_rollback",
+)
+def _clear_rolled_back_notification_deliveries(
+    session: Session,
+) -> None:
+    session.info.pop(
+        PENDING_PUSH_IDS_KEY,
+        None,
+    )
+    session.info.pop(
+        PENDING_ADMIN_EMAIL_IDS_KEY,
+        None,
+    )
 
 
 class NotificationRepository:
@@ -99,6 +171,96 @@ class NotificationRepository:
             data=data,
             dedupe_key=dedupe_key,
         )
+
+    @staticmethod
+    def create_for_admins(
+        db: Session,
+        *,
+        event_type: str,
+        entity_type: str,
+        entity_id: UUID,
+        data: dict[str, Any],
+        dedupe_key: str,
+    ) -> list[UserNotification]:
+        """
+        Create one durable inbox notification for every configured admin.
+
+        Exactly one deterministic admin notification is selected as the
+        email-delivery anchor so multiple ADMIN_USER_IDS never cause
+        duplicate operational emails to ADMIN_ALERT_EMAILS.
+        """
+        admin_user_ids = (
+            _configured_admin_user_ids()
+        )
+
+        if not admin_user_ids:
+            return []
+
+        notifications: list[
+            UserNotification
+        ] = []
+
+        primary_was_created = False
+
+        for index, admin_user_id in enumerate(
+            admin_user_ids
+        ):
+            admin_dedupe_key = (
+                f"{dedupe_key}:admin:"
+                f"{admin_user_id}"
+            )
+
+            existing = db.scalar(
+                select(UserNotification).where(
+                    UserNotification.dedupe_key
+                    == admin_dedupe_key
+                )
+            )
+
+            if existing is not None:
+                notifications.append(
+                    existing
+                )
+                continue
+
+            created = (
+                NotificationRepository.create(
+                    db,
+                    recipient_user_id=(
+                        admin_user_id
+                    ),
+                    event_type=event_type,
+                    entity_type=entity_type,
+                    entity_id=entity_id,
+                    data=data,
+                    dedupe_key=(
+                        admin_dedupe_key
+                    ),
+                )
+            )
+
+            notifications.append(created)
+
+            if index == 0:
+                primary_was_created = True
+
+        if (
+            primary_was_created
+            and notifications
+        ):
+            pending = db.info.setdefault(
+                PENDING_ADMIN_EMAIL_IDS_KEY,
+                [],
+            )
+
+            primary_id = str(
+                notifications[0].id
+            )
+
+            if primary_id not in pending:
+                pending.append(primary_id)
+
+        return notifications
 
     @staticmethod
     def create(
@@ -365,6 +527,89 @@ class NotificationRepository:
                 if listing is not None
                 else None
             )
+
+            if (
+                listing is not None
+                and recipient is None
+                and listing.listing_source
+                == "curated"
+                and listing.employer_organization_id
+                is None
+            ):
+                metadata = (
+                    listing.metadata_json
+                    if isinstance(
+                        listing.metadata_json,
+                        dict,
+                    )
+                    else {}
+                )
+
+                if (
+                    metadata.get(
+                        "created_via"
+                    )
+                    == "admin_console"
+                ):
+                    profile = db.get(
+                        StudentProfile,
+                        application.student_id,
+                    )
+
+                    notifications = (
+                        NotificationRepository
+                        .create_for_admins(
+                            db,
+                            event_type=(
+                                "admin_curated_"
+                                "application_submitted"
+                            ),
+                            entity_type=(
+                                "application"
+                            ),
+                            entity_id=(
+                                application.id
+                            ),
+                            data={
+                                "application_id": str(
+                                    application.id
+                                ),
+                                "internship_id": str(
+                                    listing.id
+                                ),
+                                "listing_title":
+                                    listing.title,
+                                "company":
+                                    listing.company,
+                                "candidate_name": (
+                                    profile.full_name
+                                    if profile
+                                    is not None
+                                    else "Candidate"
+                                ),
+                                "candidate_user_id": (
+                                    str(
+                                        profile.user_id
+                                    )
+                                    if profile
+                                    is not None
+                                    else None
+                                ),
+                                "status": status,
+                            },
+                            dedupe_key=(
+                                f"application:"
+                                f"{application.id}:"
+                                "admin-submitted"
+                            ),
+                        )
+                    )
+
+                    return (
+                        notifications[0]
+                        if notifications
+                        else None
+                    )
 
             if recipient is None:
                 return None

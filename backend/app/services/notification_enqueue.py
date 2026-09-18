@@ -4,7 +4,7 @@
 from uuid import UUID
 
 from redis import Redis
-from rq import Queue
+from rq import Queue, Retry
 
 from app.core.config import settings
 
@@ -53,4 +53,59 @@ def enqueue_notification_delivery(
         job_timeout=30,
         result_ttl=300,
         failure_ttl=86400,
+    )
+
+
+def enqueue_admin_alert_email_delivery(
+    notification_id: UUID | str,
+):
+    """
+    Enqueue one administrative email alert.
+
+    The durable UserNotification already committed before this is called.
+    SMTP errors are retried by RQ and never affect the original user action.
+    """
+    normalized_id = str(
+        notification_id
+    )
+
+    queue_name = (
+        getattr(
+            settings,
+            "RQ_QUEUE_NAME",
+            None,
+        )
+        or "default"
+    )
+
+    redis_connection = Redis.from_url(
+        settings.REDIS_URL
+    )
+
+    queue = Queue(
+        queue_name,
+        connection=redis_connection,
+    )
+
+    return queue.enqueue(
+        (
+            "tasks.notification_email_delivery."
+            "run_notification_email_delivery"
+        ),
+        normalized_id,
+        job_id=(
+            "notification-email:"
+            + normalized_id
+        ),
+        job_timeout=30,
+        result_ttl=300,
+        failure_ttl=86400,
+        retry=Retry(
+            max=3,
+            interval=[
+                30,
+                120,
+                300,
+            ],
+        ),
     )

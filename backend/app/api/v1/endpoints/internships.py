@@ -17,6 +17,7 @@ from app.repositories.application import ApplicationRepository
 from app.repositories.employer_organization import EmployerOrganizationRepository
 from app.repositories.internship import InternshipRepository
 from app.repositories.matching_data import MatchingDataRepository
+from app.repositories.notification import NotificationRepository
 from app.schemas.application import (
     EmployerApplicantListResponse,
     EmployerApplicantResponse,
@@ -349,6 +350,29 @@ def create_internship(
             experience_requirements=payload.experience_requirements,
             description_embedding=list(embedding),
         )
+        NotificationRepository.create_for_admins(
+            db,
+            event_type="listing_review_requested",
+            entity_type="internship",
+            entity_id=listing.id,
+            data={
+                "internship_id": str(
+                    listing.id
+                ),
+                "organization_id": str(
+                    organization.id
+                ),
+                "title": listing.title,
+                "company": listing.company,
+                "publication_status":
+                    "under_review",
+            },
+            dedupe_key=(
+                f"internship:{listing.id}:"
+                "review-requested:create"
+            ),
+        )
+
         db.commit()
         db.refresh(listing)
     except Exception:
@@ -493,6 +517,39 @@ def update_internship_opportunity(
             experience_requirements=payload.experience_requirements,
             description_embedding=description_embedding,
         )
+        review_requested_at = (
+            datetime.now(
+                timezone.utc
+            ).isoformat()
+        )
+
+        NotificationRepository.create_for_admins(
+            db,
+            event_type="listing_review_requested",
+            entity_type="internship",
+            entity_id=updated_listing.id,
+            data={
+                "internship_id": str(
+                    updated_listing.id
+                ),
+                "organization_id": str(
+                    organization.id
+                ),
+                "title":
+                    updated_listing.title,
+                "company":
+                    updated_listing.company,
+                "publication_status":
+                    "under_review",
+            },
+            dedupe_key=(
+                f"internship:"
+                f"{updated_listing.id}:"
+                "review-requested:"
+                f"{review_requested_at}"
+            ),
+        )
+
         db.commit()
         db.refresh(updated_listing)
     except Exception:
