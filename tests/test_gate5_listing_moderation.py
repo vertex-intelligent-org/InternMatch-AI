@@ -352,6 +352,44 @@ def test_gate5_admin_review_and_visibility_integrity_contract():
     assert "Approve & publish" in ui_source
     assert "Request changes" in ui_source
 
+    # Request-changes must carry explicit employer-visible feedback only.
+    assert (
+        "payload: AdminInternshipChangesRequest"
+        in request_changes_block
+    )
+    assert (
+        '"employer_visible_feedback": ('
+        in request_changes_block
+    )
+
+    schema_source = Path(
+        "backend/app/schemas/internship.py"
+    ).read_text(
+        encoding="utf-8"
+    )
+
+    assert (
+        "class AdminInternshipChangesRequest"
+        in schema_source
+    )
+    assert (
+        "max_length=1000"
+        in schema_source
+    )
+    assert (
+        "internal_admin_note"
+        not in request_changes_block
+    )
+
+    assert (
+        "employer_visible_feedback"
+        in api_source
+    )
+    assert (
+        "Employer-visible feedback"
+        in ui_source
+    )
+
 
 def test_gate5_admin_review_routes_are_registered_and_protected():
     from uuid import uuid4

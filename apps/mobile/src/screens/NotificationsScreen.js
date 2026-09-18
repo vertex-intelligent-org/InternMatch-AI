@@ -46,6 +46,12 @@ function eventCopy(
       ? notification.data.status
       : '';
 
+  const employerVisibleFeedback =
+    typeof notification?.data?.employer_visible_feedback
+      === 'string'
+      ? notification.data.employer_visible_feedback.trim()
+      : '';
+
   switch (
     notification.event_type
   ) {
@@ -88,16 +94,21 @@ function eventCopy(
         icon: 'megaphone-outline',
       };
 
-    case 'listing_changes_requested':
+    case 'listing_changes_requested': {
+      const baseBody = t(
+        'notifications.events.listingChanges.body'
+      );
+
       return {
         title: t(
           'notifications.events.listingChanges.title'
         ),
-        body: t(
-          'notifications.events.listingChanges.body'
-        ),
+        body: employerVisibleFeedback
+          ? `${baseBody}\n\n${employerVisibleFeedback}`
+          : baseBody,
         icon: 'create-outline',
       };
+    }
 
     case 'organization_verified':
       return {
@@ -188,8 +199,36 @@ export default function NotificationsScreen({ navigation }) {
             item.id
           ).catch(() => {});
         }
+
+        if (
+          item.event_type
+            === 'listing_changes_requested'
+        ) {
+          const dataInternshipId =
+            typeof item?.data?.internship_id
+              === 'string'
+              ? item.data.internship_id
+              : null;
+
+          const internshipId =
+            dataInternshipId
+            || (
+              item.entity_type === 'internship'
+                ? item.entity_id
+                : null
+            );
+
+          if (internshipId) {
+            navigation.navigate(
+              'CreateOpportunity',
+              {
+                internshipId,
+              }
+            );
+          }
+        }
       },
-      [markRead]
+      [markRead, navigation]
     );
 
 

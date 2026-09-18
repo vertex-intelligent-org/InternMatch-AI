@@ -675,7 +675,10 @@ export default function EmployerOpportunitiesScreen({ navigation }) {
                       )}
 
                       <View style={[styles.cardActionGroup, isRTL && styles.rowRTL]}>
-                        {item.is_active !== false && (
+                        {(
+                          item.publication_status === 'draft'
+                          || item.publication_status === 'published'
+                        ) && (
                           <TouchableOpacity
                             style={[styles.editOpportunityBtn, isRTL && styles.rowRTL]}
                             onPress={() =>

@@ -625,8 +625,13 @@ export async function approveAdminInternship(
   );
 }
 
+export type AdminInternshipChangesRequestPayload = {
+  employer_visible_feedback: string;
+};
+
 export async function requestChangesAdminInternship(
-  internshipId: string
+  internshipId: string,
+  payload: AdminInternshipChangesRequestPayload
 ): Promise<AdminInternshipDetail> {
   return adminApiRequest<AdminInternshipDetail>(
     (
@@ -636,6 +641,7 @@ export async function requestChangesAdminInternship(
     ),
     {
       method: 'POST',
+      body: JSON.stringify(payload),
     }
   );
 }

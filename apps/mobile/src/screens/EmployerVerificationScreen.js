@@ -11,6 +11,7 @@ import {
   View,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
+import { Ionicons } from '@expo/vector-icons';
 
 import ScreenContainer from '../components/ScreenContainer';
 import ScreenHeader from '../components/ScreenHeader';
@@ -423,6 +424,44 @@ export default function EmployerVerificationScreen({ navigation }) {
         bordered
       />
 
+      <TouchableOpacity
+        style={[
+          styles.guidanceLink,
+          isRTL && styles.guidanceLinkRTL,
+        ]}
+        onPress={() => {
+          navigation.navigate(
+            'EmployerGuidance',
+            {
+              topic: 'organization',
+            }
+          );
+        }}
+        accessibilityRole="button"
+        accessibilityLabel={t(
+          'employerGuidance.organization.linkLabel'
+        )}
+      >
+        <View style={styles.guidanceIcon}>
+          <Ionicons
+            name="help"
+            size={14}
+            color={colors.accentStrong || colors.tealDark}
+          />
+        </View>
+
+        <Text
+          style={[
+            styles.guidanceLinkText,
+            isRTL && styles.rtlText,
+          ]}
+        >
+          {t(
+            'employerGuidance.organization.linkLabel'
+          )}
+        </Text>
+      </TouchableOpacity>
+
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -738,6 +777,32 @@ export default function EmployerVerificationScreen({ navigation }) {
 const styles = StyleSheet.create({
   flex: {
     flex: 1,
+  },
+  guidanceLink: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    marginHorizontal: spacing.screenHorizontalPadding,
+    marginTop: spacing.sm,
+    paddingVertical: spacing.xs,
+  },
+  guidanceLinkRTL: {
+    alignSelf: 'flex-end',
+    flexDirection: 'row-reverse',
+  },
+  guidanceIcon: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.accentSoft || '#E6F7F5',
+  },
+  guidanceLinkText: {
+    color: colors.accentStrong || colors.tealDark,
+    fontSize: 12,
+    fontWeight: '700',
   },
   content: {
     paddingHorizontal: spacing.lg,

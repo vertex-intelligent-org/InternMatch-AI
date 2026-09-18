@@ -2140,3 +2140,41 @@ body {
     grid-column: auto;
   }
 }
+
+
+.feedbackField {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.feedbackTextarea {
+  width: 100%;
+  min-height: 118px;
+  resize: vertical;
+  padding: 11px 12px;
+  border: 1px solid #d0d5dd;
+  border-radius: 9px;
+  background: #ffffff;
+  color: #344054;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.feedbackTextarea:focus-visible {
+  outline: 3px solid rgba(49, 97, 255, 0.24);
+  outline-offset: 2px;
+  border-color: #84adff;
+}
+
+.feedbackTextarea:disabled {
+  background: #f9fafb;
+  cursor: not-allowed;
+}
+
+.feedbackMeta {
+  color: #667085;
+  font-size: 11px;
+  line-height: 1.5;
+}

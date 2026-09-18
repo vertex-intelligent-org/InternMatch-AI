@@ -166,6 +166,11 @@ export default function AdminListingsPage() {
   const [success, setSuccess] =
     useState<string | null>(null);
 
+  const [
+    employerVisibleFeedback,
+    setEmployerVisibleFeedback,
+  ] = useState('');
+
   const handleProtectedFailure =
     useCallback(
       async (
@@ -207,6 +212,7 @@ export default function AdminListingsPage() {
         setSelectedId(id);
         setLoadingDetail(true);
         setDetailError(null);
+        setEmployerVisibleFeedback('');
 
         try {
           const detail =
@@ -601,11 +607,22 @@ export default function AdminListingsPage() {
       return;
     }
 
+    const feedback =
+      employerVisibleFeedback.trim();
+
+    if (!feedback) {
+      setPageError(
+        'Add employer-visible feedback explaining what must be corrected.'
+      );
+      return;
+    }
+
     const confirmed = window.confirm(
       (
         'Request changes for '
         + selected.title
-        + '?'
+        + '?\n\n'
+        + 'The employer will see the feedback entered in the review field.'
       )
     );
 
@@ -615,7 +632,11 @@ export default function AdminListingsPage() {
 
     await runMutation(
       () => requestChangesAdminInternship(
-        selected.id
+        selected.id,
+        {
+          employer_visible_feedback:
+            feedback,
+        }
       ),
       selected.title
       + ' was returned for changes.'
@@ -1212,6 +1233,36 @@ export default function AdminListingsPage() {
                         This employer submission is hidden from candidates
                         until an administrator approves it.
                       </div>
+
+                      <label className="feedbackField">
+                        <span className="label">
+                          Employer-visible feedback
+                        </span>
+
+                        <textarea
+                          className="feedbackTextarea"
+                          value={employerVisibleFeedback}
+                          maxLength={1000}
+                          disabled={mutating}
+                          placeholder={
+                            'Explain exactly what the employer should correct '
+                            + 'before resubmitting the listing.'
+                          }
+                          onChange={(event) => {
+                            setEmployerVisibleFeedback(
+                              event.target.value
+                            );
+                          }}
+                        />
+
+                        <span className="feedbackMeta">
+                          This text is shown to the employer.
+                          Do not include internal notes, credentials,
+                          private evidence, or security-sensitive information.
+                          {' '}
+                          {employerVisibleFeedback.length}/1000
+                        </span>
+                      </label>
 
                       <div className="actionFooter">
                         <span className="actionHint">

@@ -1513,6 +1513,117 @@ export default {
     error503: 'Bu fırsat şu anda incelemeye gönderilemedi. Lütfen tekrar deneyin.',
     errorGeneric: 'Fırsat incelemeye gönderilirken bir hata oluştu. Lütfen tekrar deneyin.',
   },
+  employerGuidance: {
+    opportunity: {
+      linkLabel: 'Neleri eklemeliyim?',
+      title: '?lan Haz?rlama Rehberi',
+      subtitle: '?nceleme i?in a??k bir staj ilan? nas?l haz?rlan?r',
+      introTitle: 'G?ndermeden ?nce',
+      introBody: 'InternMatch, i?verenler taraf?ndan olu?turulan f?rsatlar? adaylara g?r?n?r hale gelmeden ?nce inceler. Adaylar?n anlayabilece?i ve platformun tutarl? ?ekilde i?leyebilece?i do?ru ve eksiksiz bilgiler sa?lamak i?in bu rehberi kullan?n.',
+      sections: {
+        content: {
+          title: 'Temel ilan bilgileri',
+          body: 'Zorunlu alanlar ger?ekten sunulan staj f?rsat?n? a??klamal?d?r.',
+          bullets: [
+            'A??k ve belirli bir staj veya rol ba?l??? kullan?n.',
+            'Ger?ek ?al??ma konumunu yaz?n; rol uzaktan ise bunu a??k?a belirtin.',
+            'Do?ru ?al??ma t?r?n? se?in: Uzaktan, Ofiste veya Hibrit.',
+            'Sorumluluklar?, projeleri, ??renme beklentilerini ve ?al??ma ortam?n? a??klay?n.',
+            '?irket ad? do?rulanm?? kurulu? profilinden gelir ve ilan formunda serbest?e de?i?tirilemez.',
+          ],
+        },
+        requirements: {
+          title: 'Beceriler ve gereksinimler',
+          body: '?ste?e ba?l? gereksinimler, aday uyumunu a??klamal? ancak gereksiz yere zorunlu hale getirilmemelidir.',
+          bullets: [
+            'Required Skills alan?na yaln?zca ger?ekten gerekli becerileri yaz?n.',
+            'Preferred Skills alan?n? faydal? ancak zorunlu olmayan deneyimler i?in kullan?n.',
+            'Gerekti?inde temel ?al??ma dilini belirtin.',
+            'E?itim ve deneyim beklentileri ger?ek rol? yans?tmal?, yan?lt?c? veya gereksiz derecede k?s?tlay?c? olmamal?d?r.',
+          ],
+        },
+        candidateClarity: {
+          title: 'Adaylar i?in a??k yaz?n',
+          body: 'Aday, kurulu?un ne bekledi?ini tahmin etmek zorunda kalmadan f?rsat? anlayabilmelidir.',
+          bullets: [
+            'Belirsiz ba?l?klardan, ge?ici metinlerden, abart?l? tan?t?m ifadelerinden ve eksik a??klamalardan ka??n?n.',
+            'Genel ilanda parola, ?zel dahili bilgi veya gizli materyal payla?may?n.',
+            'Sorumluluklar?n ve beklentilerin kurulu?un ger?ekten sunaca?? ko?ullarla uyumlu olmas?n? sa?lay?n.',
+          ],
+        },
+        review: {
+          title: '?nceleme nas?l ?al???r',
+          body: 'Kurulu? do?rulamas? ile ilan onay? ayr? kontrollerdir.',
+          bullets: [
+            'Do?rulanm?? bir kurulu? yeni ilanlar? otomatik olarak yay?nlamaz.',
+            '??veren taraf?ndan olu?turulan her ilan, adaylara g?r?nmeden ?nce ayr?ca incelenir.',
+            'De?i?iklik istenirse ilan taslak durumuna d?ner ve d?zenlenip yeniden g?nderilene kadar gizli kal?r.',
+            'Daha ?nce onaylanm?? bir ilan?n d?zenlenmesi, g?ncellenen i?eri?i yeniden incelemeye g?nderir.',
+          ],
+        },
+        processing: {
+          title: '?lan verileri nas?l kullan?l?r',
+          body: 'InternMatch ilan alanlar?n? f?rsatlar? g?stermek ve arama, e?le?tirme ve ba?vuru ak??lar? gibi ?r?n i?levlerini desteklemek i?in kullan?r.',
+          bullets: [
+            'Ba?l?k, a??klama, konum, ?al??ma t?r?, beceriler, dil, e?itim ve deneyim gereksinimleri ?r?n i?inde f?rsat? temsil etmek ve i?lemek i?in kullan?labilir.',
+            'Yaln?zca staj ilan?na uygun ve normal i?veren-aday ak??lar?nda g?sterilmesi g?venli bilgileri girin.',
+          ],
+        },
+      },
+      noticeTitle: 'Bir ilan? d?zeltmeniz mi gerekiyor?',
+      noticeBody: 'Y?netici de?i?iklik istedi?inde bildirim, i?verene g?sterilecek a??klamay? i?erebilir. Bildirime dokunarak do?rudan ilan d?zenleyicisine gidin, istenen d?zeltmeleri yap?n ve yeniden incelemeye g?nderin.',
+    },
+    organization: {
+      linkLabel: 'Bu bilgileri nas?l doldurmal?y?m?',
+      title: 'Kurulu? Do?rulama Rehberi',
+      subtitle: 'Kurulu? bilgileri inceleme i?in nas?l haz?rlan?r',
+      introTitle: 'Do?rulanabilir kurulu? bilgileri kullan?n',
+      introBody: 'Kurulu? do?rulamas?, f?rsatlar?n arkas?ndaki i?veren kimli?ini do?rulamak i?in kullan?l?r. Tutarl? ?ekilde incelenebilecek do?ru i?letme ve temsilci bilgileri girin.',
+      sections: {
+        identity: {
+          title: 'Kurulu? kimli?i',
+          body: 'Ger?ek kurulu?u tan?mlayan bilgileri kullan?n.',
+          bullets: [
+            'Yasal kurulu? ad? kay?tl? veya resmi kurulu? ad?yla e?le?melidir.',
+            'G?r?nen ad, adaylar?n ?r?n i?inde tan?yaca?? kurulu? ad?d?r.',
+            'Kurulu?a ait web sitesini kullan?n.',
+            'Kurulu?u temsil eden i? e-posta adresini kullan?n.',
+            '?lke kodu, formun istedi?i bi?imde kurulu?un ba?l? oldu?u ?lkeyi g?stermelidir.',
+          ],
+        },
+        verification: {
+          title: 'Kay?t ve temsilci bilgileri',
+          body: 'Ge?erli oldu?u durumlarda do?ru kay?t ve temsil bilgileri sa?lay?n.',
+          bullets: [
+            'Kay?t numaras? ve vergi numaras?n? yaln?zca kurulu? i?in ge?erliyse girin.',
+            'Temsilci ad?, kurulu? ad?na hareket eden ki?iyi tan?mlamal?d?r.',
+            'Temsilci rol?, ki?inin kurulu?la ili?kisini a??klamal?d?r.',
+            'Sahte, ?d?n? al?nm?? veya ilgisiz kurulu? bilgileri kullanmay?n.',
+          ],
+        },
+        visibility: {
+          title: 'Do?rulama neyi de?i?tirir',
+          body: 'Do?rulama i?veren kimli?ini do?rular ancak ilan moderasyonunu atlamaz.',
+          bullets: [
+            'Kurulu? onay?, do?rulanm?? i?veren ak??lar?n?n kullan?lmas?n? sa?lar.',
+            'Her i?veren ilan? yay?nlanmadan ?nce ayr? ilan incelemesinden ge?er.',
+            'Kurulu? do?rulanm?? olsa bile ilan i?eri?i d?zeltilmek ?zere geri g?nderilebilir.',
+          ],
+        },
+        accuracy: {
+          title: 'Do?ruluk ve veri i?leme',
+          body: 'Yaln?zca kurulu? do?rulama ak???n?n istedi?i bilgileri sa?lay?n.',
+          bullets: [
+            'Kurulu? profili kimlik do?rulamas?n? ve i?veren ?r?n i?levlerini desteklemek i?in i?lenir.',
+            'Kurulu? alanlar?na parola, eri?im anahtar?, ?zel kimlik bilgisi veya ilgisiz gizli bilgi yazmay?n.',
+            'Do?rulama reddedilirse uygulamada g?sterilen nedeni inceleyin, ilgili kurulu? bilgilerini d?zeltin ve yeniden g?nderin.',
+          ],
+        },
+      },
+      noticeTitle: 'Do?rulama ve yay?nlama ayr? ad?mlard?r',
+      noticeBody: 'Kurulu? do?rulamas? i?veren hesab?n? onaylar. F?rsatlar?n yay?nlanmas? ayr? bir incelemedir; bu nedenle kurulu? onay? i?veren ilanlar?n? otomatik olarak yay?nlamaz.',
+    },
+  },
   employerApplicants: {
     title: 'Başvurular',
     eyebrow: 'ADAY BAŞVURULARI',

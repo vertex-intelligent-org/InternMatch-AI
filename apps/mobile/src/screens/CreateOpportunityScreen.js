@@ -9,8 +9,10 @@ import {
   Platform,
   Alert,
   ActivityIndicator,
+  TouchableOpacity,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
+import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import colors from '../theme/colors';
 import { spacing } from '../theme/spacing';
@@ -452,15 +454,8 @@ export default function CreateOpportunityScreen({ navigation, route }) {
       haptics.success();
 
       Alert.alert(
-        isEditing
-          ? t('createOpportunity.editSuccessTitle', 'Opportunity Updated')
-          : t('createOpportunity.successTitle'),
-        isEditing
-          ? t(
-              'createOpportunity.editSuccessMessage',
-              'Your opportunity has been updated successfully.'
-            )
-          : t('createOpportunity.successMessage'),
+        t('createOpportunity.successTitle'),
+        t('createOpportunity.successMessage'),
         [
           {
             text: 'OK',
@@ -550,6 +545,44 @@ export default function CreateOpportunityScreen({ navigation, route }) {
         alignment="center"
         bordered
       />
+
+      <TouchableOpacity
+        style={[
+          styles.guidanceLink,
+          isRTL && styles.guidanceLinkRTL,
+        ]}
+        onPress={() => {
+          navigation.navigate(
+            'EmployerGuidance',
+            {
+              topic: 'opportunity',
+            }
+          );
+        }}
+        accessibilityRole="button"
+        accessibilityLabel={t(
+          'employerGuidance.opportunity.linkLabel'
+        )}
+      >
+        <View style={styles.guidanceIcon}>
+          <Ionicons
+            name="help"
+            size={14}
+            color={colors.accentStrong || colors.tealDark}
+          />
+        </View>
+
+        <Text
+          style={[
+            styles.guidanceLinkText,
+            isRTL && styles.rtlText,
+          ]}
+        >
+          {t(
+            'employerGuidance.opportunity.linkLabel'
+          )}
+        </Text>
+      </TouchableOpacity>
 
         {!isEditing ? (
           <Card padding="sm">
@@ -898,6 +931,33 @@ export default function CreateOpportunityScreen({ navigation, route }) {
 const styles = StyleSheet.create({
   flex: {
     flex: 1,
+  },
+  guidanceLink: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    marginHorizontal: spacing.screenHorizontalPadding,
+    marginTop: spacing.sm,
+    marginBottom: spacing.xs,
+    paddingVertical: spacing.xs,
+  },
+  guidanceLinkRTL: {
+    alignSelf: 'flex-end',
+    flexDirection: 'row-reverse',
+  },
+  guidanceIcon: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.accentSoft || '#E6F7F5',
+  },
+  guidanceLinkText: {
+    color: colors.accentStrong || colors.tealDark,
+    fontSize: 12,
+    fontWeight: '700',
   },
   screen: {
     flex: 1,

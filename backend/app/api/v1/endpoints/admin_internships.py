@@ -19,6 +19,7 @@ from app.schemas.application import (
     EmployerInterviewScheduleRequest,
 )
 from app.schemas.internship import (
+    AdminInternshipChangesRequest,
     AdminInternshipCreateRequest,
     AdminInternshipDetailResponse,
     InternshipDetailResponse,
@@ -988,6 +989,7 @@ def approve_admin_internship(
 )
 def request_changes_admin_internship(
     id: UUID,
+    payload: AdminInternshipChangesRequest,
     _admin_user: AuthenticatedUser = Depends(
         require_admin_user
     ),
@@ -1048,6 +1050,9 @@ def request_changes_admin_internship(
                 data={
                     "internship_id": str(listing.id),
                     "publication_status": "draft",
+                    "employer_visible_feedback": (
+                        payload.employer_visible_feedback
+                    ),
                 },
                 dedupe_key=(
                     f"internship:{listing.id}:"

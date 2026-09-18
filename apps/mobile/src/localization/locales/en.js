@@ -1513,6 +1513,117 @@ export default {
     error503: 'We couldn\'t submit this opportunity for review right now. Please try again.',
     errorGeneric: 'Failed to submit opportunity for review. Please try again.',
   },
+  employerGuidance: {
+    opportunity: {
+      linkLabel: 'What should I include?',
+      title: 'Opportunity Guidelines',
+      subtitle: 'How to prepare a clear internship listing for review',
+      introTitle: 'Before you submit',
+      introBody: 'InternMatch reviews employer-created opportunities before they become visible to candidates. Use these guidelines to provide accurate, complete information that candidates can understand and that the platform can process consistently.',
+      sections: {
+        content: {
+          title: 'Core listing information',
+          body: 'The required listing fields should describe the actual internship being offered.',
+          bullets: [
+            'Use a clear and specific internship or role title.',
+            'Provide the real working location, or state Remote when the role is remote.',
+            'Choose the correct work type: Remote, On-site, or Hybrid.',
+            'Write a description covering responsibilities, projects, learning expectations, and the working context.',
+            'The company name is derived from your verified organization and is not freely editable in the listing form.',
+          ],
+        },
+        requirements: {
+          title: 'Skills and requirements',
+          body: 'Optional requirements should help candidates understand fit without overstating what is mandatory.',
+          bullets: [
+            'Use Required Skills only for skills that are genuinely necessary.',
+            'Use Preferred Skills for useful but non-essential experience.',
+            'Add the primary working language when relevant.',
+            'Education and experience requirements should reflect the actual role and should not be misleading or unnecessarily restrictive.',
+          ],
+        },
+        candidateClarity: {
+          title: 'Write for candidates',
+          body: 'Candidates should be able to understand the opportunity without guessing what the organization expects.',
+          bullets: [
+            'Avoid vague titles, placeholder text, promotional claims, or incomplete descriptions.',
+            'Do not include credentials, private internal information, or confidential material in the public listing.',
+            'Keep responsibilities and expectations consistent with what the organization will actually provide.',
+          ],
+        },
+        review: {
+          title: 'How review works',
+          body: 'Organization verification and listing approval are separate controls.',
+          bullets: [
+            'A verified organization does not automatically publish new listings.',
+            'Every employer-authored listing is reviewed before candidate visibility.',
+            'If changes are requested, the listing returns to a draft state and remains hidden until you edit and resubmit it.',
+            'Editing a previously approved listing sends the updated content back for review before it can be published again.',
+          ],
+        },
+        processing: {
+          title: 'How listing data is used',
+          body: 'InternMatch uses listing fields to display opportunities and support product functions such as search, matching, and application workflows.',
+          bullets: [
+            'Title, description, location, work type, skills, language, education, and experience requirements may be used to represent and process the opportunity inside the product.',
+            'Only provide information that is appropriate for the internship listing and safe to expose through normal employer and candidate workflows.',
+          ],
+        },
+      },
+      noticeTitle: 'Need to correct a listing?',
+      noticeBody: 'When an administrator requests changes, the employer notification can include employer-visible feedback. Open that notification to return directly to the listing editor, correct the requested items, and resubmit for review.',
+    },
+    organization: {
+      linkLabel: 'How should I complete this?',
+      title: 'Organization Verification Guide',
+      subtitle: 'How to prepare organization information for review',
+      introTitle: 'Use verifiable organization information',
+      introBody: 'Organization verification is used to establish the employer identity behind opportunities. Enter accurate business and representative information that can be reviewed consistently.',
+      sections: {
+        identity: {
+          title: 'Organization identity',
+          body: 'Use information that identifies the real organization.',
+          bullets: [
+            'Legal organization name should match the registered or official organization name.',
+            'Display name is the name candidates should recognize in the product.',
+            'Use the organization website associated with the business.',
+            'Use a business email that represents the organization.',
+            'Country code should identify the organization jurisdiction using the format requested by the form.',
+          ],
+        },
+        verification: {
+          title: 'Registration and representative details',
+          body: 'Provide accurate ownership and representative information where applicable.',
+          bullets: [
+            'Registration number and tax number should only be entered when they apply to the organization.',
+            'Representative name should identify the person acting for the organization.',
+            'Representative role should describe that person?s relationship to the organization.',
+            'Do not enter fabricated, borrowed, or unrelated organization information.',
+          ],
+        },
+        visibility: {
+          title: 'What verification changes',
+          body: 'Verification establishes employer identity but does not bypass listing moderation.',
+          bullets: [
+            'Organization approval allows the employer to use verified employer workflows.',
+            'Each employer-authored opportunity still requires separate listing review before publication.',
+            'A verified organization can still have a listing returned for changes if the listing content needs correction.',
+          ],
+        },
+        accuracy: {
+          title: 'Accuracy and data handling',
+          body: 'Provide only information required by the organization verification workflow.',
+          bullets: [
+            'The organization profile is processed to support identity verification and employer product functions.',
+            'Do not place passwords, access tokens, private credentials, or unrelated confidential information into organization fields.',
+            'If verification is rejected, review the reason shown in the app, correct the relevant organization details, and resubmit.',
+          ],
+        },
+      },
+      noticeTitle: 'Verification and publication are separate',
+      noticeBody: 'Organization verification confirms the employer account. Opportunity publication is a separate review step, so approval of the organization never auto-publishes employer listings.',
+    },
+  },
   employerApplicants: {
     title: 'Applicants',
     eyebrow: 'CANDIDATE APPLICATIONS',

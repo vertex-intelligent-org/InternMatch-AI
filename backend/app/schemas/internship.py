@@ -88,6 +88,57 @@ class InternshipUpdateRequest(InternshipCreateRequest):
 
 
 
+class AdminInternshipChangesRequest(BaseModel):
+    """
+    Employer-visible correction feedback supplied by an administrator.
+
+    This contract is intentionally public-facing. Internal moderation notes,
+    credentials, private evidence, and administrative-only context must never
+    be placed in this field.
+    """
+
+    employer_visible_feedback: str = Field(
+        ...,
+        min_length=1,
+        max_length=1000,
+        description=(
+            "Plain-text correction guidance visible to the employer."
+        ),
+    )
+
+    @field_validator(
+        "employer_visible_feedback",
+        mode="before",
+    )
+    @classmethod
+    def validate_employer_visible_feedback(
+        cls,
+        value: Any,
+    ) -> str:
+        if not isinstance(value, str):
+            raise ValueError(
+                "Employer-visible feedback must be text."
+            )
+
+        cleaned = value.strip()
+
+        if not cleaned:
+            raise ValueError(
+                "Employer-visible feedback cannot be empty."
+            )
+
+        if any(
+            ord(char) < 32
+            and char not in "\n\t"
+            for char in cleaned
+        ):
+            raise ValueError(
+                "Employer-visible feedback contains unsupported control characters."
+            )
+
+        return cleaned
+
+
 class AdminInternshipCreateRequest(InternshipCreateRequest):
     """
     Server-authorized curated opportunity creation payload.
