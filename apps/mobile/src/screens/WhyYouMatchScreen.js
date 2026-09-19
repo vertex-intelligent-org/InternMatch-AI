@@ -533,6 +533,22 @@ export default function WhyYouMatchScreen({ route, navigation }) {
             <Text style={styles.loadingSubtext}>
               {t('whyYouMatch.analyzingRequirements')}
             </Text>
+            <View style={styles.aiProgressTrack}>
+              <View
+                style={[
+                  styles.aiProgressFill,
+                  {
+                    width: `${aiProgress}%`,
+                  },
+                ]}
+              />
+            </View>
+            <Text
+              style={styles.aiProgressText}
+              accessibilityLiveRegion="polite"
+            >
+              {aiProgress}%
+            </Text>
             <TouchableOpacity
               style={styles.primaryButton}
               onPress={() =>
@@ -550,22 +566,6 @@ export default function WhyYouMatchScreen({ route, navigation }) {
                   : t('aiCancellation.cancel')}
               </Text>
             </TouchableOpacity>
-            <View style={styles.aiProgressTrack}>
-              <View
-                style={[
-                  styles.aiProgressFill,
-                  {
-                    width: `${aiProgress}%`,
-                  },
-                ]}
-              />
-            </View>
-            <Text
-              style={styles.aiProgressText}
-              accessibilityLiveRegion="polite"
-            >
-              {aiProgress}%
-            </Text>
           </View>
         )}
 
