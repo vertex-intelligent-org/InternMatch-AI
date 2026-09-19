@@ -47,7 +47,7 @@ def enqueue_notification_delivery(
         ),
         normalized_id,
         job_id=(
-            "notification:"
+            "notification-"
             + normalized_id
         ),
         job_timeout=30,
@@ -94,7 +94,7 @@ def enqueue_admin_alert_email_delivery(
         ),
         normalized_id,
         job_id=(
-            "notification-email:"
+            "notification-email-"
             + normalized_id
         ),
         job_timeout=30,
@@ -150,7 +150,7 @@ def enqueue_user_notification_email_delivery(
         ),
         normalized_id,
         job_id=(
-            "user-notification-email:"
+            "user-notification-email-"
             + normalized_id
         ),
         job_timeout=30,
