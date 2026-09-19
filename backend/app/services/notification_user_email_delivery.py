@@ -41,201 +41,130 @@ APPLICATION_EMAIL_STATUSES = frozenset(
 PUBLIC_APP_URL = "https://internmatch.college"
 
 
-COPY = {
-    "en": {
-        "application_submitted": (
-            "New application received",
-            "You received a new application",
-            "A candidate applied to one of your opportunities.",
-        ),
-        "application_interviewing": (
-            "You?ve moved to the interview stage",
-            "Your application is moving forward",
-            "The employer moved your application to the interview stage.",
-        ),
-        "application_accepted": (
-            "Congratulations ? your application was accepted",
-            "Congratulations!",
-            "Your application has been accepted.",
-        ),
-        "application_rejected": (
-            "Update on your application",
-            "Your application has been reviewed",
-            "The employer decided not to proceed with your application at this time.",
-        ),
-        "listing_published": (
-            "Your opportunity is now live",
-            "Your opportunity was published",
-            "Your opportunity passed review and is now visible to candidates.",
-        ),
-        "listing_changes_requested": (
-            "Changes are required for your opportunity",
-            "Your opportunity needs changes",
-            "Please review the requested changes before submitting the opportunity again.",
-        ),
-        "organization_verified": (
-            "Your organization has been verified",
-            "Organization verified",
-            "Your employer organization verification was approved.",
-        ),
-        "organization_rejected": (
-            "Action required for organization verification",
-            "Verification needs attention",
-            "Your organization verification needs attention before it can be approved.",
-        ),
-        "compliance_approved": (
-            "Compliance review approved",
-            "Compliance approved",
-            "Your submitted compliance evidence was approved.",
-        ),
-        "compliance_rejected": (
-            "Action required for compliance review",
-            "Compliance review needs attention",
-            "Your submitted compliance evidence needs attention before approval.",
-        ),
-    },
-    "tr": {
-        "application_submitted": (
-            "Yeni ba?vuru al?nd?",
-            "Yeni bir ba?vuru ald?n?z",
-            "Bir aday f?rsatlar?n?zdan birine ba?vurdu.",
-        ),
-        "application_interviewing": (
-            "M?lakat a?amas?na ge?tiniz",
-            "Ba?vurunuz ilerliyor",
-            "??veren ba?vurunuzu m?lakat a?amas?na ta??d?.",
-        ),
-        "application_accepted": (
-            "Tebrikler ? ba?vurunuz kabul edildi",
-            "Tebrikler!",
-            "Ba?vurunuz kabul edildi.",
-        ),
-        "application_rejected": (
-            "Ba?vurunuzla ilgili g?ncelleme",
-            "Ba?vurunuz incelendi",
-            "??veren ?u anda ba?vurunuzla devam etmeme karar? ald?.",
-        ),
-        "listing_published": (
-            "F?rsat?n?z art?k yay?nda",
-            "F?rsat?n?z yay?nland?",
-            "F?rsat?n?z incelemeyi ge?ti ve art?k adaylara g?r?n?r durumda.",
-        ),
-        "listing_changes_requested": (
-            "F?rsat?n?z i?in de?i?iklik gerekiyor",
-            "F?rsat?n?zda de?i?iklik gerekiyor",
-            "L?tfen f?rsat? yeniden g?ndermeden ?nce istenen de?i?iklikleri inceleyin.",
-        ),
-        "organization_verified": (
-            "Kurulu?unuz do?ruland?",
-            "Kurulu? do?ruland?",
-            "??veren kurulu?u do?rulaman?z onayland?.",
-        ),
-        "organization_rejected": (
-            "Kurulu? do?rulamas? i?in i?lem gerekiyor",
-            "Do?rulama dikkat gerektiriyor",
-            "Kurulu? do?rulaman?z?n onaylanabilmesi i?in baz? noktalarla ilgilenmeniz gerekiyor.",
-        ),
-        "compliance_approved": (
-            "Uyumluluk incelemesi onayland?",
-            "Uyumluluk onayland?",
-            "G?nderdi?iniz uyumluluk kan?t? onayland?.",
-        ),
-        "compliance_rejected": (
-            "Uyumluluk incelemesi i?in i?lem gerekiyor",
-            "Uyumluluk incelemesi dikkat gerektiriyor",
-            "G?nderdi?iniz uyumluluk kan?t?n?n onaylanmadan ?nce g?zden ge?irilmesi gerekiyor.",
-        ),
-    },
-    "ar": {
-        "application_submitted": (
-            "?? ?????? ??? ????",
-            "???? ??? ????",
-            "????? ???? ??? ???? ????? ???? ??????.",
-        ),
-        "application_interviewing": (
-            "?????? ??? ????? ????????",
-            "???? ?????",
-            "??? ???? ????? ???? ??? ????? ????????.",
-        ),
-        "application_accepted": (
-            "??????? ? ?? ???? ????",
-            "???????!",
-            "?? ???? ????.",
-        ),
-        "application_rejected": (
-            "????? ????? ????",
-            "??? ?????? ????",
-            "??? ???? ????? ??? ?????? ???? ?? ??? ???????.",
-        ),
-        "listing_published": (
-            "?? ??? ?????",
-            "????? ????? ?????",
-            "?????? ????? ???????? ?????? ????? ????????.",
-        ),
-        "listing_changes_requested": (
-            "????? ????? ??? ?????",
-            "????? ????? ??? ???????",
-            "???? ?????? ????????? ???????? ??? ????? ?????? ???????? ??? ????.",
-        ),
-        "organization_verified": (
-            "?? ?????? ?? ??????",
-            "?? ?????? ?? ???????",
-            "??? ???????? ??? ?????? ?? ????? ???? ?????.",
-        ),
-        "organization_rejected": (
-            "????? ????? ????? ?????? ?? ???????",
-            "?????? ????? ??? ??????",
-            "????? ????? ?????? ?? ?????? ??? ??? ????????? ??? ???????? ?????.",
-        ),
-        "compliance_approved": (
-            "??? ???????? ??? ?????? ????????",
-            "??? ???????? ??? ????????",
-            "??? ???????? ??? ??????? ???????? ???? ???????.",
-        ),
-        "compliance_rejected": (
-            "????? ????? ????? ?????? ????????",
-            "?????? ???????? ????? ??? ??????",
-            "????? ??????? ???????? ???? ??????? ??? ?????? ??? ???????? ?????.",
-        ),
-    },
-}
+COPY = {'en': {'application_submitted': ('New application received',
+                                  'You received a new application',
+                                  'A candidate applied to one of your opportunities.'),
+        'application_interviewing': ("You've moved to the interview stage",
+                                     'Your application is moving forward',
+                                     'The employer moved your application to the '
+                                     'interview stage.'),
+        'application_accepted': ('Congratulations - your application was accepted',
+                                 'Congratulations!',
+                                 'Your application has been accepted.'),
+        'application_rejected': ('Update on your application',
+                                 'Your application has been reviewed',
+                                 'The employer decided not to proceed with your '
+                                 'application at this time.'),
+        'listing_published': ('Your opportunity is now live',
+                              'Your opportunity was published',
+                              'Your opportunity passed review and is now visible to '
+                              'candidates.'),
+        'listing_changes_requested': ('Changes are required for your opportunity',
+                                      'Your opportunity needs changes',
+                                      'Please review the requested changes before '
+                                      'submitting the opportunity again.'),
+        'organization_verified': ('Your organization has been verified',
+                                  'Organization verified',
+                                  'Your employer organization verification was '
+                                  'approved.'),
+        'organization_rejected': ('Action required for organization verification',
+                                  'Verification needs attention',
+                                  'Your organization verification needs attention '
+                                  'before it can be approved.'),
+        'compliance_approved': ('Compliance review approved',
+                                'Compliance approved',
+                                'Your submitted compliance evidence was approved.'),
+        'compliance_rejected': ('Action required for compliance review',
+                                'Compliance review needs attention',
+                                'Your submitted compliance evidence needs attention '
+                                'before approval.')},
+ 'tr': {'application_submitted': ('Yeni başvuru alındı',
+                                  'Yeni bir başvuru aldınız',
+                                  'Bir aday fırsatlarınızdan birine başvurdu.'),
+        'application_interviewing': ('Mülakat aşamasına geçtiniz',
+                                     'Başvurunuz ilerliyor',
+                                     'İşveren başvurunuzu mülakat aşamasına taşıdı.'),
+        'application_accepted': ('Tebrikler - başvurunuz kabul edildi',
+                                 'Tebrikler!',
+                                 'Başvurunuz kabul edildi.'),
+        'application_rejected': ('Başvurunuzla ilgili güncelleme',
+                                 'Başvurunuz incelendi',
+                                 'İşveren şu anda başvurunuzla devam etmeme kararı '
+                                 'aldı.'),
+        'listing_published': ('Fırsatınız artık yayında',
+                              'Fırsatınız yayınlandı',
+                              'Fırsatınız incelemeyi geçti ve artık adaylara görünür '
+                              'durumda.'),
+        'listing_changes_requested': ('Fırsatınız için değişiklik gerekiyor',
+                                      'Fırsatınızda değişiklik gerekiyor',
+                                      'Lütfen fırsatı yeniden göndermeden önce istenen '
+                                      'değişiklikleri inceleyin.'),
+        'organization_verified': ('Kuruluşunuz doğrulandı',
+                                  'Kuruluş doğrulandı',
+                                  'İşveren kuruluşu doğrulamanız onaylandı.'),
+        'organization_rejected': ('Kuruluş doğrulaması için işlem gerekiyor',
+                                  'Doğrulama dikkat gerektiriyor',
+                                  'Kuruluş doğrulamanızın onaylanabilmesi için bazı '
+                                  'noktalarla ilgilenmeniz gerekiyor.'),
+        'compliance_approved': ('Uyumluluk incelemesi onaylandı',
+                                'Uyumluluk onaylandı',
+                                'Gönderdiğiniz uyumluluk kanıtı onaylandı.'),
+        'compliance_rejected': ('Uyumluluk incelemesi için işlem gerekiyor',
+                                'Uyumluluk incelemesi dikkat gerektiriyor',
+                                'Gönderdiğiniz uyumluluk kanıtının onaylanmadan önce '
+                                'gözden geçirilmesi gerekiyor.')},
+ 'ar': {'application_submitted': ('تم استلام طلب جديد',
+                                  'لديك طلب جديد',
+                                  'قدم مرشح طلبا على إحدى فرصك.'),
+        'application_interviewing': ('انتقلت إلى مرحلة المقابلة',
+                                     'طلبك يتقدم',
+                                     'نقل صاحب العمل طلبك إلى مرحلة المقابلة.'),
+        'application_accepted': ('تهانينا - تم قبول طلبك', 'تهانينا!', 'تم قبول طلبك.'),
+        'application_rejected': ('تحديث بشأن طلبك',
+                                 'تمت مراجعة طلبك',
+                                 'قرر صاحب العمل عدم متابعة طلبك في الوقت الحالي.'),
+        'listing_published': ('تم نشر فرصتك',
+                              'أصبحت فرصتك منشورة',
+                              'اجتازت فرصتك المراجعة وأصبحت الآن ظاهرة للمرشحين.'),
+        'listing_changes_requested': ('مطلوب تعديلات على فرصتك',
+                                      'فرصتك تحتاج إلى تعديلات',
+                                      'يرجى مراجعة التعديلات المطلوبة قبل إعادة إرسال '
+                                      'الفرصة.'),
+        'organization_verified': ('تم توثيق مؤسستك',
+                                  'تم توثيق المؤسسة',
+                                  'تمت الموافقة على توثيق مؤسسة صاحب العمل الخاصة بك.'),
+        'organization_rejected': ('مطلوب إجراء بشأن توثيق المؤسسة',
+                                  'التوثيق يحتاج إلى مراجعة',
+                                  'يحتاج توثيق مؤسستك إلى مراجعة قبل الموافقة عليه.'),
+        'compliance_approved': ('تمت الموافقة على مراجعة الامتثال',
+                                'تمت الموافقة على الامتثال',
+                                'تمت الموافقة على مستندات الامتثال المقدمة.'),
+        'compliance_rejected': ('مطلوب إجراء بشأن مراجعة الامتثال',
+                                'مراجعة الامتثال تحتاج إلى انتباه',
+                                'تحتاج مستندات الامتثال المقدمة إلى مراجعة قبل '
+                                'الموافقة.')}}
 
 
-LABELS = {
-    "en": {
-        "opportunity": "Opportunity",
-        "company": "Company",
-        "candidate": "Candidate",
-        "feedback": "Reviewer feedback",
-        "cta": "Open InternMatch",
-        "footer": (
-            "This is a transactional message about activity "
-            "in your InternMatch AI account."
-        ),
-    },
-    "tr": {
-        "opportunity": "F?rsat",
-        "company": "?irket",
-        "candidate": "Aday",
-        "feedback": "?nceleme geri bildirimi",
-        "cta": "InternMatch?i A?",
-        "footer": (
-            "Bu, InternMatch AI hesab?n?zdaki etkinlikle "
-            "ilgili i?lemsel bir mesajd?r."
-        ),
-    },
-    "ar": {
-        "opportunity": "??????",
-        "company": "??????",
-        "candidate": "??????",
-        "feedback": "??????? ???????",
-        "cta": "??? InternMatch",
-        "footer": (
-            "??? ????? ????? ?????? ????? ????? "
-            "?? InternMatch AI."
-        ),
-    },
-}
+LABELS = {'en': {'opportunity': 'Opportunity',
+        'company': 'Company',
+        'candidate': 'Candidate',
+        'feedback': 'Reviewer feedback',
+        'cta': 'Open InternMatch',
+        'footer': 'This is a transactional message about activity in your InternMatch '
+                  'AI account.'},
+ 'tr': {'opportunity': 'Fırsat',
+        'company': 'Şirket',
+        'candidate': 'Aday',
+        'feedback': 'İnceleme geri bildirimi',
+        'cta': "InternMatch'i Aç",
+        'footer': 'Bu, InternMatch AI hesabınızdaki etkinlikle ilgili işlemsel bir '
+                  'mesajdır.'},
+ 'ar': {'opportunity': 'الفرصة',
+        'company': 'الشركة',
+        'candidate': 'المرشح',
+        'feedback': 'ملاحظات المراجع',
+        'cta': 'فتح InternMatch',
+        'footer': 'هذه رسالة خدمية متعلقة بالنشاط في حسابك على InternMatch AI.'}}
 
 
 @dataclass(frozen=True)

@@ -369,3 +369,56 @@ def test_user_email_queue_is_cleared_on_rollback(
         assert enqueued == []
     finally:
         db.close()
+
+
+def test_user_email_locale_copy_has_no_encoding_corruption():
+    for language in ("tr", "ar"):
+        values = list(
+            email_delivery.LABELS[language].values()
+        )
+
+        for event_copy in (
+            email_delivery.COPY[language].values()
+        ):
+            values.extend(event_copy)
+
+        assert all(
+            "?" not in value
+            for value in values
+        )
+
+        assert all(
+            "\ufffd" not in value
+            for value in values
+        )
+
+    assert (
+        email_delivery.COPY["en"][
+            "application_interviewing"
+        ][0]
+        == "You've moved to the interview stage"
+    )
+
+    assert (
+        email_delivery.COPY["tr"][
+            "application_submitted"
+        ][0]
+        == "Yeni ba\u015fvuru al\u0131nd\u0131"
+    )
+
+    assert (
+        email_delivery.COPY["ar"][
+            "application_accepted"
+        ][2]
+        == "\u062a\u0645 \u0642\u0628\u0648\u0644 \u0637\u0644\u0628\u0643."
+    )
+
+    assert (
+        email_delivery.LABELS["tr"]["company"]
+        == "\u015eirket"
+    )
+
+    assert (
+        email_delivery.LABELS["ar"]["candidate"]
+        == "\u0627\u0644\u0645\u0631\u0634\u062d"
+    )
