@@ -1327,6 +1327,8 @@ export default {
   },
   employerOpportunities: {
     title: 'Fırsatlarım',
+    detailsTitle: 'Fırsat Detayları',
+    detailsLoadError: 'Bu fırsat yüklenemedi. Lütfen tekrar deneyin.',
     eyebrow: 'İLANLARI YÖNET',
     createBtn: 'Oluştur',
     createOpportunity: 'Fırsat Oluştur',

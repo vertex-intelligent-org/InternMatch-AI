@@ -24,6 +24,7 @@ import CreateOpportunityScreen from '../screens/CreateOpportunityScreen';
 import EmployerVerificationScreen from '../screens/EmployerVerificationScreen';
 import EmployerComplianceScreen from '../screens/EmployerComplianceScreen';
 import EmployerApplicantsScreen from '../screens/EmployerApplicantsScreen';
+import EmployerOpportunityDetailScreen from '../screens/EmployerOpportunityDetailScreen';
 import EmployerApplicantDetailScreen from '../screens/EmployerApplicantDetailScreen';
 import EmployerGuidanceScreen from '../screens/EmployerGuidanceScreen';
 import PrivacyPolicyScreen from '../screens/PrivacyPolicyScreen';
@@ -361,6 +362,7 @@ export default function RootNavigator() {
         <Stack.Screen name="EmployerVerification" component={EmployerVerificationScreen} />
         <Stack.Screen name="EmployerCompliance" component={EmployerComplianceScreen} />
         <Stack.Screen name="CreateOpportunity" component={CreateOpportunityScreen} />
+        <Stack.Screen name="EmployerOpportunityDetail" component={EmployerOpportunityDetailScreen} />
         <Stack.Screen name="EmployerApplicants" component={EmployerApplicantsScreen} />
         <Stack.Screen name="EmployerApplicantDetail" component={EmployerApplicantDetailScreen} />
         <Stack.Screen name="EmployerGuidance" component={EmployerGuidanceScreen} />

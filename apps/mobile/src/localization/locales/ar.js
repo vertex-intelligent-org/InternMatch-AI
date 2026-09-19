@@ -1288,6 +1288,8 @@ export default {
   },
   employerOpportunities: {
     title: 'فرصي التدريبية',
+    detailsTitle: 'تفاصيل الفرصة',
+    detailsLoadError: 'تعذر تحميل تفاصيل هذه الفرصة. يرجى المحاولة مرة أخرى.',
     eyebrow: 'إدارة الإعلانات',
     createBtn: 'إنشاء',
     createOpportunity: 'إنشاء فرصة',

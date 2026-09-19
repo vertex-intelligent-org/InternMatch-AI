@@ -1327,6 +1327,8 @@ export default {
   },
   employerOpportunities: {
     title: 'My Opportunities',
+    detailsTitle: 'Opportunity Details',
+    detailsLoadError: 'Could not load this opportunity. Please try again.',
     eyebrow: 'MANAGE LISTINGS',
     createBtn: 'Create',
     createOpportunity: 'Create Opportunity',

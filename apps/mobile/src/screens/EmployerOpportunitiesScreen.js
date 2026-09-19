@@ -257,6 +257,19 @@ export default function EmployerOpportunitiesScreen({ navigation }) {
 
   const bottomPadding = getTabScreenBottomPadding(insets.bottom);
 
+  const handleOpenOpportunityDetails =
+    useCallback(
+      (item) => {
+        navigation.navigate(
+          'EmployerOpportunityDetail',
+          {
+            internshipId: item.id,
+          }
+        );
+      },
+      [navigation]
+    );
+
   return (
     <ScreenContainer edges={['top']}>
       <AuthenticatedAppChromeHeader />
@@ -572,19 +585,23 @@ export default function EmployerOpportunitiesScreen({ navigation }) {
                   <PressableCard
                     style={styles.oppCard}
                     padding="md"
-                    onPress={() => {
-                      if (item.publication_status === 'published') {
-                        navigation.navigate('EmployerApplicants', {
-                          internshipId: item.id,
-                          title: item.title,
-                        });
-                      }
-                    }}
+                    onPress={() =>
+                      handleOpenOpportunityDetails(
+                        item
+                      )
+                    }
                     accessibilityLabel={`${item.title} at ${item.company}`}
                   >
                     {/* Header: Title and Badges */}
                     <View style={[styles.cardHeader, isRTL && styles.rowRTL]}>
-                      <Text style={[styles.title, isRTL && styles.rtlText]} numberOfLines={1}>
+                      <Text
+                        style={[
+                          styles.title,
+                          isRTL && styles.rtlText,
+                        ]}
+                        numberOfLines={1}
+                        ellipsizeMode="tail"
+                      >
                         {item.title}
                       </Text>
                       <View style={[styles.badgesContainer, isRTL && styles.rowRTL]}>
@@ -646,7 +663,15 @@ export default function EmployerOpportunitiesScreen({ navigation }) {
                     </View>
 
                     {/* Company and Location */}
-                    <Text style={[styles.metaText, isRTL && styles.rtlText]}>
+                    <Text
+                      style={[
+                        styles.metaText,
+                        styles.summaryMetaText,
+                        isRTL && styles.rtlText,
+                      ]}
+                      numberOfLines={1}
+                      ellipsizeMode="tail"
+                    >
                       {item.company} {'\u00b7'} {item.location}
                     </Text>
 
@@ -801,15 +826,22 @@ export default function EmployerOpportunitiesScreen({ navigation }) {
                               style={[styles.browseIcon, isRTL && styles.browseIconRTL]}
                             />
                           </TouchableOpacity>
-                        ) : item.publication_status === 'under_review' ? (
-                          <Text style={[styles.metaText, isRTL && styles.rtlText]}>
-                            {t(
-                              'employerOpportunities.pendingReviewMessage',
-                              'Waiting for InternMatch team approval'
-                            )}
-                          </Text>
                         ) : null}
                       </View>
+
+                      {item.publication_status === 'under_review' ? (
+                        <Text
+                          style={[
+                            styles.pendingReviewText,
+                            isRTL && styles.rtlText,
+                          ]}
+                        >
+                          {t(
+                            'employerOpportunities.pendingReviewMessage',
+                            'Waiting for InternMatch team approval'
+                          )}
+                        </Text>
+                      ) : null}
                     </View>
                   </PressableCard>
                 </Reveal>
@@ -946,9 +978,12 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: spacing.xxs,
+    minWidth: 0,
   },
   title: {
     flex: 1,
+    flexShrink: 1,
+    minWidth: 0,
     ...typography.cardTitle,
     fontSize: 16,
     color: colors.textPrimary || colors.textDark,
@@ -956,7 +991,11 @@ const styles = StyleSheet.create({
   },
   badgesContainer: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    flexShrink: 0,
+    maxWidth: '58%',
     alignItems: 'center',
+    justifyContent: 'flex-end',
     gap: 4,
   },
   statusBadge: {
@@ -1041,6 +1080,11 @@ const styles = StyleSheet.create({
     color: colors.textSecondary || colors.textMuted,
     marginBottom: spacing.sm,
   },
+  summaryMetaText: {
+    flexShrink: 1,
+    minWidth: 0,
+    width: '100%',
+  },
   skillsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -1060,17 +1104,18 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
   },
   cardFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.borderSubtle || colors.border,
     paddingTop: spacing.xs,
     marginTop: spacing.xs,
+    minWidth: 0,
   },
   cardActionGroup: {
+    width: '100%',
+    minWidth: 0,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'flex-end',
     flexWrap: 'wrap',
     gap: spacing.xs,
   },
@@ -1103,6 +1148,17 @@ const styles = StyleSheet.create({
     ...typography.caption,
     fontSize: 12,
     color: colors.textTertiary || colors.textMuted,
+    flexShrink: 1,
+    minWidth: 0,
+    marginBottom: spacing.xxs,
+  },
+  pendingReviewText: {
+    ...typography.caption,
+    color: colors.textSecondary || colors.textMuted,
+    width: '100%',
+    minWidth: 0,
+    flexShrink: 1,
+    marginTop: spacing.xxs,
   },
   viewApplicantsBtn: {
     flexDirection: 'row',
