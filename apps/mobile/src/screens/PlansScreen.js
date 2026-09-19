@@ -5,6 +5,7 @@ import {
   StyleSheet,
   ScrollView,
   Alert,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
@@ -78,6 +79,50 @@ export default function PlansScreen({ navigation }) {
     purchaseState,
   } = subscriptionSnapshot;
   const isEmployer = accountType === 'employer';
+
+  const plansScrollRef =
+    useRef(null);
+
+  const promoSectionYRef =
+    useRef(0);
+
+
+  const handlePromoLayout =
+    useCallback((event) => {
+      promoSectionYRef.current =
+        event.nativeEvent.layout.y;
+    }, []);
+
+
+  const scrollPromoIntoView =
+    useCallback(() => {
+      const targetY =
+        Math.max(
+          promoSectionYRef.current
+            - spacing.md,
+          0
+        );
+
+      plansScrollRef.current
+        ?.scrollTo({
+          y: targetY,
+          animated: true,
+        });
+    }, []);
+
+
+  const handlePromoInputFocus =
+    useCallback(() => {
+      const delay =
+        Platform.OS === 'ios'
+          ? 300
+          : 180;
+
+      setTimeout(
+        scrollPromoIntoView,
+        delay
+      );
+    }, [scrollPromoIntoView]);
 
   useFocusEffect(
     useCallback(() => {
@@ -409,9 +454,19 @@ export default function PlansScreen({ navigation }) {
       />
 
       <ScrollView
+        ref={plansScrollRef}
         style={styles.screen}
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode={
+          Platform.OS === 'ios'
+            ? 'interactive'
+            : 'on-drag'
+        }
+        automaticallyAdjustKeyboardInsets={
+          Platform.OS === 'ios'
+        }
       >
         {/* Intro Header */}
         <View style={styles.headerSection}>
@@ -696,21 +751,28 @@ export default function PlansScreen({ navigation }) {
         </View>
 
         {/* Restore Purchases CTA — supported platform stores only */}
-        <PromoCodePanel
-          isEmployer={isEmployer}
-          isRTL={isRTL}
-          activePro={
-            backendSubscription
-              ?.is_active === true
-          }
-          busy={
-            isPurchaseFlowBusy
-            || isRestoreFlowBusy
-          }
-          reconcileSubscription={
-            reconcileSubscription
-          }
-        />
+        <View
+          onLayout={handlePromoLayout}
+        >
+          <PromoCodePanel
+            isEmployer={isEmployer}
+            isRTL={isRTL}
+            activePro={
+              backendSubscription
+                ?.is_active === true
+            }
+            busy={
+              isPurchaseFlowBusy
+              || isRestoreFlowBusy
+            }
+            onInputFocus={
+              handlePromoInputFocus
+            }
+            reconcileSubscription={
+              reconcileSubscription
+            }
+          />
+        </View>
 
         {runtimeState?.restorePurchasesSupported === true ? (
           <View style={styles.restoreContainer}>

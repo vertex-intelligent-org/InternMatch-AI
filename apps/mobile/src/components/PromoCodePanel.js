@@ -57,6 +57,7 @@ export default function PromoCodePanel({
   activePro,
   busy,
   reconcileSubscription,
+  onInputFocus,
 }) {
   const { t } = useTranslation();
 
@@ -411,6 +412,7 @@ export default function PromoCodePanel({
               <TextInput
                 value={code}
                 onChangeText={setCode}
+                onFocus={onInputFocus}
                 placeholder={
                   t(
                     'plans.promo.placeholder'

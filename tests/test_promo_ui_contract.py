@@ -153,3 +153,50 @@ def test_canonical_promo_routes_only():
         "/admin/promo-campaigns"
         not in router
     )
+
+
+
+def test_promo_input_remains_visible_when_keyboard_opens():
+    plans = source(
+        "apps/mobile/src/screens/"
+        "PlansScreen.js"
+    )
+
+    panel = source(
+        "apps/mobile/src/components/"
+        "PromoCodePanel.js"
+    )
+
+    assert "plansScrollRef" in plans
+    assert "promoSectionYRef" in plans
+    assert "handlePromoLayout" in plans
+    assert "handlePromoInputFocus" in plans
+    assert "scrollPromoIntoView" in plans
+
+    assert (
+        'keyboardShouldPersistTaps="handled"'
+        in plans
+    )
+
+    assert (
+        "automaticallyAdjustKeyboardInsets"
+        in plans
+    )
+
+    assert "keyboardDismissMode={" in plans
+
+    assert (
+        "onInputFocus={"
+        in plans
+    )
+
+    assert (
+        "onFocus={onInputFocus}"
+        in panel
+    )
+
+    # Keyboard accommodation must be dynamic.
+    # Do not introduce permanent keyboard-sized
+    # padding while the keyboard is closed.
+    assert "keyboardHeight" not in plans
+    assert "keyboardPadding" not in plans
