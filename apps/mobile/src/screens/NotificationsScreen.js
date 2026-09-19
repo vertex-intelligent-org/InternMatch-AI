@@ -55,6 +55,16 @@ function eventCopy(
       ? notification.data.employer_visible_feedback.trim()
       : '';
 
+  const opportunityCompany =
+    typeof notification?.data?.company === 'string'
+      ? notification.data.company.trim()
+      : '';
+
+  const opportunityTitle =
+    typeof notification?.data?.title === 'string'
+      ? notification.data.title.trim()
+      : '';
+
   switch (
     notification.event_type
   ) {
@@ -84,6 +94,21 @@ function eventCopy(
             : status === 'rejected'
               ? 'close-circle-outline'
               : 'calendar-outline',
+      };
+
+    case 'new_opportunity_published':
+      return {
+        title: t(
+          'notifications.events.newOpportunityPublished.title'
+        ),
+        body: t(
+          'notifications.events.newOpportunityPublished.body',
+          {
+            company: opportunityCompany,
+            title: opportunityTitle,
+          }
+        ),
+        icon: 'briefcase-outline',
       };
 
     case 'listing_published':

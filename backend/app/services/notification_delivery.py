@@ -77,6 +77,26 @@ def _copy(
         )
     )
 
+    company = " ".join(
+        str(
+            data.get(
+                "company",
+                "",
+            )
+            or ""
+        ).split()
+    )[:80]
+
+    listing_title = " ".join(
+        str(
+            data.get(
+                "title",
+                "",
+            )
+            or ""
+        ).split()
+    )[:120]
+
     translations = {
         "en": {
             "application_submitted": (
@@ -98,6 +118,15 @@ def _copy(
                 (
                     "Your opportunity was approved and is "
                     "now visible to candidates."
+                ),
+            ),
+            "new_opportunity_published": (
+                "New internship opportunity \U0001f440",
+                (
+                    f"{company or 'A company'} is looking "
+                    f"for {listing_title or 'an intern'}. "
+                    "Open InternMatch AI to see if it "
+                    "matches you."
                 ),
             ),
             "listing_changes_requested": (
@@ -158,6 +187,15 @@ def _copy(
                     "adaylara görünür."
                 ),
             ),
+            "new_opportunity_published": (
+                "Yeni staj f\u0131rsat\u0131 \U0001f440",
+                (
+                    f"{company or 'Bir \u015firket'}, "
+                    f"{listing_title or 'bir stajyer'} "
+                    "ar\u0131yor. Sana uygun olup olmad\u0131\u011f\u0131n\u0131 "
+                    "g\u00f6rmek i\u00e7in InternMatch AI'\u0131 a\u00e7."
+                ),
+            ),
             "listing_changes_requested": (
                 "Değişiklik istendi",
                 (
@@ -212,6 +250,15 @@ def _copy(
                 (
                     "تمت الموافقة على فرصتك وأصبحت "
                     "ظاهرة للمرشحين."
+                ),
+            ),
+            "new_opportunity_published": (
+                "\u0641\u0631\u0635\u0629 \u062a\u062f\u0631\u064a\u0628 \u062c\u062f\u064a\u062f\u0629 \U0001f440",
+                (
+                    f"{company or '\u0625\u062d\u062f\u0649 \u0627\u0644\u0634\u0631\u0643\u0627\u062a'} "
+                    f"\u062a\u0628\u062d\u062b \u0639\u0646 {listing_title or '\u0645\u062a\u062f\u0631\u0628'}. "
+                    "\u0627\u0641\u062a\u062d InternMatch AI \u0648\u0634\u0648\u0641 \u0625\u0630\u0627 "
+                    "\u0627\u0644\u0641\u0631\u0635\u0629 \u0645\u0646\u0627\u0633\u0628\u0629 \u0625\u0644\u0643."
                 ),
             ),
             "listing_changes_requested": (

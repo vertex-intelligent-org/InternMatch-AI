@@ -14,14 +14,22 @@ from app.db.session import get_db
 from app.repositories.notification import (
     NotificationRepository,
 )
+from app.repositories.student_profile import (
+    StudentProfileRepository,
+)
 from app.schemas.notification import (
     MarkAllNotificationsReadResponse,
     NotificationListResponse,
     NotificationResponse,
     NotificationUnreadResponse,
+    OpportunityAlertPreferenceRequest,
+    OpportunityAlertPreferenceResponse,
     PushDeviceDisableRequest,
     PushDeviceRegisterRequest,
     PushDeviceResponse,
+)
+from app.services.opportunity_alerts import (
+    NEW_OPPORTUNITY_ALERT_PREFERENCE,
 )
 from fastapi import (
     APIRouter,
@@ -121,6 +129,90 @@ def get_my_unread_count(
                 user_id=current_user.user_id,
             )
         )
+    )
+
+
+@router.get(
+    "/preferences/opportunity-alerts",
+    response_model=OpportunityAlertPreferenceResponse,
+)
+def get_opportunity_alert_preference(
+    current_user: AuthenticatedUser = Depends(
+        get_current_user
+    ),
+    db: Session = Depends(get_db),
+):
+    profile = (
+        StudentProfileRepository.get_by_user_id(
+            db,
+            user_id=current_user.user_id,
+        )
+    )
+
+    if profile is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Student profile not found.",
+        )
+
+    preferences = dict(
+        profile.preferences or {}
+    )
+
+    return OpportunityAlertPreferenceResponse(
+        enabled=(
+            preferences.get(
+                NEW_OPPORTUNITY_ALERT_PREFERENCE
+            )
+            is True
+        )
+    )
+
+
+@router.put(
+    "/preferences/opportunity-alerts",
+    response_model=OpportunityAlertPreferenceResponse,
+)
+def update_opportunity_alert_preference(
+    payload: OpportunityAlertPreferenceRequest,
+    current_user: AuthenticatedUser = Depends(
+        get_current_user
+    ),
+    db: Session = Depends(get_db),
+):
+    profile = (
+        StudentProfileRepository.get_by_user_id(
+            db,
+            user_id=current_user.user_id,
+        )
+    )
+
+    if profile is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Student profile not found.",
+        )
+
+    preferences = dict(
+        profile.preferences or {}
+    )
+
+    preferences[
+        NEW_OPPORTUNITY_ALERT_PREFERENCE
+    ] = payload.enabled
+
+    StudentProfileRepository.upsert_by_user_id(
+        db=db,
+        user_id=current_user.user_id,
+        full_name=profile.full_name,
+        headline=profile.headline,
+        preferences=preferences,
+    )
+
+    db.commit()
+
+    return OpportunityAlertPreferenceResponse(
+        enabled=payload.enabled
     )
 
 

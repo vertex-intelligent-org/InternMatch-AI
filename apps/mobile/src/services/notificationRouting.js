@@ -142,6 +142,18 @@ export function resolveNotificationDestination(
         },
       };
 
+    case 'new_opportunity_published':
+      if (!internshipId) {
+        return null;
+      }
+
+      return {
+        name: 'InternshipDetail',
+        params: {
+          internshipId,
+        },
+      };
+
     case 'listing_published':
       return {
         name: 'MainTabs',

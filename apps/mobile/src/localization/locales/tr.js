@@ -1188,6 +1188,13 @@ export default {
     unsaveFailedTitle: 'Kaydı Silinemedi',
   },
   settings: {
+    opportunityAlerts: {
+      section: 'B\u0130LD\u0130R\u0130MLER',
+      label: 'Yeni f\u0131rsat bildirimleri',
+      hint: 'Onaylanan yeni bir staj f\u0131rsat\u0131 yay\u0131nland\u0131\u011f\u0131nda bildirim al. Bu ayar\u0131 istedi\u011fin zaman kapatabilirsin.',
+      saveFailedTitle: 'Bildirimler G\u00fcncellenemedi',
+      saveFailedMessage: 'F\u0131rsat bildirimi tercihin g\u00fcncellenemedi. L\u00fctfen tekrar dene.',
+    },
     accessibility: {
       editProfile: 'Profili Düzenle ekranına git',
       language: 'Uygulama dilini değiştir',
@@ -1791,6 +1798,10 @@ export default {
       listingPublished: {
         title: 'Fırsat yayınlandı',
         body: 'Fırsatınız onaylandı ve artık adaylara görünür.',
+      },
+      newOpportunityPublished: {
+        title: 'Yeni staj f\u0131rsat\u0131',
+        body: "{{company}}, {{title}} ar\u0131yor. Sana uygun olup olmad\u0131\u011f\u0131n\u0131 g\u00f6rmek i\u00e7in InternMatch AI'\u0131 a\u00e7.",
       },
       listingChanges: {
         title: 'Değişiklik istendi',

@@ -64,3 +64,11 @@ class PushDeviceDisableRequest(BaseModel):
 
 class PushDeviceResponse(BaseModel):
     registered: bool
+
+
+class OpportunityAlertPreferenceRequest(BaseModel):
+    enabled: bool
+
+
+class OpportunityAlertPreferenceResponse(BaseModel):
+    enabled: bool

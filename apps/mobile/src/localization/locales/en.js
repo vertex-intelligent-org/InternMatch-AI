@@ -1188,6 +1188,13 @@ export default {
     unsaveFailedTitle: 'Unable to Unsave',
   },
   settings: {
+    opportunityAlerts: {
+      section: 'NOTIFICATIONS',
+      label: 'New opportunity alerts',
+      hint: 'Get notified when a reviewed internship opportunity is published. You can turn this off anytime.',
+      saveFailedTitle: 'Could Not Update Alerts',
+      saveFailedMessage: 'We could not update your opportunity alert preference. Please try again.',
+    },
     accessibility: {
       editProfile: 'Navigate to Edit Profile',
       language: 'Change app language',
@@ -1791,6 +1798,10 @@ export default {
       listingPublished: {
         title: 'Opportunity published',
         body: 'Your opportunity was approved and is now visible to candidates.',
+      },
+      newOpportunityPublished: {
+        title: 'New internship opportunity',
+        body: '{{company}} is looking for {{title}}. Open InternMatch AI to see if it matches you.',
       },
       listingChanges: {
         title: 'Changes requested',

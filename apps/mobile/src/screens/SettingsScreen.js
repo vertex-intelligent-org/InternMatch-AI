@@ -9,6 +9,7 @@ import {
   Modal,
   ActivityIndicator,
   Linking,
+  Switch,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import colors from '../theme/colors';
@@ -28,7 +29,10 @@ import { useTranslation } from 'react-i18next';
 import { useLocalization } from '../localization/LocalizationContext';
 import { getLocalizedErrorMessage } from '../localization/errorMessages';
 import LocaleFlag from '../components/LocaleFlag';
-import { deleteAccount } from '../services/api';
+import {
+  deleteAccount,
+  setOpportunityAlertPreference,
+} from '../services/api';
 
 const appVersion = require('../../app.json').expo.version || '1.0.0';
 const DATA_DELETION_URL = 'https://internmatch.college/data-deletion';
@@ -108,7 +112,7 @@ export default function SettingsScreen({ navigation }) {
   const [signingOut, setSigningOut] = useState(false);
 
   const [deletingAccount, setDeletingAccount] = useState(false);
-  const { profile, clearProfile } = useProfile();
+  const { profile, setProfile, clearProfile } = useProfile();
   const { candidateState } = useRevenueCat();
   const { backendSubscription } = useSubscription();
   const { t } = useTranslation();
@@ -117,6 +121,7 @@ export default function SettingsScreen({ navigation }) {
   const [supportFallbackVisible, setSupportFallbackVisible] = useState(false);
   const [changingLanguage, setChangingLanguage] = useState(false);
   const [resettingPassword, setResettingPassword] = useState(false);
+  const [savingOpportunityAlerts, setSavingOpportunityAlerts] = useState(false);
   const languageChangeInFlightRef = useRef(false);
   const passwordResetPromptVisibleRef = useRef(false);
   const passwordResetInFlightRef = useRef(false);
@@ -127,6 +132,8 @@ export default function SettingsScreen({ navigation }) {
     ? normalizeAccountType(profile.preferences.account_type)
     : null;
   const isEmployer = accountType === 'employer';
+  const opportunityAlertsEnabled =
+    profile?.preferences?.new_opportunity_alerts_enabled === true;
   const subscriptionSnapshot = getSubscriptionSnapshot(
     profile?.preferences?.account_type,
     candidateState,
@@ -375,6 +382,48 @@ export default function SettingsScreen({ navigation }) {
     );
   };
 
+  const handleOpportunityAlertsChange = async (nextValue) => {
+    if (
+      !profile
+      || isEmployer
+      || savingOpportunityAlerts
+    ) {
+      return;
+    }
+
+    setSavingOpportunityAlerts(true);
+
+    try {
+      const result =
+        await setOpportunityAlertPreference(
+          Boolean(nextValue)
+        );
+
+      setProfile({
+        ...profile,
+        preferences: {
+          ...(profile.preferences || {}),
+          new_opportunity_alerts_enabled:
+            result.enabled,
+        },
+      });
+
+      haptics.success();
+    } catch (error) {
+      console.warn(
+        'Opportunity alert preference update failed:',
+        error
+      );
+
+      Alert.alert(
+        t('settings.opportunityAlerts.saveFailedTitle'),
+        t('settings.opportunityAlerts.saveFailedMessage')
+      );
+    } finally {
+      setSavingOpportunityAlerts(false);
+    }
+  };
+
   if (!profile) {
     return (
       <ScreenContainer edges={['top', 'bottom']}>
@@ -466,6 +515,80 @@ export default function SettingsScreen({ navigation }) {
             />
           )}
         </GlassSurface>
+
+        {!isEmployer && (
+          <>
+            <Text
+              style={[
+                styles.sectionHeader,
+                isRTL && styles.textRTL,
+              ]}
+            >
+              {t('settings.opportunityAlerts.section')}
+            </Text>
+
+            <GlassSurface
+              variant="card"
+              style={styles.glassCard}
+            >
+              <View
+                style={[
+                  styles.row,
+                  styles.rowLast,
+                  isRTL && styles.rowRTL,
+                ]}
+              >
+                <View
+                  style={[
+                    styles.rowLeft,
+                    isRTL && styles.rowLeftRTL,
+                  ]}
+                >
+                  <View
+                    style={[
+                      styles.iconContainer,
+                      isRTL && styles.iconContainerRTL,
+                    ]}
+                  >
+                    <Ionicons
+                      name="notifications-outline"
+                      size={18}
+                      color={colors.accent || colors.teal}
+                    />
+                  </View>
+
+                  <Text
+                    style={[
+                      styles.rowLabel,
+                      isRTL && styles.textRTL,
+                    ]}
+                  >
+                    {t('settings.opportunityAlerts.label')}
+                  </Text>
+                </View>
+
+                <Switch
+                  value={opportunityAlertsEnabled}
+                  onValueChange={handleOpportunityAlertsChange}
+                  disabled={savingOpportunityAlerts}
+                  accessibilityRole="switch"
+                  accessibilityLabel={t(
+                    'settings.opportunityAlerts.label'
+                  )}
+                />
+              </View>
+            </GlassSurface>
+
+            <Text
+              style={[
+                styles.opportunityAlertsHint,
+                isRTL && styles.textRTL,
+              ]}
+            >
+              {t('settings.opportunityAlerts.hint')}
+            </Text>
+          </>
+        )}
 
         {/* Privacy & Legal Section */}
         <Text style={[styles.sectionHeader, isRTL && styles.textRTL]}>{t('settings.sections.privacyLegal')}</Text>
@@ -867,6 +990,14 @@ const styles = StyleSheet.create({
     ...typography.button,
     color: colors.danger || colors.red,
     fontWeight: '600',
+  },
+  opportunityAlertsHint: {
+    ...typography.caption,
+    color: colors.textSecondary || colors.textMuted,
+    marginTop: spacing.xs,
+    marginBottom: spacing.lg,
+    paddingHorizontal: spacing.sm,
+    lineHeight: 18,
   },
   profileLoadingContainer: {
     flex: 1,

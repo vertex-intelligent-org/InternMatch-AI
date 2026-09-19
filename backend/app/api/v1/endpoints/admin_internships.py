@@ -1,5 +1,6 @@
 """Server-authorized administration of internship listings."""
 
+import logging
 from datetime import datetime, timezone
 from typing import Literal, Optional
 from uuid import UUID
@@ -31,8 +32,13 @@ from app.services.employer_product_policy import (
     EmployerListingLimitError,
     require_employer_listing_capacity,
 )
+from app.services.opportunity_alert_enqueue import (
+    enqueue_new_opportunity_alert_fanout,
+)
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -974,6 +980,20 @@ def approve_admin_internship(
 
         db.commit()
         db.refresh(listing)
+
+        # Engagement fan-out is asynchronous and intentionally
+        # isolated from the authoritative publication transaction.
+        # Queue failure must never roll back an approved listing.
+        try:
+            enqueue_new_opportunity_alert_fanout(
+                listing.id
+            )
+        except Exception:
+            logger.exception(
+                "New opportunity alert fan-out enqueue failed "
+                "for internship %s.",
+                listing.id,
+            )
     except Exception:
         db.rollback()
         raise

@@ -2148,6 +2148,33 @@ export async function markAllNotificationsRead(): Promise<{
   );
 }
 
+export type OpportunityAlertPreferenceResponse = {
+  enabled: boolean;
+};
+
+export async function getOpportunityAlertPreference(): Promise<
+  OpportunityAlertPreferenceResponse
+> {
+  return apiRequest<OpportunityAlertPreferenceResponse>(
+    '/notifications/preferences/opportunity-alerts'
+  );
+}
+
+export async function setOpportunityAlertPreference(
+  enabled: boolean
+): Promise<OpportunityAlertPreferenceResponse> {
+  return apiRequest<OpportunityAlertPreferenceResponse>(
+    '/notifications/preferences/opportunity-alerts',
+    {
+      method: 'PUT',
+      body: JSON.stringify({
+        enabled,
+      }),
+    }
+  );
+}
+
+
 export async function registerPushDevice(payload: {
   expo_push_token: string;
   platform: 'ios' | 'android';
