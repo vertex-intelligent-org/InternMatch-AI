@@ -1784,6 +1784,9 @@ export default {
     title: 'Bildirimler',
     unreadCount: '{{count}} okunmamış',
     markAllRead: 'Tümünü okundu işaretle',
+    markRead: 'Okundu işaretle',
+    markUnread: 'Okunmadı işaretle',
+    delete: 'Sil',
     emptyTitle: 'Yeni bildiriminiz yok',
     emptyBody: 'Başvuru ve işveren hesabı güncellemeleri burada görünecek.',
     events: {

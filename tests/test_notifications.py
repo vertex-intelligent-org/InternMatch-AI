@@ -290,3 +290,153 @@ def test_notification_routes_require_authentication(
         ).status_code
         == 401
     )
+
+
+
+def test_mark_notification_unread_is_user_scoped(
+    client: TestClient,
+):
+    owner = uuid4()
+    attacker = uuid4()
+
+    db = TestingSessionLocal()
+
+    try:
+        notification = NotificationRepository.create(
+            db,
+            recipient_user_id=owner,
+            event_type="listing_published",
+        )
+
+        NotificationRepository.mark_read(
+            db,
+            user_id=owner,
+            notification_id=notification.id,
+        )
+
+        db.commit()
+        notification_id = notification.id
+    finally:
+        db.close()
+
+    denied = client.post(
+        (
+            "/api/v1/notifications/"
+            f"{notification_id}/unread"
+        ),
+        headers={
+            "Authorization":
+            f"Bearer valid-user-{attacker}"
+        },
+    )
+
+    assert denied.status_code == 404
+
+    allowed = client.post(
+        (
+            "/api/v1/notifications/"
+            f"{notification_id}/unread"
+        ),
+        headers={
+            "Authorization":
+            f"Bearer valid-user-{owner}"
+        },
+    )
+
+    assert allowed.status_code == 200
+    assert allowed.json()["read_at"] is None
+
+    unread = client.get(
+        "/api/v1/notifications/unread-count",
+        headers={
+            "Authorization":
+            f"Bearer valid-user-{owner}"
+        },
+    )
+
+    assert unread.status_code == 200
+    assert unread.json()["unread_count"] == 1
+
+
+
+def test_delete_notification_is_user_scoped(
+    client: TestClient,
+):
+    owner = uuid4()
+    attacker = uuid4()
+
+    db = TestingSessionLocal()
+
+    try:
+        notification = NotificationRepository.create(
+            db,
+            recipient_user_id=owner,
+            event_type="listing_published",
+        )
+
+        db.commit()
+        notification_id = notification.id
+    finally:
+        db.close()
+
+    denied = client.delete(
+        (
+            "/api/v1/notifications/"
+            f"{notification_id}"
+        ),
+        headers={
+            "Authorization":
+            f"Bearer valid-user-{attacker}"
+        },
+    )
+
+    assert denied.status_code == 404
+
+    owner_before = client.get(
+        "/api/v1/notifications",
+        headers={
+            "Authorization":
+            f"Bearer valid-user-{owner}"
+        },
+    )
+
+    assert owner_before.status_code == 200
+    assert owner_before.json()["total"] == 1
+
+    allowed = client.delete(
+        (
+            "/api/v1/notifications/"
+            f"{notification_id}"
+        ),
+        headers={
+            "Authorization":
+            f"Bearer valid-user-{owner}"
+        },
+    )
+
+    assert allowed.status_code == 200
+    assert allowed.json() == {
+        "deleted": True,
+    }
+
+    owner_after = client.get(
+        "/api/v1/notifications",
+        headers={
+            "Authorization":
+            f"Bearer valid-user-{owner}"
+        },
+    )
+
+    assert owner_after.status_code == 200
+    assert owner_after.json()["total"] == 0
+
+    unread_after = client.get(
+        "/api/v1/notifications/unread-count",
+        headers={
+            "Authorization":
+            f"Bearer valid-user-{owner}"
+        },
+    )
+
+    assert unread_after.status_code == 200
+    assert unread_after.json()["unread_count"] == 0

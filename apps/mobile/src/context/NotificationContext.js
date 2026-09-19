@@ -22,10 +22,12 @@ import {
 
 import {
   disablePushDevice,
+  deleteUserNotification,
   getNotificationUnreadCount,
   getNotifications,
   markAllNotificationsRead,
   markNotificationRead,
+  markNotificationUnread,
   registerPushDevice,
 } from '../services/api';
 
@@ -170,36 +172,179 @@ export function NotificationProvider({
     }, [enabled]);
 
 
+  const updateUnreadCount =
+    useCallback((updater) => {
+      setUnreadCount(
+        (current) => {
+          const next =
+            Math.max(
+              0,
+              Number(
+                updater(current)
+              ) || 0
+            );
+
+          Notifications
+            .setBadgeCountAsync(next)
+            .catch(() => {});
+
+          return next;
+        }
+      );
+    }, []);
+
+
+  const reconcileNotificationState =
+    useCallback(() => {
+      refreshNotifications()
+        .catch(() => {});
+    }, [refreshNotifications]);
+
+
   const markRead =
     useCallback(
       async (notificationId) => {
-        const result =
-          await markNotificationRead(
-            notificationId
+        const currentItem =
+          items.find(
+            (item) =>
+              item.id === notificationId
           );
 
-        setItems(
-          (current) =>
-            current.map((item) =>
-              item.id === notificationId
-                ? result
-                : item
-            )
-        );
+        if (
+          currentItem
+          && !currentItem.read_at
+        ) {
+          const readAt =
+            new Date().toISOString();
 
-        await refreshUnread();
+          setItems(
+            (current) =>
+              current.map((item) =>
+                item.id === notificationId
+                  ? {
+                      ...item,
+                      read_at: readAt,
+                    }
+                  : item
+              )
+          );
 
-        return result;
+          updateUnreadCount(
+            (current) =>
+              current - 1
+          );
+        }
+
+        try {
+          return await markNotificationRead(
+            notificationId
+          );
+        } catch (error) {
+          reconcileNotificationState();
+          throw error;
+        }
       },
-      [refreshUnread]
+      [
+        items,
+        reconcileNotificationState,
+        updateUnreadCount,
+      ]
+    );
+
+
+  const markUnread =
+    useCallback(
+      async (notificationId) => {
+        const currentItem =
+          items.find(
+            (item) =>
+              item.id === notificationId
+          );
+
+        if (
+          currentItem
+          && currentItem.read_at
+        ) {
+          setItems(
+            (current) =>
+              current.map((item) =>
+                item.id === notificationId
+                  ? {
+                      ...item,
+                      read_at: null,
+                    }
+                  : item
+              )
+          );
+
+          updateUnreadCount(
+            (current) =>
+              current + 1
+          );
+        }
+
+        try {
+          return await markNotificationUnread(
+            notificationId
+          );
+        } catch (error) {
+          reconcileNotificationState();
+          throw error;
+        }
+      },
+      [
+        items,
+        reconcileNotificationState,
+        updateUnreadCount,
+      ]
+    );
+
+
+  const deleteNotification =
+    useCallback(
+      async (notificationId) => {
+        const currentItem =
+          items.find(
+            (item) =>
+              item.id === notificationId
+          );
+
+        if (currentItem) {
+          setItems(
+            (current) =>
+              current.filter(
+                (item) =>
+                  item.id !== notificationId
+              )
+          );
+
+          if (!currentItem.read_at) {
+            updateUnreadCount(
+              (current) =>
+                current - 1
+            );
+          }
+        }
+
+        try {
+          return await deleteUserNotification(
+            notificationId
+          );
+        } catch (error) {
+          reconcileNotificationState();
+          throw error;
+        }
+      },
+      [
+        items,
+        reconcileNotificationState,
+        updateUnreadCount,
+      ]
     );
 
 
   const markAllRead =
     useCallback(async () => {
-      const result =
-        await markAllNotificationsRead();
-
       const readAt =
         new Date().toISOString();
 
@@ -213,14 +358,20 @@ export function NotificationProvider({
           }))
       );
 
-      setUnreadCount(0);
+      updateUnreadCount(
+        () => 0
+      );
 
-      await Notifications
-        .setBadgeCountAsync(0)
-        .catch(() => {});
-
-      return result;
-    }, []);
+      try {
+        return await markAllNotificationsRead();
+      } catch (error) {
+        reconcileNotificationState();
+        throw error;
+      }
+    }, [
+      reconcileNotificationState,
+      updateUnreadCount,
+    ]);
 
 
   useEffect(() => {
@@ -448,6 +599,8 @@ export function NotificationProvider({
       refreshUnread,
       refreshNotifications,
       markRead,
+      markUnread,
+      deleteNotification,
       markAllRead,
     }),
     [
@@ -460,6 +613,8 @@ export function NotificationProvider({
       refreshUnread,
       refreshNotifications,
       markRead,
+      markUnread,
+      deleteNotification,
       markAllRead,
     ]
   );

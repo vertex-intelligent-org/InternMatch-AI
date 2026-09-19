@@ -247,6 +247,37 @@ def mark_notification_read(
 
 
 @router.post(
+    "/{notification_id}/unread",
+    response_model=NotificationResponse,
+)
+def mark_notification_unread(
+    notification_id: UUID,
+    current_user: AuthenticatedUser = Depends(
+        get_current_user
+    ),
+    db: Session = Depends(get_db),
+):
+    notification = (
+        NotificationRepository.mark_unread(
+            db,
+            user_id=current_user.user_id,
+            notification_id=notification_id,
+        )
+    )
+
+    if notification is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Notification not found.",
+        )
+
+    db.commit()
+    db.refresh(notification)
+
+    return _response(notification)
+
+
+@router.post(
     "/read-all",
     response_model=MarkAllNotificationsReadResponse,
 )
@@ -333,3 +364,33 @@ def disable_push_device(
     return PushDeviceResponse(
         registered=False
     )
+
+@router.delete(
+    "/{notification_id}",
+)
+def delete_notification(
+    notification_id: UUID,
+    current_user: AuthenticatedUser = Depends(
+        get_current_user
+    ),
+    db: Session = Depends(get_db),
+):
+    deleted = (
+        NotificationRepository.delete_for_user(
+            db,
+            user_id=current_user.user_id,
+            notification_id=notification_id,
+        )
+    )
+
+    if not deleted:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Notification not found.",
+        )
+
+    db.commit()
+
+    return {
+        "deleted": True,
+    }

@@ -33,6 +33,7 @@ import {
 } from '../services/notificationRouting';
 import ScreenContainer from '../components/ScreenContainer';
 import ScreenHeader from '../components/ScreenHeader';
+import SwipeableNotificationRow from '../components/SwipeableNotificationRow';
 
 
 import colors from '../theme/colors';
@@ -207,6 +208,8 @@ export default function NotificationsScreen({ navigation }) {
     loading,
     refreshNotifications,
     markRead,
+    markUnread,
+    deleteNotification,
     markAllRead,
   } = useNotifications();
 
@@ -221,17 +224,17 @@ export default function NotificationsScreen({ navigation }) {
 
   const handleOpen =
     useCallback(
-      async (item) => {
-        if (!item.read_at) {
-          await markRead(
-            item.id
-          ).catch(() => {});
-        }
-
+      (item) => {
         const destination =
           resolveNotificationDestination(
             item
           );
+
+        if (!item.read_at) {
+          markRead(
+            item.id
+          ).catch(() => {});
+        }
 
         if (destination) {
           navigation.navigate(
@@ -241,6 +244,36 @@ export default function NotificationsScreen({ navigation }) {
         }
       },
       [markRead, navigation]
+    );
+
+
+  const handleToggleRead =
+    useCallback(
+      (item) => {
+        const action =
+          item.read_at
+            ? markUnread
+            : markRead;
+
+        action(
+          item.id
+        ).catch(() => {});
+      },
+      [
+        markRead,
+        markUnread,
+      ]
+    );
+
+
+  const handleDelete =
+    useCallback(
+      (item) => {
+        deleteNotification(
+          item.id
+        ).catch(() => {});
+      },
+      [deleteNotification]
     );
 
 
@@ -334,77 +367,25 @@ export default function NotificationsScreen({ navigation }) {
                   );
 
                 return (
-                  <Pressable
+                  <SwipeableNotificationRow
                     key={item.id}
-                    onPress={() =>
-                      handleOpen(
-                        item
-                      )
+                    item={item}
+                    copy={copy}
+                    onOpen={handleOpen}
+                    onToggleRead={
+                      handleToggleRead
                     }
-                    style={[
-                      styles.card,
-                      !item.read_at
-                        && styles.unreadCard,
-                    ]}
-                  >
-                    <View
-                      style={
-                        styles.iconCircle
-                      }
-                    >
-                      <Ionicons
-                        name={copy.icon}
-                        size={21}
-                        color={colors.accentStrong || colors.tealDark}
-                      />
-                    </View>
-
-                    <View
-                      style={
-                        styles.cardBody
-                      }
-                    >
-                      <View
-                        style={
-                          styles.titleRow
-                        }
-                      >
-                        <Text
-                          style={
-                            styles.cardTitle
-                          }
-                        >
-                          {copy.title}
-                        </Text>
-
-                        {!item.read_at ? (
-                          <View
-                            style={
-                              styles.unreadDot
-                            }
-                          />
-                        ) : null}
-                      </View>
-
-                      <Text
-                        style={
-                          styles.cardText
-                        }
-                      >
-                        {copy.body}
-                      </Text>
-
-                      <Text
-                        style={
-                          styles.timestamp
-                        }
-                      >
-                        {new Date(
-                          item.created_at
-                        ).toLocaleString()}
-                      </Text>
-                    </View>
-                  </Pressable>
+                    onDelete={handleDelete}
+                    markReadLabel={t(
+                      'notifications.markRead'
+                    )}
+                    markUnreadLabel={t(
+                      'notifications.markUnread'
+                    )}
+                    deleteLabel={t(
+                      'notifications.delete'
+                    )}
+                  />
                 );
               }
             )

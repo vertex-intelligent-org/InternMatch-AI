@@ -1784,6 +1784,9 @@ export default {
     title: 'Notifications',
     unreadCount: '{{count}} unread',
     markAllRead: 'Mark all read',
+    markRead: 'Mark read',
+    markUnread: 'Mark unread',
+    delete: 'Delete',
     emptyTitle: 'You are all caught up',
     emptyBody: 'Application and employer activity will appear here.',
     events: {

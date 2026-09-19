@@ -125,3 +125,64 @@ def test_notification_localization_exists_in_all_languages():
         assert "applicationStatus" in source
         assert "listingPublished" in source
         assert "listingChanges" in source
+
+
+
+def test_notification_inbox_actions_are_optimistic_and_swipeable():
+    screen = Path(
+        "apps/mobile/src/screens/NotificationsScreen.js"
+    ).read_text(
+        encoding="utf-8"
+    )
+
+    context = Path(
+        "apps/mobile/src/context/NotificationContext.js"
+    ).read_text(
+        encoding="utf-8"
+    )
+
+    swipe = Path(
+        "apps/mobile/src/components/"
+        "SwipeableNotificationRow.js"
+    ).read_text(
+        encoding="utf-8"
+    )
+
+    api = Path(
+        "apps/mobile/src/services/api.ts"
+    ).read_text(
+        encoding="utf-8"
+    )
+
+    assert "await markRead(" not in screen
+    assert "navigation.navigate(" in screen
+    assert "markRead(" in screen
+
+    assert "markUnread" in context
+    assert "deleteNotification" in context
+    assert "reconcileNotificationState" in context
+
+    assert "PanResponder.create" in swipe
+    assert "Animated.spring" in swipe
+    assert "onToggleRead" in swipe
+    assert "onDelete" in swipe
+
+    assert "markNotificationUnread" in api
+    assert "deleteUserNotification" in api
+
+    for filename in (
+        "en.js",
+        "ar.js",
+        "tr.js",
+    ):
+        locale = Path(
+            "apps/mobile/src/localization/locales"
+        ).joinpath(
+            filename
+        ).read_text(
+            encoding="utf-8"
+        )
+
+        assert "markRead:" in locale
+        assert "markUnread:" in locale
+        assert "delete:" in locale

@@ -2148,6 +2148,39 @@ export async function markAllNotificationsRead(): Promise<{
   );
 }
 
+export async function markNotificationUnread(
+  notificationId: string
+): Promise<UserNotification> {
+  return apiRequest<UserNotification>(
+    (
+      '/notifications/'
+      + encodeURIComponent(notificationId)
+      + '/unread'
+    ),
+    {
+      method: 'POST',
+    }
+  );
+}
+
+export async function deleteUserNotification(
+  notificationId: string
+): Promise<{
+  deleted: boolean;
+}> {
+  return apiRequest<{
+    deleted: boolean;
+  }>(
+    (
+      '/notifications/'
+      + encodeURIComponent(notificationId)
+    ),
+    {
+      method: 'DELETE',
+    }
+  );
+}
+
 export type OpportunityAlertPreferenceResponse = {
   enabled: boolean;
 };

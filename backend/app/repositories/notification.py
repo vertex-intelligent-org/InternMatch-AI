@@ -467,6 +467,55 @@ class NotificationRepository:
         return notification
 
     @staticmethod
+    def mark_unread(
+        db: Session,
+        *,
+        user_id: UUID,
+        notification_id: UUID,
+    ) -> UserNotification | None:
+        notification = db.scalar(
+            select(UserNotification).where(
+                UserNotification.id
+                == notification_id,
+                UserNotification.recipient_user_id
+                == user_id,
+            )
+        )
+
+        if notification is None:
+            return None
+
+        if notification.read_at is not None:
+            notification.read_at = None
+            db.flush()
+
+        return notification
+
+    @staticmethod
+    def delete_for_user(
+        db: Session,
+        *,
+        user_id: UUID,
+        notification_id: UUID,
+    ) -> bool:
+        notification = db.scalar(
+            select(UserNotification).where(
+                UserNotification.id
+                == notification_id,
+                UserNotification.recipient_user_id
+                == user_id,
+            )
+        )
+
+        if notification is None:
+            return False
+
+        db.delete(notification)
+        db.flush()
+
+        return True
+
+    @staticmethod
     def mark_all_read(
         db: Session,
         *,

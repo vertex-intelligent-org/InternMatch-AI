@@ -1745,6 +1745,9 @@ export default {
     title: 'الإشعارات',
     unreadCount: '{{count}} غير مقروء',
     markAllRead: 'تحديد الكل كمقروء',
+    markRead: 'تحديد كمقروء',
+    markUnread: 'تحديد كغير مقروء',
+    delete: 'حذف',
     emptyTitle: 'لا توجد إشعارات جديدة',
     emptyBody: 'ستظهر هنا تحديثات الطلبات ونشاط حساب صاحب العمل.',
     events: {
