@@ -28,7 +28,7 @@ import EmployerDescriptionAssistant from '../components/EmployerDescriptionAssis
 import {
   createEmployerInternship,
   getEmployerOrganization,
-  getInternshipDetail,
+  getEmployerInternshipDetail,
   updateEmployerInternship,
   ApiError,
 
@@ -265,7 +265,7 @@ export default function CreateOpportunityScreen({ navigation, route }) {
       setErrorMessage(null);
 
       try {
-        const detail = await getInternshipDetail(editingId);
+        const detail = await getEmployerInternshipDetail(editingId);
 
         if (!active) return;
 

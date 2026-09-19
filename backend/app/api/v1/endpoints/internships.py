@@ -441,6 +441,47 @@ def list_my_internships(
     )
 
 
+
+@router.get(
+    "/mine/{id}",
+    response_model=InternshipDetailResponse,
+)
+def get_my_internship_detail(
+    id: UUID,
+    current_user: AuthenticatedUser = Depends(
+        require_employer_user
+    ),
+    db: Session = Depends(get_db),
+):
+    """
+    Return one internship owned by the authenticated employer.
+
+    This owner-only endpoint intentionally does not apply public
+    visibility rules so an employer can reopen and edit a listing
+    that is under review, draft, closed, or otherwise non-public.
+
+    Cross-employer access returns 404.
+    """
+    listing = InternshipRepository.get_by_id_and_owner(
+        db=db,
+        internship_id=id,
+        employer_user_id=current_user.user_id,
+    )
+
+    if listing is None:
+        return JSONResponse(
+            status_code=status.HTTP_404_NOT_FOUND,
+            content=format_not_found_error(
+                "Internship opportunity not found or "
+                "not owned by current user."
+            ),
+        )
+
+    return InternshipDetailResponse.from_orm_model(
+        listing
+    )
+
+
 @router.patch("/{id}", response_model=InternshipDetailResponse)
 def update_internship_opportunity(
     id: UUID,

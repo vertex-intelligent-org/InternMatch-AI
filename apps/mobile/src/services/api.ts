@@ -968,6 +968,19 @@ export async function createEmployerInternship(
   });
 }
 
+
+
+export async function getEmployerInternshipDetail(
+  id: string
+): Promise<InternshipDetail> {
+  return apiRequest<InternshipDetail>(
+    `/internships/mine/${encodeURIComponent(id)}`,
+    {
+      method: 'GET',
+    }
+  );
+}
+
 export async function updateEmployerInternship(
   id: string,
   payload: EmployerCreateInternshipPayload

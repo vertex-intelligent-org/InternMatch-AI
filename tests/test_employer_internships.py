@@ -3263,3 +3263,185 @@ def test_employer_cannot_delete_other_employer_listing(
     )
 
     assert attempted.status_code == 404
+
+
+
+def test_get_my_internship_detail_allows_owner_to_edit_non_public_listing(
+    client: TestClient,
+):
+    """
+    A listing returned to draft by moderation must remain private
+    from the public endpoint while remaining fully readable by its
+    authenticated employer owner for correction/resubmission.
+    """
+    employer_a = uuid4()
+    employer_b = uuid4()
+
+    _create_profile(
+        employer_a,
+        "Employer A",
+        account_type="employer",
+    )
+    _create_profile(
+        employer_b,
+        "Employer B",
+        account_type="employer",
+    )
+
+    headers_a = {
+        "Authorization":
+        f"Bearer valid-user-{employer_a}"
+    }
+    headers_b = {
+        "Authorization":
+        f"Bearer valid-user-{employer_b}"
+    }
+
+    payload = {
+        "title": "Backend Platform Intern",
+        "company": "Client supplied name ignored",
+        "location": "Istanbul, Turkiye",
+        "work_type": "hybrid",
+        "description": (
+            "Build secure FastAPI services and "
+            "production PostgreSQL integrations."
+        ),
+        "required_skills": [
+            "Python",
+            "FastAPI",
+            "PostgreSQL",
+        ],
+        "preferred_skills": [
+            "Redis",
+            "Docker",
+        ],
+        "language": "English",
+        "education_requirements": (
+            "Computer Science student"
+        ),
+        "experience_requirements": (
+            "At least one backend project"
+        ),
+    }
+
+    created = client.post(
+        "/api/v1/internships",
+        json=payload,
+        headers=headers_a,
+    )
+
+    assert created.status_code == 201
+
+    listing_id = created.json()["id"]
+
+    # Match the authoritative state produced by
+    # admin request-changes.
+    with TestingSessionLocal() as db:
+        listing = db.get(
+            InternshipListing,
+            UUID(listing_id),
+        )
+
+        assert listing is not None
+
+        listing.publication_status = "draft"
+        listing.is_active = False
+
+        db.commit()
+
+    # Candidate/public boundary remains closed.
+    public_response = client.get(
+        f"/api/v1/internships/{listing_id}"
+    )
+
+    assert public_response.status_code == 404
+
+    # Owner can retrieve the complete canonical listing.
+    owner_response = client.get(
+        f"/api/v1/internships/mine/{listing_id}",
+        headers=headers_a,
+    )
+
+    assert owner_response.status_code == 200
+
+    detail = owner_response.json()
+
+    assert detail["id"] == listing_id
+    assert detail["title"] == payload["title"]
+    assert detail["location"] == payload["location"]
+    assert detail["work_type"] == payload["work_type"]
+    assert detail["description"] == payload["description"]
+    assert (
+        detail["required_skills"]
+        == payload["required_skills"]
+    )
+    assert (
+        detail["preferred_skills"]
+        == payload["preferred_skills"]
+    )
+    assert detail["languages"] == ["English"]
+    assert (
+        detail["min_education"]
+        == payload["education_requirements"]
+    )
+    assert (
+        detail["experience_requirements"]
+        == payload["experience_requirements"]
+    )
+    assert detail["publication_status"] == "draft"
+    assert detail["is_active"] is False
+
+    # Another employer must not be able to inspect it.
+    cross_tenant = client.get(
+        f"/api/v1/internships/mine/{listing_id}",
+        headers=headers_b,
+    )
+
+    assert cross_tenant.status_code == 404
+
+    # Owner endpoint is never anonymous.
+    unauthenticated = client.get(
+        f"/api/v1/internships/mine/{listing_id}"
+    )
+
+    assert unauthenticated.status_code == 401
+
+
+def test_create_opportunity_edit_uses_owner_detail_endpoint():
+    screen = Path(
+        "apps/mobile/src/screens/"
+        "CreateOpportunityScreen.js"
+    ).read_text(
+        encoding="utf-8"
+    )
+
+    api = Path(
+        "apps/mobile/src/services/api.ts"
+    ).read_text(
+        encoding="utf-8"
+    )
+
+    assert (
+        "getEmployerInternshipDetail"
+        in screen
+    )
+
+    assert (
+        "getEmployerInternshipDetail(editingId)"
+        in screen
+    )
+
+    assert (
+        "getInternshipDetail(editingId)"
+        not in screen
+    )
+
+    assert (
+        "getEmployerInternshipDetail"
+        in api
+    )
+
+    assert (
+        "/internships/mine/"
+        in api
+    )
