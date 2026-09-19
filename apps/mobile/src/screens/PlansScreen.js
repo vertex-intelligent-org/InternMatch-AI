@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
+import { useFocusEffect } from '@react-navigation/native';
 import colors from '../theme/colors';
 import { spacing } from '../theme/spacing';
 import { typography } from '../theme/typography';
@@ -61,6 +62,7 @@ export default function PlansScreen({ navigation }) {
   const {
     backendSubscription,
     aiUsage,
+    refreshAIUsage,
     reconcileSubscription,
   } = useSubscription();
   const subscriptionSnapshot = getSubscriptionSnapshot(
@@ -76,6 +78,28 @@ export default function PlansScreen({ navigation }) {
     purchaseState,
   } = subscriptionSnapshot;
   const isEmployer = accountType === 'employer';
+
+  useFocusEffect(
+    useCallback(() => {
+      if (isEmployer) {
+        return undefined;
+      }
+
+      refreshAIUsage().catch(
+        (usageError) => {
+          console.warn(
+            'AI usage refresh on Plans focus failed:',
+            usageError
+          );
+        }
+      );
+
+      return undefined;
+    }, [
+      isEmployer,
+      refreshAIUsage,
+    ])
+  );
   const screenSubtitle = isEmployer ? t('plans.employer.subtitle') : t('plans.subtitle');
 
   const isPurchaseReady = Boolean(
