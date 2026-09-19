@@ -385,3 +385,24 @@ def test_opportunity_alert_fanout_job_id_is_rq_safe(
         r"[A-Za-z0-9_-]+",
         captured["job_id"],
     )
+
+
+def test_new_opportunity_arabic_push_fallback_is_localized():
+    title, body = _copy(
+        event_type="new_opportunity_published",
+        locale="ar",
+        data={},
+    )
+
+    assert title
+    assert (
+        "\u0625\u062d\u062f\u0649 "
+        "\u0627\u0644\u0634\u0631\u0643\u0627\u062a"
+        in body
+    )
+    assert (
+        "\u0645\u062a\u062f\u0631\u0628"
+        in body
+    )
+    assert "A company" not in body
+    assert "an intern" not in body

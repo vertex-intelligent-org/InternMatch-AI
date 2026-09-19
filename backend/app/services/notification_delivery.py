@@ -97,6 +97,16 @@ def _copy(
         ).split()
     )[:120]
 
+\
+    arabic_company_default = (
+        "\u0625\u062d\u062f\u0649 "
+        "\u0627\u0644\u0634\u0631\u0643\u0627\u062a"
+    )
+
+    arabic_title_default = (
+        "\u0645\u062a\u062f\u0631\u0628"
+    )
+
     translations = {
         "en": {
             "application_submitted": (
@@ -253,12 +263,21 @@ def _copy(
                 ),
             ),
             "new_opportunity_published": (
-                "\u0641\u0631\u0635\u0629 \u062a\u062f\u0631\u064a\u0628 \u062c\u062f\u064a\u062f\u0629 \U0001f440",
                 (
-                    f"{company or '\u0625\u062d\u062f\u0649 \u0627\u0644\u0634\u0631\u0643\u0627\u062a'} "
-                    f"\u062a\u0628\u062d\u062b \u0639\u0646 {listing_title or '\u0645\u062a\u062f\u0631\u0628'}. "
-                    "\u0627\u0641\u062a\u062d InternMatch AI \u0648\u0634\u0648\u0641 \u0625\u0630\u0627 "
-                    "\u0627\u0644\u0641\u0631\u0635\u0629 \u0645\u0646\u0627\u0633\u0628\u0629 \u0625\u0644\u0643."
+                    "\u0641\u0631\u0635\u0629 "
+                    "\u062a\u062f\u0631\u064a\u0628 "
+                    "\u062c\u062f\u064a\u062f\u0629 "
+                    "\U0001f440"
+                ),
+                (
+                    f"{company or arabic_company_default} "
+                    "\u062a\u0628\u062d\u062b \u0639\u0646 "
+                    f"{listing_title or arabic_title_default}. "
+                    "\u0627\u0641\u062a\u062d InternMatch AI "
+                    "\u0648\u0634\u0648\u0641 \u0625\u0630\u0627 "
+                    "\u0627\u0644\u0641\u0631\u0635\u0629 "
+                    "\u0645\u0646\u0627\u0633\u0628\u0629 "
+                    "\u0625\u0644\u0643."
                 ),
             ),
             "listing_changes_requested": (
