@@ -453,7 +453,10 @@ async def private_document_browser_guard(
 
     is_cv = (
         path.startswith(
-            "/api/v1/internships/"
+            (
+                "/api/v1/internships/",
+                "/api/v1/admin/internships/",
+            )
         )
         and "/applicants/" in path
         and path.endswith(

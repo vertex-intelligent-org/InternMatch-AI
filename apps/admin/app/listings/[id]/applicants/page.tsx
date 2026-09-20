@@ -16,6 +16,7 @@ import {
 
 import {
   ApiError,
+  downloadAdminInternshipApplicantCV,
   getAdminInternship,
   listAdminInternshipApplicants,
   scheduleAdminInternshipApplicantInterview,
@@ -147,6 +148,11 @@ export default function AdminApplicantsPage() {
   const [
     mutatingId,
     setMutatingId,
+  ] = useState<string | null>(null);
+
+  const [
+    openingCvId,
+    setOpeningCvId,
   ] = useState<string | null>(null);
 
   const [
@@ -326,6 +332,107 @@ export default function AdminApplicantsPage() {
               : item
         )
     );
+  }
+
+
+  async function openCandidateCv(
+    applicant: AdminApplicantItem
+  ): Promise<void> {
+    if (openingCvId !== null) {
+      return;
+    }
+
+    // Open synchronously from the user's click so
+    // browser popup protection does not turn the
+    // secure document flow into a downloadable URL.
+    const popup = window.open(
+      '',
+      '_blank'
+    );
+
+    if (popup) {
+      try {
+        popup.opener = null;
+        popup.document.title =
+          'Opening secure candidate CV...';
+      } catch {
+        // The document access flow does not rely
+        // on manipulating the popup document.
+      }
+    }
+
+    setOpeningCvId(
+      applicant.application_id
+    );
+
+    setError(null);
+
+    let objectUrl: string | null =
+      null;
+
+    try {
+      const blob =
+        await downloadAdminInternshipApplicantCV(
+          internshipId,
+          applicant.application_id
+        );
+
+      objectUrl =
+        URL.createObjectURL(blob);
+
+      if (popup) {
+        popup.location.replace(
+          objectUrl
+        );
+      } else {
+        window.open(
+          objectUrl,
+          '_blank',
+          'noopener,noreferrer'
+        );
+      }
+
+      const disposableUrl =
+        objectUrl;
+
+      // The Blob URL is browser-local and temporary.
+      // No storage-provider URL exists in the client.
+      window.setTimeout(
+        () => {
+          URL.revokeObjectURL(
+            disposableUrl
+          );
+        },
+        60_000
+      );
+    } catch (cvError) {
+      if (popup) {
+        popup.close();
+      }
+
+      const handled =
+        await handleProtectedFailure(
+          cvError
+        );
+
+      if (!handled) {
+        setError(
+          cvError instanceof ApiError
+          && (
+            cvError.status === 403
+            || cvError.status === 404
+          )
+            ? (
+                'This CV is unavailable or '
+                + 'you do not have permission '
+                + 'to access it.'
+              )
+            : errorMessage(cvError)
+        );
+      }
+    } finally {
+      setOpeningCvId(null);
+    }
   }
 
   async function updateStatus(
@@ -768,6 +875,34 @@ export default function AdminApplicantsPage() {
                             || 'No cover letter available.'
                           }
                         </span>
+                      </div>
+
+                      <div className="field fieldWide">
+                        <span className="label">
+                          Candidate CV
+                        </span>
+
+                        <div className="value">
+                          <button
+                            className="button buttonSecondary"
+                            type="button"
+                            disabled={
+                              openingCvId !== null
+                            }
+                            onClick={() => {
+                              void openCandidateCv(
+                                applicant
+                              );
+                            }}
+                          >
+                            {
+                              openingCvId
+                              === applicant.application_id
+                                ? 'Opening securely...'
+                                : 'Open CV securely'
+                            }
+                          </button>
+                        </div>
                       </div>
 
                       {

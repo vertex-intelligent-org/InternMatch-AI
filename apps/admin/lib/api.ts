@@ -664,6 +664,131 @@ export async function listAdminInternshipApplicants(
   );
 }
 
+
+
+export async function downloadAdminInternshipApplicantCV(
+  internshipId: string,
+  applicationId: string
+): Promise<Blob> {
+  const apiBaseUrl =
+    resolveApiBaseUrl();
+
+  if (!apiBaseUrl) {
+    throw new ApiError(
+      'NEXT_PUBLIC_API_URL is not configured.',
+      0,
+      'API_NOT_CONFIGURED'
+    );
+  }
+
+  const token =
+    await getAccessToken();
+
+  const path =
+    '/admin/internships/'
+    + encodeURIComponent(internshipId)
+    + '/applicants/'
+    + encodeURIComponent(applicationId)
+    + '/cv/content';
+
+  const url =
+    apiBaseUrl + path;
+
+  // Never allow the browser client to consume
+  // a storage-provider URL directly.
+  if (/supabase\.co/i.test(url)) {
+    throw new ApiError(
+      'Storage-provider CV URLs are not permitted.',
+      0,
+      'PROVIDER_URL_BLOCKED'
+    );
+  }
+
+  let response: Response;
+
+  try {
+    response = await fetch(
+      url,
+      {
+        method: 'GET',
+        headers: {
+          Authorization:
+            'Bearer ' + token,
+          Accept: (
+            'application/pdf,'
+            + 'application/msword,'
+            + 'application/vnd.openxmlformats-'
+            + 'officedocument.wordprocessingml.document'
+          ),
+        },
+        cache: 'no-store',
+        credentials: 'omit',
+        redirect: 'error',
+      }
+    );
+  } catch {
+    throw new ApiError(
+      'Candidate CV request failed.',
+      0,
+      'NETWORK_ERROR'
+    );
+  }
+
+  if (!response.ok) {
+    throw new ApiError(
+      (
+        response.status === 403
+        || response.status === 404
+      )
+        ? (
+            'This CV is unavailable or you '
+            + 'do not have permission to access it.'
+          )
+        : (
+            'Candidate CV could not be opened.'
+          ),
+      response.status,
+      'CV_ACCESS_DENIED'
+    );
+  }
+
+  const contentType =
+    (
+      response.headers
+        .get('content-type')
+      ?? ''
+    )
+      .split(';', 1)[0]
+      .trim()
+      .toLowerCase();
+
+  const allowedContentTypes =
+    new Set([
+      'application/pdf',
+      'application/msword',
+      (
+        'application/vnd.openxmlformats-'
+        + 'officedocument.'
+        + 'wordprocessingml.document'
+      ),
+    ]);
+
+  if (
+    !allowedContentTypes.has(
+      contentType
+    )
+  ) {
+    throw new ApiError(
+      'Candidate CV format is not supported.',
+      415,
+      'CV_CONTENT_TYPE_INVALID'
+    );
+  }
+
+  return response.blob();
+}
+
+
 export async function updateAdminInternshipApplicantStatus(
   internshipId: string,
   applicationId: string,

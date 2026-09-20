@@ -869,3 +869,398 @@ def test_admin_recruiter_actions_reject_employer_owned_listing(
         )
 
         assert persisted_listing is not None
+
+
+
+def test_admin_candidate_cv_is_brokered_without_provider_url(
+    client: TestClient,
+    mock_supabase_auth,
+    monkeypatch,
+):
+    listing_id = _create_listing()
+
+    candidate_user_id = uuid4()
+    candidate_profile_id = uuid4()
+    application_id = uuid4()
+
+    storage_path = (
+        f"{candidate_user_id}/"
+        "private-candidate-cv.pdf"
+    )
+
+    with TestingSessionLocal() as db:
+        candidate = StudentProfile(
+            id=candidate_profile_id,
+            user_id=candidate_user_id,
+            full_name="Private CV Candidate",
+            cv_storage_path=storage_path,
+            preferences={
+                "account_type": "intern",
+            },
+        )
+
+        application = Application(
+            id=application_id,
+            student_id=candidate.id,
+            internship_id=listing_id,
+            status="applied",
+            generated_cover_letter=(
+                "Submitted application."
+            ),
+        )
+
+        db.add_all([
+            candidate,
+            application,
+        ])
+        db.commit()
+
+    calls = {}
+
+    def fake_download_candidate_cv(
+        *,
+        user_id,
+        storage_path,
+    ):
+        calls["user_id"] = user_id
+        calls["storage_path"] = (
+            storage_path
+        )
+
+        return (
+            b"%PDF-1.7\n"
+            b"secure-admin-cv"
+        )
+
+    monkeypatch.setattr(
+        (
+            "app.api.v1.endpoints."
+            "admin_internships."
+            "download_candidate_cv"
+        ),
+        fake_download_candidate_cv,
+    )
+
+    admin_headers = _admin_headers(
+        mock_supabase_auth,
+        monkeypatch,
+    )
+
+    path = (
+        "/api/v1/admin/internships/"
+        f"{listing_id}/applicants/"
+        f"{application_id}/cv/content"
+    )
+
+    response = client.get(
+        path,
+        headers=admin_headers,
+    )
+
+    assert response.status_code == 200
+    assert (
+        response.headers["content-type"]
+        .startswith("application/pdf")
+    )
+    assert (
+        response.headers[
+            "content-disposition"
+        ]
+        == (
+            'inline; filename='
+            '"candidate-cv.pdf"'
+        )
+    )
+    assert (
+        response.headers[
+            "cache-control"
+        ]
+        == "private, no-store, max-age=0"
+    )
+    assert (
+        response.headers["pragma"]
+        == "no-cache"
+    )
+    assert (
+        response.headers[
+            "x-content-type-options"
+        ]
+        == "nosniff"
+    )
+    assert (
+        response.headers[
+            "referrer-policy"
+        ]
+        == "no-referrer"
+    )
+
+    assert response.content == (
+        b"%PDF-1.7\n"
+        b"secure-admin-cv"
+    )
+
+    assert (
+        calls["user_id"]
+        == candidate_user_id
+    )
+    assert (
+        calls["storage_path"]
+        == storage_path
+    )
+
+    # Private storage metadata/provider URLs
+    # are never serialized to the caller.
+    assert (
+        storage_path.encode("utf-8")
+        not in response.content
+    )
+    assert (
+        b"supabase.co"
+        not in response.content
+    )
+
+    # Anonymous browser/API access is blocked.
+    unauthenticated = client.get(
+        path
+    )
+    assert (
+        unauthenticated.status_code
+        == 401
+    )
+
+    # A normal student token is not an admin token.
+    student_user_id = uuid4()
+    student_token = (
+        f"student-cv-{student_user_id}"
+    )
+
+    _register_token(
+        mock_supabase_auth,
+        token=student_token,
+        user_id=student_user_id,
+        email="student@example.test",
+    )
+
+    student_response = client.get(
+        path,
+        headers={
+            "Authorization":
+                f"Bearer {student_token}"
+        },
+    )
+
+    assert (
+        student_response.status_code
+        == 403
+    )
+
+    # An employer token also has no admin authority.
+    employer_user_id = uuid4()
+    employer_token = (
+        f"employer-cv-{employer_user_id}"
+    )
+
+    _register_token(
+        mock_supabase_auth,
+        token=employer_token,
+        user_id=employer_user_id,
+        email="employer@example.test",
+    )
+
+    employer_response = client.get(
+        path,
+        headers={
+            "Authorization":
+                f"Bearer {employer_token}"
+        },
+    )
+
+    assert (
+        employer_response.status_code
+        == 403
+    )
+
+
+def test_admin_candidate_cv_fails_closed_across_resource_boundaries(
+    client: TestClient,
+    mock_supabase_auth,
+    monkeypatch,
+):
+    listing_a = _create_listing()
+    listing_b = _create_listing()
+
+    employer_owned_listing = (
+        _create_listing(
+            listing_source="employer",
+            employer_user_id=uuid4(),
+        )
+    )
+
+    with TestingSessionLocal() as db:
+        submitted_candidate = (
+            StudentProfile(
+                id=uuid4(),
+                user_id=uuid4(),
+                full_name="Submitted Candidate",
+                cv_storage_path=(
+                    "submitted-user/cv.pdf"
+                ),
+                preferences={
+                    "account_type": "intern",
+                },
+            )
+        )
+
+        saved_candidate = (
+            StudentProfile(
+                id=uuid4(),
+                user_id=uuid4(),
+                full_name="Saved Candidate",
+                cv_storage_path=(
+                    "saved-user/cv.pdf"
+                ),
+                preferences={
+                    "account_type": "intern",
+                },
+            )
+        )
+
+        no_cv_candidate = (
+            StudentProfile(
+                id=uuid4(),
+                user_id=uuid4(),
+                full_name="No CV Candidate",
+                cv_storage_path=None,
+                preferences={
+                    "account_type": "intern",
+                },
+            )
+        )
+
+        db.add_all([
+            submitted_candidate,
+            saved_candidate,
+            no_cv_candidate,
+        ])
+        db.flush()
+
+        submitted_application = (
+            Application(
+                id=uuid4(),
+                student_id=(
+                    submitted_candidate.id
+                ),
+                internship_id=listing_a,
+                status="applied",
+            )
+        )
+
+        saved_application = (
+            Application(
+                id=uuid4(),
+                student_id=saved_candidate.id,
+                internship_id=listing_a,
+                status="saved",
+            )
+        )
+
+        no_cv_application = (
+            Application(
+                id=uuid4(),
+                student_id=no_cv_candidate.id,
+                internship_id=listing_a,
+                status="applied",
+            )
+        )
+
+        db.add_all([
+            submitted_application,
+            saved_application,
+            no_cv_application,
+        ])
+        db.commit()
+
+        submitted_application_id = (
+            submitted_application.id
+        )
+        saved_application_id = (
+            saved_application.id
+        )
+        no_cv_application_id = (
+            no_cv_application.id
+        )
+
+    def storage_must_not_be_reached(
+        **_kwargs,
+    ):
+        raise AssertionError(
+            "Unauthorized boundary reached CV storage."
+        )
+
+    monkeypatch.setattr(
+        (
+            "app.api.v1.endpoints."
+            "admin_internships."
+            "download_candidate_cv"
+        ),
+        storage_must_not_be_reached,
+    )
+
+    headers = _admin_headers(
+        mock_supabase_auth,
+        monkeypatch,
+    )
+
+    wrong_listing = client.get(
+        (
+            "/api/v1/admin/internships/"
+            f"{listing_b}/applicants/"
+            f"{submitted_application_id}"
+            "/cv/content"
+        ),
+        headers=headers,
+    )
+
+    assert wrong_listing.status_code == 404
+
+    saved_draft = client.get(
+        (
+            "/api/v1/admin/internships/"
+            f"{listing_a}/applicants/"
+            f"{saved_application_id}"
+            "/cv/content"
+        ),
+        headers=headers,
+    )
+
+    assert saved_draft.status_code == 404
+
+    missing_cv = client.get(
+        (
+            "/api/v1/admin/internships/"
+            f"{listing_a}/applicants/"
+            f"{no_cv_application_id}"
+            "/cv/content"
+        ),
+        headers=headers,
+    )
+
+    assert missing_cv.status_code == 404
+
+    employer_boundary = client.get(
+        (
+            "/api/v1/admin/internships/"
+            f"{employer_owned_listing}"
+            "/applicants/"
+            f"{submitted_application_id}"
+            "/cv/content"
+        ),
+        headers=headers,
+    )
+
+    # Admin recruiter actions are intentionally
+    # isolated from employer-owned listings.
+    assert (
+        employer_boundary.status_code
+        == 409
+    )

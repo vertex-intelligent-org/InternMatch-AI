@@ -27,6 +27,10 @@ from app.schemas.internship import (
     InternshipListResponse,
     InternshipSummaryResponse,
 )
+from app.services.cv_storage import (
+    CVStorageValidationError,
+    download_candidate_cv,
+)
 from app.services.embeddings import generate_embedding
 from app.services.employer_product_policy import (
     EmployerListingLimitError,
@@ -347,6 +351,134 @@ def get_admin_internship_applicant(
         db,
         application,
         profile,
+    )
+
+
+
+
+@router.get(
+    "/{id}/applicants/{application_id}/cv/content",
+)
+def download_admin_internship_applicant_cv_content(
+    id: UUID,
+    application_id: UUID,
+    _admin_user: AuthenticatedUser = Depends(
+        require_admin_user
+    ),
+    db: Session = Depends(get_db),
+):
+    """
+    Stream one submitted candidate CV through the
+    authenticated InternMatch administration boundary.
+
+    Security invariants:
+    - admin authentication is required for every request
+    - recruiter access is restricted to admin-managed listings
+    - application/listing relationship is revalidated server-side
+    - candidate saved drafts remain private
+    - storage paths stay server-side
+    - storage-provider URLs are never returned
+    - the response is explicitly non-cacheable
+    """
+    _get_admin_managed_listing(
+        db=db,
+        internship_id=id,
+    )
+
+    record = (
+        ApplicationRepository
+        .get_applicant_detail_for_admin(
+            db=db,
+            internship_id=id,
+            application_id=application_id,
+        )
+    )
+
+    if record is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Applicant record not found.",
+        )
+
+    application, profile = record
+
+    # Defense in depth. The repository already excludes
+    # saved applications, but this boundary stays explicit.
+    if application.status == "saved":
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Applicant record not found.",
+        )
+
+    storage_object_path = (
+        profile.cv_storage_path
+    )
+
+    if not storage_object_path:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Candidate CV is not available.",
+        )
+
+    try:
+        document_bytes = download_candidate_cv(
+            user_id=profile.user_id,
+            storage_path=storage_object_path,
+        )
+    except CVStorageValidationError:
+        raise HTTPException(
+            status_code=(
+                status.HTTP_503_SERVICE_UNAVAILABLE
+            ),
+            detail=(
+                "Candidate CV is temporarily unavailable."
+            ),
+        )
+
+    extension = (
+        storage_object_path
+        .rsplit(".", 1)[-1]
+        .lower()
+    )
+
+    media_types = {
+        "pdf": "application/pdf",
+        "doc": "application/msword",
+        "docx": (
+            "application/vnd.openxmlformats-"
+            "officedocument.wordprocessingml.document"
+        ),
+    }
+
+    media_type = media_types.get(
+        extension
+    )
+
+    if media_type is None:
+        raise HTTPException(
+            status_code=(
+                status.HTTP_415_UNSUPPORTED_MEDIA_TYPE
+            ),
+            detail=(
+                "Candidate CV format is not supported."
+            ),
+        )
+
+    return Response(
+        content=document_bytes,
+        media_type=media_type,
+        headers={
+            "Content-Disposition": (
+                f'inline; filename="candidate-cv.{extension}"'
+            ),
+            "Cache-Control": (
+                "private, no-store, max-age=0"
+            ),
+            "Pragma": "no-cache",
+            "X-Content-Type-Options": "nosniff",
+            "Referrer-Policy": "no-referrer",
+            "X-Robots-Tag": "noindex, nofollow",
+        },
     )
 
 

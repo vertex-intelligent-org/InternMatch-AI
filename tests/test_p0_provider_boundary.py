@@ -933,3 +933,253 @@ def test_mobile_profile_contract_uses_has_cv_not_storage_metadata():
     assert "has_cv" in combined
     assert "cv_storage_path" not in combined
     assert "cv_url" not in combined
+
+
+
+def test_admin_cv_broker_has_no_provider_or_secret_url_contract():
+    endpoint_source = Path(
+        "backend/app/api/v1/endpoints/"
+        "admin_internships.py"
+    ).read_text(
+        encoding="utf-8"
+    )
+
+    tree = ast.parse(
+        endpoint_source
+    )
+
+    matches = [
+        node
+        for node in tree.body
+        if isinstance(
+            node,
+            (
+                ast.FunctionDef,
+                ast.AsyncFunctionDef,
+            ),
+        )
+        and node.name
+        == (
+            "download_admin_internship_"
+            "applicant_cv_content"
+        )
+    ]
+
+    assert len(matches) == 1
+
+    node = matches[0]
+    assert node.end_lineno is not None
+
+    start = node.lineno
+
+    if node.decorator_list:
+        start = min(
+            [start]
+            + [
+                decorator.lineno
+                for decorator
+                in node.decorator_list
+            ]
+        )
+
+    endpoint_lines = (
+        endpoint_source.splitlines()
+    )
+
+    block = "\n".join(
+        endpoint_lines[
+            start - 1:
+            node.end_lineno
+        ]
+    )
+
+    assert (
+        "Depends("
+        in block
+    )
+    assert (
+        "require_admin_user"
+        in block
+    )
+    assert (
+        "_get_admin_managed_listing("
+        in block
+    )
+    assert (
+        "get_applicant_detail_for_admin("
+        in block
+    )
+    assert (
+        'application.status == "saved"'
+        in block
+    )
+
+    assert (
+        "download_candidate_cv("
+        in block
+    )
+    assert "Response(" in block
+
+    assert (
+        "create_signed_url"
+        not in block
+    )
+    assert (
+        "signed_url"
+        not in block
+    )
+    assert (
+        "cv_url"
+        not in block
+    )
+    assert (
+        "supabase.co"
+        not in block
+    )
+
+    assert (
+        '"private, no-store, max-age=0"'
+        in block
+    )
+    assert (
+        '"no-referrer"'
+        in block
+    )
+    assert (
+        '"nosniff"'
+        in block
+    )
+
+
+def test_admin_cv_browser_uses_ephemeral_authenticated_blob_only():
+    admin_api = Path(
+        "apps/admin/lib/api.ts"
+    ).read_text(
+        encoding="utf-8"
+    )
+
+    page = Path(
+        "apps/admin/app/listings/[id]/"
+        "applicants/page.tsx"
+    ).read_text(
+        encoding="utf-8"
+    )
+
+    helper_start = admin_api.index(
+        (
+            "export async function "
+            "downloadAdminInternshipApplicantCV("
+        )
+    )
+
+    helper_end = admin_api.index(
+        (
+            "export async function "
+            "updateAdminInternshipApplicantStatus("
+        ),
+        helper_start,
+    )
+
+    helper = admin_api[
+        helper_start:
+        helper_end
+    ]
+
+    assert (
+        "Authorization:"
+        in helper
+    )
+    assert (
+        "'Bearer ' + token"
+        in helper
+    )
+
+    assert (
+        "cache: 'no-store'"
+        in helper
+    )
+    assert (
+        "credentials: 'omit'"
+        in helper
+    )
+    assert (
+        "redirect: 'error'"
+        in helper
+    )
+
+    assert (
+        "create_signed_url"
+        not in helper
+    )
+    assert (
+        "signed_url"
+        not in helper
+    )
+    assert (
+        "cv_url"
+        not in helper
+    )
+
+    assert (
+        "downloadAdminInternshipApplicantCV("
+        in page
+    )
+    assert (
+        "URL.createObjectURL(blob)"
+        in page
+    )
+    assert (
+        "URL.revokeObjectURL("
+        in page
+    )
+    assert (
+        "window.open("
+        in page
+    )
+
+    assert (
+        "cv_storage_path"
+        not in page
+    )
+    assert (
+        "signed_url"
+        not in page
+    )
+    assert (
+        "cv_url"
+        not in page
+    )
+
+    # Never print session credentials or document
+    # bytes into browser logs.
+    assert (
+        "console.log(token"
+        not in admin_api
+    )
+    assert (
+        "console.log(blob"
+        not in page
+    )
+
+
+def test_private_document_browser_guard_covers_admin_candidate_cv():
+    source = Path(
+        "backend/app/main.py"
+    ).read_text(
+        encoding="utf-8"
+    )
+
+    assert (
+        '"/api/v1/admin/internships/"'
+        in source
+    )
+
+    assert (
+        '"/cv/content"'
+        in source
+    )
+
+    assert (
+        '"/document-unavailable"'
+        in source
+    )
