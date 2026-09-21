@@ -1006,32 +1006,24 @@ export type EmployerProductPolicyResponse = {
   pipeline_analytics_available: boolean;
 };
 
-export type EmployerPipelineListingCounts = {
-  total: number;
-  draft: number;
-  under_review: number;
-  published: number;
-  closed: number;
-};
+export type EmployerPipelineAnalyticsResponse = {
+  analytics_scope: 'current_pipeline_snapshot';
 
-export type EmployerPipelineApplicationCounts = {
-  total_submitted: number;
+  total_listings: number;
+  draft_listings: number;
+  under_review_listings: number;
+  published_listings: number;
+  closed_listings: number;
+
+  total_submitted_applications: number;
   applied: number;
   interviewing: number;
   accepted: number;
   rejected: number;
-};
 
-export type EmployerPipelinePercentages = {
-  interviewing_share_percent: number | null;
-  decision_share_percent: number | null;
-  acceptance_share_percent: number | null;
-};
-
-export type EmployerPipelineAnalyticsResponse = {
-  listing_counts: EmployerPipelineListingCounts;
-  application_counts: EmployerPipelineApplicationCounts;
-  percentages: EmployerPipelinePercentages;
+  interviewing_share_percent: number;
+  decision_share_percent: number;
+  acceptance_share_among_decisions_percent: number | null;
 };
 
 export async function getEmployerProductPolicy(): Promise<EmployerProductPolicyResponse> {

@@ -364,7 +364,7 @@ export function RevenueCatProvider({ children }) {
     runtimeState,
     candidateState,
     employerState,
-    isRefreshing:
+    isRefreshing,
     isPurchasing,
     isRestoring,
     refreshCandidateState,

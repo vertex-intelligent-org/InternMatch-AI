@@ -132,7 +132,7 @@ export default function EmployerWorkspaceSummary({
   );
 
   const publishedCount = (
-    analytics?.listing_counts?.published
+    analytics?.published_listings
     ?? null
   );
 
@@ -292,16 +292,16 @@ export default function EmployerWorkspaceSummary({
             {[
               [
                 t('employerProduct.workspace.applicants'),
-                analytics.application_counts.total_submitted,
+                analytics.total_submitted_applications,
               ],
               [
                 t('employerProduct.workspace.interviewing'),
-                analytics.application_counts.interviewing,
+                analytics.interviewing,
               ],
               [
                 t('employerProduct.workspace.decisions'),
-                analytics.application_counts.accepted
-                  + analytics.application_counts.rejected,
+                analytics.accepted
+                  + analytics.rejected,
               ],
             ].map(([label, value]) => (
               <View

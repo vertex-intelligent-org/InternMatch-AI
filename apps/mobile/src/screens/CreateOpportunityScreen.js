@@ -197,7 +197,7 @@ export default function CreateOpportunityScreen({ navigation, route }) {
         if (!active) return;
 
         const rawCount =
-          analytics?.listing_counts?.published ?? 0;
+          analytics?.published_listings ?? 0;
 
         const count = Number.isFinite(
           Number(rawCount)
