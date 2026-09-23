@@ -108,6 +108,45 @@ async function establishOAuthSession(callbackUrl) {
   );
 }
 
+
+function resolveGoogleFullName(session) {
+  const metadata =
+    session?.user?.user_metadata ?? {};
+
+  const directCandidates = [
+    metadata.full_name,
+    metadata.name,
+    metadata.display_name,
+  ];
+
+  for (const value of directCandidates) {
+    if (
+      typeof value === 'string'
+      && value.trim()
+    ) {
+      return value.trim();
+    }
+  }
+
+  const combinedName = [
+    metadata.given_name,
+    metadata.family_name,
+  ]
+    .filter(
+      value =>
+        typeof value === 'string'
+        && value.trim()
+    )
+    .map(value => value.trim())
+    .join(' ');
+
+  if (combinedName) {
+    return combinedName;
+  }
+
+  return 'InternMatch User';
+}
+
 export async function signInWithGoogle() {
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
@@ -150,6 +189,8 @@ export async function signInWithGoogle() {
   return {
     cancelled: false,
     session,
+    fullName:
+      resolveGoogleFullName(session),
   };
 }
 

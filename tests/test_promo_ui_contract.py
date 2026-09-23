@@ -16,27 +16,27 @@ def source(relative: str) -> str:
     )
 
 
-def test_mobile_promo_panel_is_mounted():
+def test_mobile_custom_promo_unlocking_is_not_mounted():
     plans = source(
         "apps/mobile/src/screens/"
         "PlansScreen.js"
-    )
-
-    panel = source(
-        "apps/mobile/src/components/"
-        "PromoCodePanel.js"
     )
 
     api = source(
         "apps/mobile/src/services/api.ts"
     )
 
-    assert "PromoCodePanel" in plans
-    assert "redeemPromoCode" in panel
-    assert "getPromoCodeStatus" in panel
+    assert "PromoCodePanel" not in plans
+    assert "promoSectionYRef" not in plans
+    assert "handlePromoLayout" not in plans
+    assert "handlePromoInputFocus" not in plans
+    assert "scrollPromoIntoView" not in plans
+
+    # Backend infrastructure remains available,
+    # but the store client no longer exposes a
+    # custom mechanism that unlocks Pro.
     assert "'/promo-codes/redeem'" in api
     assert "'/promo-codes/status'" in api
-    assert "setCode('')" in panel
 
 
 def test_mobile_contains_no_promo_secrets():
@@ -156,47 +156,14 @@ def test_canonical_promo_routes_only():
 
 
 
-def test_promo_input_remains_visible_when_keyboard_opens():
+def test_store_plans_screen_has_no_custom_promo_unlock_ui():
     plans = source(
         "apps/mobile/src/screens/"
         "PlansScreen.js"
     )
 
-    panel = source(
-        "apps/mobile/src/components/"
-        "PromoCodePanel.js"
-    )
-
-    assert "plansScrollRef" in plans
-    assert "promoSectionYRef" in plans
-    assert "handlePromoLayout" in plans
-    assert "handlePromoInputFocus" in plans
-    assert "scrollPromoIntoView" in plans
-
-    assert (
-        'keyboardShouldPersistTaps="handled"'
-        in plans
-    )
-
-    assert (
-        "automaticallyAdjustKeyboardInsets"
-        in plans
-    )
-
-    assert "keyboardDismissMode={" in plans
-
-    assert (
-        "onInputFocus={"
-        in plans
-    )
-
-    assert (
-        "onFocus={onInputFocus}"
-        in panel
-    )
-
-    # Keyboard accommodation must be dynamic.
-    # Do not introduce permanent keyboard-sized
-    # padding while the keyboard is closed.
-    assert "keyboardHeight" not in plans
-    assert "keyboardPadding" not in plans
+    assert "PromoCodePanel" not in plans
+    assert "promoSectionYRef" not in plans
+    assert "handlePromoLayout" not in plans
+    assert "handlePromoInputFocus" not in plans
+    assert "scrollPromoIntoView" not in plans

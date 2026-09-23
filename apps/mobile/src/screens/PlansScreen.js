@@ -18,7 +18,6 @@ import ScreenHeader from '../components/ScreenHeader';
 import GlassSurface from '../components/GlassSurface';
 import GradientButton from '../components/GradientButton';
 import PlanBadge from '../components/PlanBadge';
-import PromoCodePanel from '../components/PromoCodePanel';
 import { useProfile } from '../context/ProfileContext';
 import { useLocalization } from '../localization/LocalizationContext';
 import { useRevenueCat } from '../context/RevenueCatProvider';
@@ -83,46 +82,6 @@ export default function PlansScreen({ navigation }) {
   const plansScrollRef =
     useRef(null);
 
-  const promoSectionYRef =
-    useRef(0);
-
-
-  const handlePromoLayout =
-    useCallback((event) => {
-      promoSectionYRef.current =
-        event.nativeEvent.layout.y;
-    }, []);
-
-
-  const scrollPromoIntoView =
-    useCallback(() => {
-      const targetY =
-        Math.max(
-          promoSectionYRef.current
-            - spacing.md,
-          0
-        );
-
-      plansScrollRef.current
-        ?.scrollTo({
-          y: targetY,
-          animated: true,
-        });
-    }, []);
-
-
-  const handlePromoInputFocus =
-    useCallback(() => {
-      const delay =
-        Platform.OS === 'ios'
-          ? 300
-          : 180;
-
-      setTimeout(
-        scrollPromoIntoView,
-        delay
-      );
-    }, [scrollPromoIntoView]);
 
   useFocusEffect(
     useCallback(() => {
@@ -750,30 +709,8 @@ export default function PlansScreen({ navigation }) {
           })}
         </View>
 
-        {/* Restore Purchases CTA — supported platform stores only */}
-        <View
-          onLayout={handlePromoLayout}
-        >
-          <PromoCodePanel
-            isEmployer={isEmployer}
-            isRTL={isRTL}
-            activePro={
-              backendSubscription
-                ?.is_active === true
-            }
-            busy={
-              isPurchaseFlowBusy
-              || isRestoreFlowBusy
-            }
-            onInputFocus={
-              handlePromoInputFocus
-            }
-            reconcileSubscription={
-              reconcileSubscription
-            }
-          />
-        </View>
 
+        {/* Restore Purchases CTA ? supported platform stores only */}
         {runtimeState?.restorePurchasesSupported === true ? (
           <View style={styles.restoreContainer}>
             <GradientButton

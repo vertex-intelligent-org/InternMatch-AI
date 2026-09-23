@@ -162,3 +162,89 @@ def test_confirmed_email_callback_bootstraps_profile_before_orphan_cleanup():
     cleanup_index = source.index("await deleteAccount();", bootstrap_index)
 
     assert bootstrap_index < complete_index < cleanup_index
+
+
+def test_store_social_signup_does_not_require_manual_identity_fields():
+    signup = _read(
+        "apps/mobile/src/screens/SignUpScreen.js"
+    )
+
+    google = _read(
+        "apps/mobile/src/services/googleAuth.js"
+    )
+
+    apple = _read(
+        "apps/mobile/src/services/appleAuth.js"
+    )
+
+    # Social signup must not require the
+    # manual full-name/email/password form.
+    ready_start = signup.index(
+        "const ensureSocialSignupReady = () =>"
+    )
+
+    ready_end = signup.index(
+        "const rejectExistingSignupAccount",
+        ready_start,
+    )
+
+    ready = signup[
+        ready_start:ready_end
+    ]
+
+    assert "ensureAccountTypeSelected()" in ready
+    assert "fullName.trim()" not in ready
+
+    # Google and Apple must pass the
+    # provider-derived name into provisioning.
+    google_start = signup.index(
+        "const handleGoogle = async () =>"
+    )
+
+    apple_start = signup.index(
+        "const handleApple = async () =>"
+    )
+
+    google_handler = signup[
+        google_start:apple_start
+    ]
+
+    apple_handler = signup[
+        apple_start:
+    ]
+
+    assert "result.fullName" in google_handler
+    assert "result.fullName" in apple_handler
+
+    # Social buttons must appear before
+    # the optional manual email signup form.
+    manual_name = signup.index(
+        "{/* Full Name */}"
+    )
+
+    google_button = signup.index(
+        'provider="google"'
+    )
+
+    apple_button = signup.index(
+        "AppleAuthenticationButtonType"
+    )
+
+    assert google_button < manual_name
+    assert apple_button < manual_name
+
+    # Provider services expose a canonical name.
+    assert "resolveGoogleFullName" in google
+    assert "fullName:" in google
+
+    assert "fullName: resolvedFullName" in apple
+
+    assert (
+        "AppleAuthenticationScope.FULL_NAME"
+        in apple
+    )
+
+    assert (
+        "AppleAuthenticationScope.EMAIL"
+        in apple
+    )

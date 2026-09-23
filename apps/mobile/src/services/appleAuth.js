@@ -169,10 +169,33 @@ export async function signInWithApple(metadata = {}) {
     }
   }
 
+  const sessionMetadata =
+    normalizeMetadata(
+      data.session?.user?.user_metadata
+    );
+
+  const sessionFullName =
+    sessionMetadata.full_name
+    || sessionMetadata.name
+    || [
+      sessionMetadata.given_name,
+      sessionMetadata.family_name,
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .trim();
+
+  const resolvedFullName =
+    appleFullName
+    || userMetadata.full_name
+    || sessionFullName
+    || 'InternMatch User';
+
   return {
     cancelled: false,
     unavailable: false,
     session: data.session,
+    fullName: resolvedFullName,
     authorizationCode:
       credential.authorizationCode || null,
   };
