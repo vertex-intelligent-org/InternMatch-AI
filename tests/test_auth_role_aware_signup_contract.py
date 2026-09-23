@@ -216,10 +216,14 @@ def test_store_social_signup_does_not_require_manual_identity_fields():
     assert "result.fullName" in google_handler
     assert "result.fullName" in apple_handler
 
-    # Social buttons must appear before
-    # the optional manual email signup form.
+    # Preserve the original visual hierarchy:
+    # manual signup first, social shortcuts below.
     manual_name = signup.index(
         "{/* Full Name */}"
+    )
+
+    primary_cta = signup.index(
+        "onPress={handleCreateAccount}"
     )
 
     google_button = signup.index(
@@ -230,8 +234,9 @@ def test_store_social_signup_does_not_require_manual_identity_fields():
         "AppleAuthenticationButtonType"
     )
 
-    assert google_button < manual_name
-    assert apple_button < manual_name
+    assert manual_name < primary_cta
+    assert primary_cta < google_button
+    assert primary_cta < apple_button
 
     # Provider services expose a canonical name.
     assert "resolveGoogleFullName" in google
