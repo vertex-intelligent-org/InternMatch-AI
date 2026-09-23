@@ -25,6 +25,7 @@ from app.schemas.application import (
     EmployerInterviewScheduleRequest,
 )
 from app.schemas.internship import (
+    EmployerInternshipDetailResponse,
     InternshipCreateRequest,
     InternshipDetailResponse,
     InternshipListResponse,
@@ -444,7 +445,7 @@ def list_my_internships(
 
 @router.get(
     "/mine/{id}",
-    response_model=InternshipDetailResponse,
+    response_model=EmployerInternshipDetailResponse,
 )
 def get_my_internship_detail(
     id: UUID,
@@ -477,7 +478,7 @@ def get_my_internship_detail(
             ),
         )
 
-    return InternshipDetailResponse.from_orm_model(
+    return EmployerInternshipDetailResponse.from_orm_model(
         listing
     )
 

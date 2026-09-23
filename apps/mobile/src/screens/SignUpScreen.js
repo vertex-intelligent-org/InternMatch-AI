@@ -701,47 +701,20 @@ export default function SignUpScreen({ navigation }) {
 
             {accountType === 'intern' ? (
               <>
-                {/* Social providers use provider identity.
-                    Manual fields above are not required for social signup. */}
-                {loadingSource === 'google' ? (
-                  <View
-                    style={styles.authLoadingButton}
-                    accessibilityRole="progressbar"
-                    accessibilityLiveRegion="polite"
-                  >
-                    <ActivityIndicator
-                      size="small"
-                      color={
-                        colors.textInverse
-                        || '#FFFFFF'
-                      }
-                    />
-                    <Text
-                      style={
-                        styles.authLoadingButtonText
-                      }
-                    >
-                      {t('auth.signingIn')}
-                    </Text>
-                  </View>
-                ) : (
-                  <SocialAuthButton
-                    provider="google"
-                    label={
-                      t('auth.signUpWithGoogle')
-                    }
-                    onPress={handleGoogle}
-                    disabled={loading}
-                  />
-                )}
+                <View style={styles.dividerRow}>
+                  <View style={styles.divider} />
+                  <Text style={styles.dividerText}>
+                    {t('auth.or')}
+                  </Text>
+                  <View style={styles.divider} />
+                </View>
 
-                {Platform.OS === 'ios' ? (
-                  loadingSource === 'apple' ? (
+                <View style={styles.socialAuthStack}>
+                  {/* Social providers use provider identity.
+                      Manual fields above are not required for social signup. */}
+                  {loadingSource === 'google' ? (
                     <View
-                      style={[
-                        styles.authLoadingButton,
-                        styles.appleAuthButton,
-                      ]}
+                      style={styles.authLoadingButton}
                       accessibilityRole="progressbar"
                       accessibilityLiveRegion="polite"
                     >
@@ -761,52 +734,72 @@ export default function SignUpScreen({ navigation }) {
                       </Text>
                     </View>
                   ) : (
-                    <AppleAuthentication.AppleAuthenticationButton
-                      buttonType={
-                        AppleAuthentication
-                          .AppleAuthenticationButtonType
-                          .SIGN_UP
+                    <SocialAuthButton
+                      provider="google"
+                      label={
+                        t('auth.signUpWithGoogle')
                       }
-                      buttonStyle={
-                        AppleAuthentication
-                          .AppleAuthenticationButtonStyle
-                          .BLACK
-                      }
-                      cornerRadius={24}
-                      style={
-                        styles.appleAuthButton
-                      }
-                      onPress={handleApple}
-                      pointerEvents={
-                        loading
-                          ? 'none'
-                          : 'auto'
-                      }
-                      accessibilityState={{
-                        disabled: loading,
-                      }}
+                      onPress={handleGoogle}
+                      disabled={loading}
                     />
-                  )
-                ) : null}
+                  )}
 
-                <View
-                  style={styles.dividerRow}
-                >
-                  <View
-                    style={styles.divider}
-                  />
-                  <Text
-                    style={styles.dividerText}
-                  >
-                    {t('auth.or')}
-                  </Text>
-                  <View
-                    style={styles.divider}
-                  />
+                  {Platform.OS === 'ios' ? (
+                    loadingSource === 'apple' ? (
+                      <View
+                        style={[
+                          styles.authLoadingButton,
+                          styles.appleAuthButton,
+                        ]}
+                        accessibilityRole="progressbar"
+                        accessibilityLiveRegion="polite"
+                      >
+                        <ActivityIndicator
+                          size="small"
+                          color={
+                            colors.textInverse
+                            || '#FFFFFF'
+                          }
+                        />
+                        <Text
+                          style={
+                            styles.authLoadingButtonText
+                          }
+                        >
+                          {t('auth.signingIn')}
+                        </Text>
+                      </View>
+                    ) : (
+                      <AppleAuthentication.AppleAuthenticationButton
+                        buttonType={
+                          AppleAuthentication
+                            .AppleAuthenticationButtonType
+                            .SIGN_UP
+                        }
+                        buttonStyle={
+                          AppleAuthentication
+                            .AppleAuthenticationButtonStyle
+                            .BLACK
+                        }
+                        cornerRadius={24}
+                        style={
+                          styles.appleAuthButton
+                        }
+                        onPress={handleApple}
+                        pointerEvents={
+                          loading
+                            ? 'none'
+                            : 'auto'
+                        }
+                        accessibilityState={{
+                          disabled: loading,
+                        }}
+                      />
+                    )
+                  ) : null}
                 </View>
               </>
             ) : null}
-
 
 
             {/* Legal Footer inside Panel */}
@@ -985,7 +978,12 @@ const styles = StyleSheet.create({
   dividerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: spacing.lg,
+    marginTop: spacing.lg,
+    marginBottom: spacing.md,
+  },
+  socialAuthStack: {
+    width: '100%',
+    gap: spacing.md,
   },
   divider: {
     flex: 1,
@@ -1017,6 +1015,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   authLoadingButton: {
+    width: '100%',
     minHeight: 48,
     borderRadius: spacing.radii.pill,
     backgroundColor: '#94A3B8',
@@ -1035,7 +1034,6 @@ const styles = StyleSheet.create({
   appleAuthButton: {
     width: '100%',
     height: 48,
-    marginTop: spacing.md,
   },
 
   inputError: {

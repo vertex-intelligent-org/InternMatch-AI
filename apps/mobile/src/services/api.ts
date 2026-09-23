@@ -438,6 +438,16 @@ export type InternshipDetail = {
   posted_at: string;
 };
 
+export type EmployerInternshipDetail =
+  InternshipDetail & {
+    publication_status:
+      | 'draft'
+      | 'under_review'
+      | 'published'
+      | 'closed';
+    employer_visible_feedback: string | null;
+  };
+
 export type GetInternshipsParams = {
   work_type?: string;
   location?: string;
@@ -972,8 +982,8 @@ export async function createEmployerInternship(
 
 export async function getEmployerInternshipDetail(
   id: string
-): Promise<InternshipDetail> {
-  return apiRequest<InternshipDetail>(
+): Promise<EmployerInternshipDetail> {
+  return apiRequest<EmployerInternshipDetail>(
     `/internships/mine/${encodeURIComponent(id)}`,
     {
       method: 'GET',

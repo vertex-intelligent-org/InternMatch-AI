@@ -269,6 +269,48 @@ class InternshipDetailResponse(BaseModel):
             posted_at=model.created_at,
         )
 
+class EmployerInternshipDetailResponse(
+    InternshipDetailResponse
+):
+    """Owner-only employer internship detail."""
+
+    employer_visible_feedback: Optional[str] = None
+
+    @classmethod
+    def from_orm_model(
+        cls,
+        model: Any,
+    ) -> "EmployerInternshipDetailResponse":
+        base = InternshipDetailResponse.from_orm_model(
+            model
+        )
+
+        metadata = (
+            model.metadata_json
+            if isinstance(
+                model.metadata_json,
+                dict,
+            )
+            else {}
+        )
+
+        raw_feedback = metadata.get(
+            "employer_visible_feedback"
+        )
+
+        feedback = (
+            raw_feedback.strip()
+            if isinstance(raw_feedback, str)
+            and raw_feedback.strip()
+            else None
+        )
+
+        return cls(
+            **base.model_dump(),
+            employer_visible_feedback=feedback,
+        )
+
+
 class AdminInternshipDetailResponse(
     InternshipDetailResponse
 ):

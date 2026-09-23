@@ -3445,3 +3445,117 @@ def test_create_opportunity_edit_uses_owner_detail_endpoint():
         "/internships/mine/"
         in api
     )
+
+def test_owner_can_read_rejected_listing_feedback_and_resubmit(
+    client: TestClient,
+):
+    employer_id = uuid4()
+
+    _create_profile(
+        employer_id,
+        "Feedback Employer",
+        account_type="employer",
+    )
+
+    headers = {
+        "Authorization":
+            f"Bearer valid-user-{employer_id}"
+    }
+
+    payload = {
+        "title": "Backend Platform Intern",
+        "company": "Feedback Corp",
+        "location": "Istanbul",
+        "work_type": "hybrid",
+        "description": "Build reliable backend systems.",
+        "required_skills": [
+            "Python",
+            "PostgreSQL",
+        ],
+        "preferred_skills": ["Redis"],
+        "language": "English",
+        "education_requirements": (
+            "Computer Engineering student"
+        ),
+        "experience_requirements": (
+            "Personal backend projects"
+        ),
+    }
+
+    created = client.post(
+        "/api/v1/internships",
+        json=payload,
+        headers=headers,
+    )
+
+    assert created.status_code == 201
+
+    listing_id = created.json()["id"]
+
+    with TestingSessionLocal() as db:
+        listing = db.get(
+            InternshipListing,
+            UUID(listing_id),
+        )
+
+        assert listing is not None
+
+        listing.publication_status = "draft"
+        listing.is_active = False
+        listing.metadata_json = {
+            "employer_visible_feedback": (
+                "Please clarify the internship responsibilities."
+            )
+        }
+
+        db.commit()
+
+    detail = client.get(
+        f"/api/v1/internships/mine/{listing_id}",
+        headers=headers,
+    )
+
+    assert detail.status_code == 200
+
+    data = detail.json()
+
+    assert data["title"] == payload["title"]
+    assert data["description"] == payload["description"]
+
+    assert (
+        data["employer_visible_feedback"]
+        == "Please clarify the internship responsibilities."
+    )
+
+    public_detail = client.get(
+        f"/api/v1/internships/{listing_id}"
+    )
+
+    assert public_detail.status_code == 404
+
+    updated = client.patch(
+        f"/api/v1/internships/{listing_id}",
+        json=payload,
+        headers=headers,
+    )
+
+    assert updated.status_code == 200
+
+    assert (
+        updated.json()["publication_status"]
+        == "under_review"
+    )
+
+    assert updated.json()["is_active"] is False
+
+    after = client.get(
+        f"/api/v1/internships/mine/{listing_id}",
+        headers=headers,
+    )
+
+    assert after.status_code == 200
+
+    assert (
+        after.json()["employer_visible_feedback"]
+        is None
+    )

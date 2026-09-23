@@ -1188,6 +1188,21 @@ def request_changes_admin_internship(
         listing.publication_status = "draft"
         listing.is_active = False
 
+        metadata = dict(
+            listing.metadata_json
+            if isinstance(
+                listing.metadata_json,
+                dict,
+            )
+            else {}
+        )
+
+        metadata["employer_visible_feedback"] = (
+            payload.employer_visible_feedback
+        )
+
+        listing.metadata_json = metadata
+
         changes_requested_at = datetime.now(
             timezone.utc
         ).isoformat()

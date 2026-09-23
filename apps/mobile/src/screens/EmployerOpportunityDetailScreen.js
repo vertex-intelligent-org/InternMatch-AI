@@ -287,6 +287,83 @@ export default function EmployerOpportunityDetailScreen({
             />
           </Card>
 
+          {detail.publication_status === 'draft' ? (
+            <Card
+              padding="lg"
+              style={styles.feedbackCard}
+            >
+              <Text
+                style={[
+                  styles.feedbackTitle,
+                  isRTL && styles.rtlText,
+                ]}
+              >
+                {t(
+                  'employerOpportunities.changesRequestedTitle'
+                )}
+              </Text>
+
+              <Text
+                style={[
+                  styles.feedbackBody,
+                  isRTL && styles.rtlText,
+                ]}
+              >
+                {t(
+                  'employerOpportunities.changesRequestedBody'
+                )}
+              </Text>
+
+              {detail.employer_visible_feedback ? (
+                <View style={styles.feedbackBox}>
+                  <Text
+                    style={[
+                      styles.feedbackLabel,
+                      isRTL && styles.rtlText,
+                    ]}
+                  >
+                    {t(
+                      'employerOpportunities.reviewFeedback'
+                    )}
+                  </Text>
+
+                  <Text
+                    selectable
+                    style={[
+                      styles.feedbackText,
+                      isRTL && styles.rtlText,
+                    ]}
+                  >
+                    {detail.employer_visible_feedback}
+                  </Text>
+                </View>
+              ) : null}
+
+              <TouchableOpacity
+                style={styles.editResubmitButton}
+                onPress={() => {
+                  navigation.navigate(
+                    'CreateOpportunity',
+                    {
+                      internshipId: detail.id,
+                      opportunity: detail,
+                    }
+                  );
+                }}
+                accessibilityRole="button"
+                accessibilityLabel={t(
+                  'employerOpportunities.editAndResubmit'
+                )}
+              >
+                <Text style={styles.editResubmitText}>
+                  {t(
+                    'employerOpportunities.editAndResubmit'
+                  )}
+                </Text>
+              </TouchableOpacity>
+            </Card>
+          ) : null}
+
           {(detail.required_skills?.length > 0
             || detail.preferred_skills?.length > 0) ? (
             <Card
@@ -503,6 +580,59 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     alignItems: 'center',
     minWidth: 0,
+  },
+
+  feedbackCard: {
+    marginBottom: spacing.md,
+  },
+
+  feedbackTitle: {
+    ...typography.bodyMedium,
+    color: colors.textPrimary || colors.textDark,
+    marginBottom: spacing.xs,
+  },
+
+  feedbackBody: {
+    ...typography.body,
+    color: colors.textSecondary || colors.textMuted,
+    lineHeight: 22,
+  },
+
+  feedbackBox: {
+    marginTop: spacing.md,
+    padding: spacing.md,
+    borderRadius: spacing.radii.md,
+    backgroundColor: colors.surface || '#FFFFFF',
+  },
+
+  feedbackLabel: {
+    ...typography.caption,
+    fontWeight: '700',
+    color: colors.textSecondary || colors.textMuted,
+    marginBottom: spacing.xxs,
+  },
+
+  feedbackText: {
+    ...typography.body,
+    color: colors.textPrimary || colors.textDark,
+    lineHeight: 22,
+  },
+
+  editResubmitButton: {
+    marginTop: spacing.md,
+    minHeight: 48,
+    borderRadius: spacing.radii.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.lg,
+    backgroundColor:
+      colors.accentStrong || colors.tealDark,
+  },
+
+  editResubmitText: {
+    ...typography.button,
+    color: '#FFFFFF',
+    textAlign: 'center',
   },
 
   errorText: {

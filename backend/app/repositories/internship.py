@@ -383,6 +383,22 @@ class InternshipRepository:
         if description_embedding is not None:
             listing.description_embedding = description_embedding
 
+        metadata = dict(
+            listing.metadata_json
+            if isinstance(
+                listing.metadata_json,
+                dict,
+            )
+            else {}
+        )
+
+        metadata.pop(
+            "employer_visible_feedback",
+            None,
+        )
+
+        listing.metadata_json = metadata
+
         # Any employer-authored content change invalidates prior publication
         # approval. The listing must be reviewed again before candidates can
         # discover or apply to it.
