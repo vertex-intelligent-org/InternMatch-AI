@@ -10,11 +10,8 @@ import Animated, {
   withSequence,
   Easing,
 } from 'react-native-reanimated';
-import { useAudioPlayer } from 'expo-audio';
 
 const AnimatedLine = Animated.createAnimatedComponent(Line);
-
-const soundAsset = require('../../assets/audio/bowstring-soft.wav');
 
 /**
  * SplashBowArrowAnimation
@@ -40,18 +37,6 @@ export default function SplashBowArrowAnimation({
 
   const onTargetImpactRef = useRef(onTargetImpact);
   onTargetImpactRef.current = onTargetImpact;
-
-  // expo-audio player hook (lifecycle-managed)
-  const player = useAudioPlayer(soundAsset);
-
-  useEffect(() => {
-    if (player) {
-      try {
-        player.volume = 0.22;
-      } catch (_) {}
-    }
-  }, [player]);
-
   // Shared animated values
   const introOpacity = useSharedValue(0);
   // drawProgress: 0 (at rest) -> 1 (full draw)
@@ -141,18 +126,6 @@ export default function SplashBowArrowAnimation({
         easing: Easing.inOut(Easing.quad),
       })
     );
-
-    // Audio tension trigger at ~750ms
-    const audioTimer = setTimeout(() => {
-      try {
-        if (player && typeof player.play === 'function') {
-          player.play();
-        }
-      } catch (_) {
-        // Non-blocking best-effort audio playback
-      }
-    }, 750);
-
     // Target pierce/impact micro-pulse trigger at 2100ms (when arrow tip reaches target center)
     const impactTimer = setTimeout(() => {
       onTargetImpactRef.current?.();
@@ -164,16 +137,10 @@ export default function SplashBowArrowAnimation({
     }, 3000);
 
     return () => {
-      clearTimeout(audioTimer);
       clearTimeout(impactTimer);
       clearTimeout(completeTimer);
-      try {
-        if (player && typeof player.pause === 'function') {
-          player.pause();
-        }
-      } catch (_) {}
     };
-  }, [isReducedMotion, player]);
+  }, [isReducedMotion]);
 
   // Measured target center coordinates relative to brandHero container
   const targetX = targetCoords?.x ?? 190;
