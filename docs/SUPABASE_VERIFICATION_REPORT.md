@@ -1,3 +1,7 @@
+> [!IMPORTANT]
+> **HISTORICAL SNAPSHOT**
+> This report reflects the project state when it was originally produced. It is preserved as historical evidence and is **not** the authoritative description of the 2026-09-24 release. For current state, see [README](../README.md), [Shipaton 2026 Submission](SHIPATON_2026_SUBMISSION.md), [Judge Runbook](JUDGE_RUNBOOK.md), and [System Architecture](ARCHITECTURE.md).
+
 # SUPABASE VERIFICATION REPORT (HISTORICAL ARCHIVE)
 
 > [!IMPORTANT]
@@ -6,7 +10,7 @@
 >
 > For current live system architecture, verified test results, and judge evaluation instructions, please refer to:
 > - **[README.md](../README.md)** — Project overview and architecture
-> - **[JUDGE_RUNBOOK.md](../JUDGE_RUNBOOK.md)** — Step-by-step evaluator instructions
+> - **[JUDGE_RUNBOOK.md](JUDGE_RUNBOOK.md)** — Step-by-step evaluator instructions
 > - **[docs/ARCHITECTURE.md](ARCHITECTURE.md)** — Comprehensive architecture specification
 > - **[docs/DATABASE.md](DATABASE.md)** — Production database schema and migrations
 

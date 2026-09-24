@@ -1,437 +1,261 @@
-# InternMatch AI - Database Schema & Security Policy
+# InternMatch AI — Database Schema & Data Security
 
-**Version:** 1.0.0
-**Status:** Approved & Authoritative
-**Migration Compatibility:** Supabase PostgreSQL 15+
-**Local Docker Reference Runtime:** PostgreSQL 17 via `pgvector/pgvector:0.8.6-pg17-bookworm`
-**Required Extensions:** `pgvector`, `uuid-ossp`
+**Documentation checkpoint:** 2026-09-24
+**Release source:** `707601d93294c891d53b900d01c644200f27292b`
 
----
+## 1. Database Boundary
 
-## 1. Source of Truth
+The production-oriented schema targets **Supabase PostgreSQL** with `pgvector`, Supabase Auth, and Supabase Storage. Migration `001` references `auth.users`, so a plain PostgreSQL database is not a complete replacement for the full platform.
 
-The canonical database definition is the ordered migration chain in `database/migrations/`.
+The repository also provides a local `pgvector` PostgreSQL container for isolated development/testing scenarios. For faithful full-stack development, use a development Supabase project.
 
-This document describes the effective schema after migrations `001` through `010`. It intentionally avoids duplicating every executable `CREATE TABLE` statement because the migration files remain the authoritative source for provisioning, constraints, indexes, privileges, and Row Level Security policies.
+## 2. Migration State
 
-Canonical migration order:
+Repository migration source spans `001` through `028`.
 
-1. `database/migrations/001_initial_schema.sql`
-2. `database/migrations/002_rls_policies.sql`
-3. `database/migrations/003_add_processing_job_progress.sql`
-4. `database/migrations/004_add_application_applied_date.sql`
-5. `database/migrations/005_add_avatar_storage_path.sql`
-6. `database/migrations/006_add_saved_internships.sql`
-7. `database/migrations/007_add_application_status_events.sql`
-8. `database/migrations/008_add_internship_employer_ownership.sql`
-9. `database/migrations/009_add_internship_lifecycle_status.sql`
-10. `database/migrations/010_add_application_interview_schedule.sql`
+**Current release execution baseline:** through `027`.
 
-After schema migrations, `database/supabase_storage_setup.sql` provides the repository-managed Supabase Storage setup described in Section 8.
+- `027` provides notification/push-device infrastructure.
+- `028_promo_campaigns.sql` exists in source but is **not part of the current production-applied baseline**.
+- Do not instruct production/current release environments to run `028`.
+- Existing environments must track their own applied migrations and must not blindly replay the chain.
+- A fresh development Supabase database should apply the required migration chain once in numeric order through `027`.
 
----
+## 3. Core Candidate Domain
 
-## 2. Effective Relational Model
+### `student_profiles`
 
-```mermaid
-erDiagram
-    AUTH_USERS ||--o| STUDENT_PROFILES : owns
-    AUTH_USERS ||--o{ INTERNSHIP_LISTINGS : employer_owns
-    AUTH_USERS ||--o{ PROCESSING_JOBS : owns
+Canonical InternMatch application profile keyed to Supabase `auth.users`. It stores identity-adjacent profile data such as name/headline, preferences, candidate embedding, CV/avatar storage metadata, and timestamps. The application account type is persisted in backend-controlled profile preferences and protected from ordinary role mutation.
 
-    STUDENT_PROFILES ||--o{ STUDENT_SKILLS : has
-    SKILLS ||--o{ STUDENT_SKILLS : categorizes
+### Skills
 
-    STUDENT_PROFILES ||--o{ EDUCATION_ENTRIES : has
-    STUDENT_PROFILES ||--o{ EXPERIENCE_ENTRIES : has
-    STUDENT_PROFILES ||--o{ PROJECT_ENTRIES : has
+`skills` is the normalized skill taxonomy; `student_skills` links candidates to skills and carries proficiency/provenance-related state introduced by later migrations.
 
-    STUDENT_PROFILES ||--o{ MATCHES : receives
-    INTERNSHIP_LISTINGS ||--o{ MATCHES : targets
-
-    STUDENT_PROFILES ||--o{ APPLICATIONS : owns
-    INTERNSHIP_LISTINGS ||--o{ APPLICATIONS : receives
-
-    STUDENT_PROFILES ||--o{ SAVED_INTERNSHIPS : bookmarks
-    INTERNSHIP_LISTINGS ||--o{ SAVED_INTERNSHIPS : bookmarked_as
-
-    APPLICATIONS ||--o{ APPLICATION_STATUS_EVENTS : records
-```
-
-`AUTH_USERS` represents Supabase `auth.users`; it is managed by Supabase Auth and is not created by the application migrations.
-
----
-
-## 3. Effective Table Contract
-
-### 3.1 `student_profiles`
-
-Candidate profile and embedding record.
-
-Key fields:
-
-- `id` - UUID primary key
-- `user_id` - unique FK to `auth.users(id)`, `ON DELETE CASCADE`
-- `full_name`
-- `headline`
-- `cv_storage_path`
-- `avatar_storage_path` - added by migration `005`
-- `preferences` - JSONB
-- `summary_embedding` - `vector(1536)`
-- `created_at`
-- `updated_at`
-
-### 3.2 `skills` and `student_skills`
-
-`skills` stores the shared skill taxonomy.
-
-`student_skills` maps candidate profiles to skills with a composite primary key and candidate ownership through `student_id`.
-
-`student_skills.skill_id` uses `ON DELETE RESTRICT` so taxonomy entries cannot be removed while still referenced.
-
-### 3.3 Structured Candidate Data
-
-The following tables are candidate-owned and reference `student_profiles(id)` with `ON DELETE CASCADE`:
+### Structured candidate history
 
 - `education_entries`
 - `experience_entries`
 - `project_entries`
 
-### 3.4 `internship_listings`
+These records feed the structured profile and deterministic candidate embedding context.
 
-Canonical internship opportunity catalog.
+## 4. Internship Listings
 
-Key fields include:
+`internship_listings` is the shared opportunity table for controlled/admin-curated and employer-owned listings.
 
-- `id`
-- `title`
-- `company`
-- `location`
-- `work_type` - `remote`, `onsite`, or `hybrid`
-- `description`
-- `required_skills`
-- `preferred_skills`
-- `language`
-- `education_requirements`
-- `experience_requirements`
-- `metadata`
-- `description_embedding` - `vector(1536)`
-- `created_at`
-- `employer_user_id` - added by migration `008`, FK to `auth.users(id)` with `ON DELETE SET NULL`
-- `is_active` - added by migration `009`, defaults to `TRUE`
+Important domains added across migrations include:
 
-`employer_user_id` establishes backend-enforced employer ownership. `is_active` provides opportunity lifecycle state without deleting historical records.
+- employer ownership (`employer_user_id`, organization linkage)
+- publication lifecycle (`draft`, `under_review`, `published`, `closed`)
+- listing provenance/source
+- description embeddings (`vector(1536)` in the current configuration)
+- requirements/skills/language/education/experience fields
+- metadata for internal source/review context
 
-### 3.5 `matches`
+Employer moderation feedback is stored in internal listing metadata and exposed only through the owner-specific API contract. Public catalog schemas do not include `employer_visible_feedback`.
 
-Persisted candidate-to-internship match results.
+### Publication semantics
 
-Key fields include:
+Candidate-visible catalog queries select published/active opportunities according to repository policy. `under_review` and requested-change `draft` listings are not public.
 
-- `student_id`
-- `internship_id`
+## 5. Matches
+
+`matches` persists the hybrid matching result between a student profile and internship listing.
+
+Core fields include:
+
 - `overall_score`
 - `skill_score`
 - `vector_score`
 - `attribute_score`
-- `why_you_match`
-- `skill_gap_analysis`
-- `created_at`
+- generated `why_you_match`
+- canonical `skill_gap_analysis` JSON
 
-Scores are constrained to `0..100`.
+Uniqueness is enforced per `(student_id, internship_id)`.
 
-The pair `(student_id, internship_id)` is unique.
+The authoritative score is deterministic application logic. Generated explanation text is downstream of that score.
 
-`skill_gap_analysis` JSONB is the canonical persisted source for matching skills, missing skills, summary information, and recommendations. API response fields such as `matching_skills` and `missing_skills` are derived from this structured payload rather than duplicated as database columns.
+### Matching index
 
-### 3.6 `applications`
+The internship description embedding uses a pgvector cosine index (HNSW in the initial schema). Supporting B-tree indexes cover common student/status/ownership access paths.
 
-Candidate application and tracker record.
+## 6. Applications & Lifecycle History
 
-Current fields include:
-
-- `id`
-- `student_id`
-- nullable `internship_id`
-- `status`
-- `generated_cover_letter`
-- `applied_date` - added by migration `004`
-- `notes`
-- `interview_scheduled_at` - added by migration `010`
-- `interview_mode` - `online`, `onsite`, or `NULL`
-- `interview_location`
-- `interview_message`
-- `created_at`
-- `updated_at`
-
-Allowed status values are:
+`applications` tracks candidate opportunity state:
 
 ```text
-saved
-applied
-interviewing
-rejected
-accepted
+saved | applied | interviewing | rejected | accepted
 ```
 
-`applications.internship_id` uses `ON DELETE SET NULL`, preserving candidate application history if a linked listing is removed.
+Later migrations add `applied_date`, interview metadata, recruiter-controlled fields, and lifecycle support.
 
-The application lifecycle is enforced by backend rules, not by treating every status value as candidate-editable:
+`application_status_events` preserves chronological transitions for the tracker/audit timeline.
+
+Historical retention is intentional: candidate application history can outlive active ownership/publication details where foreign-key delete rules use `SET NULL`/detachment instead of cascading away the record.
+
+## 7. Saved Internships
+
+`saved_internships` stores candidate bookmarks, scoped to student and internship uniqueness. Save/unsave operations are idempotent at the API level.
+
+## 8. Processing Jobs
+
+`processing_jobs` persists async RQ work such as CV extraction, match calculation, and application generation. Later migration adds progress tracking.
+
+Ownership is tied to the authenticated user. Jobs have durable status and result/error metadata; active match jobs are also used to prevent employer-facing stale-match presentation.
+
+## 9. Subscription State
+
+Later migrations add backend-authoritative subscription state for Student and Employer entitlements.
+
+The backend persists provider-derived status rather than trusting a client-side flag. RevenueCat reconciliation and webhook handling update this state.
+
+Canonical entitlements:
+
+- `pro_student`
+- `pro_employer`
+
+Subscription snapshots can include provider/store/environment/product/renewal/expiry/event metadata as defined by the current backend model/service contract.
+
+## 10. AI Quota & Usage Domain
+
+AI product policy is persisted server-side. The schema supports quota periods/operations/usage events needed for:
+
+- feature limits
+- used/remaining counts
+- period reset windows
+- idempotent operation reservation/settlement
+- employer/student feature policy
+
+Product quota exhaustion is a billing/product-policy condition and is distinct from abuse rate limiting.
+
+## 11. Employer Organization Verification
+
+Employer organization tables persist:
+
+- owner user ID
+- legal/display name
+- website / normalized domain
+- business email
+- country
+- optional registration/tax numbers
+- representative name/role
+- organization type
+- verification method/status
+- submission/review timestamps
+- rejection reason
+
+A separate verification event table records lifecycle actions, reviewer context, previous/new state, reasons, and internal notes.
+
+Organization verification is not opportunity publication authority.
+
+## 12. Internship Provenance
+
+Later migrations attach source/provenance context to listings so the platform can distinguish employer-owned opportunities from controlled/admin-curated opportunities and enforce recruiter ownership boundaries.
+
+Admin recruiter operations on applicant records are restricted to admin-managed opportunities; employer recruiter operations are restricted to employer-owned opportunities.
+
+## 13. Employer Compliance Claims & Evidence
+
+Migration `024` adds jurisdiction-scoped employer compliance claims, supporting evidence metadata, and compliance event history.
+
+Claim states:
 
 ```text
-Candidate:
-saved -> applied
-
-Employer:
-applied -> interviewing | accepted | rejected
-interviewing -> accepted | rejected
-
-Terminal:
-accepted
-rejected
+draft | pending | approved | rejected | revoked | expired
 ```
 
-Candidates cannot manually set `interviewing`, `accepted`, or `rejected`, and a submitted application cannot be reverted to `saved`.
+Claim types currently include:
 
-Scheduling an interview for an `applied` application promotes it to `interviewing`.
+- insurance arrangement
+- completion certificate
+- university agreement
+- legal internship eligibility
 
-### 3.7 `application_status_events`
+Each claim records jurisdiction, scope, optional validity dates, version, submission/review state, and rejection reason. Optimistic version checks protect concurrent mutations.
 
-Added by migration `007`.
+Compliance review is independent from organization identity verification.
 
-This table stores the authoritative chronological application-status timeline.
+### Private evidence storage
 
-Key fields:
+Migration `025` provisions the private `employer-compliance-evidence` bucket for PDFs. There are intentionally no direct anon/authenticated storage policies; the backend uses trusted credentials after employer/Admin authorization.
 
-- `id`
-- `application_id` - FK to `applications(id)`, `ON DELETE CASCADE`
-- `status`
-- `occurred_at`
+## 14. Notifications & Push Devices
 
-Allowed event statuses match the canonical application status set.
+Migration `027` establishes durable notification state and Expo push-device registration data.
 
-The chronological index is ordered by:
+The API uses this domain for:
 
-```text
-application_id, occurred_at ASC, id ASC
-```
+- user inbox
+- unread count/read state
+- event/entity metadata
+- deduplication where applicable
+- push token/platform/locale registration
+- disable/logout behavior
+- notification preferences such as new-opportunity alerts
 
-### 3.8 `saved_internships`
+Push delivery is supplemental to persisted notification records.
 
-Added by migration `006`.
+## 15. Promo Migration Boundary
 
-Candidate bookmark table with:
+Migration `028_promo_campaigns.sql` exists in repository source and backend/Admin promo code source also exists. It is outside the current production-applied release baseline and should not be represented as active current production schema/mobile functionality.
 
-- `id`
-- `student_id`
-- `internship_id`
-- `created_at`
+The current mobile custom promo UI that directly unlocked Pro has been removed.
 
-The pair `(student_id, internship_id)` is unique.
+## 16. Row Level Security & Trusted Backend Access
 
-Deleting a candidate profile or internship cascades to its bookmark records.
+Early migrations establish RLS for candidate-owned/public domains. The trusted FastAPI backend also uses the Supabase service-role boundary for controlled operations such as private storage access and authoritative writes.
 
-### 3.9 `processing_jobs`
+Security model:
 
-Authenticated asynchronous work tracking.
+- candidate-owned data: JWT identity + backend ownership checks + RLS where applicable
+- public internship data: read-only published catalog contract
+- employer domains: employer role + ownership + organization state
+- Admin domains: authenticated Admin allow-list
+- private storage: backend-mediated, not direct public access
 
-Key fields:
+Service-role credentials must never appear in mobile/Admin public configuration.
 
-- `id`
-- `user_id` - FK to `auth.users(id)`, `ON DELETE CASCADE`
-- `job_type`
-- `status`
-- `progress_percent` - added by migration `003`, constrained to `0..100`
-- `result`
-- `error`
-- `created_at`
-- `updated_at`
+## 17. Referential Integrity
 
-Canonical job types remain:
+Foreign keys are chosen according to data ownership and historical retention. Examples include:
 
-```text
-cv_extraction
-match_calculation
-application_generation
-```
+- candidate profile -> `auth.users` lifecycle
+- student-owned structured records -> candidate profile lifecycle
+- applications -> student cascade, internship historical retention behavior
+- employer organization -> owner identity
+- compliance/evidence -> organization/claim lifecycle
+- notification/device records -> authenticated user lifecycle
 
-Canonical job statuses are:
+When account deletion must preserve other users' historical application records, service-level orchestration explicitly detaches/closes employer-owned listing state instead of indiscriminately deleting shared history.
 
-```text
-queued
-processing
-completed
-failed
-```
+## 18. Vector & Search Policy
 
-AI interview preparation is not represented as a new `processing_jobs.job_type` in the current schema.
+`pgvector` is required. Initial schema creates vector support and the internship embedding index. Candidate embeddings and internship description embeddings use the configured server embedding dimension (`1536` in current template).
 
----
+The vector score is only one component of the hybrid match; skills and supported preferences contribute independently.
 
-## 4. Vector Search & Matching Persistence
+## 19. Storage Configuration
 
-InternMatch AI uses `pgvector` with `1536`-dimension embeddings for:
+| Purpose | Configuration / provisioning | Visibility |
+|---|---|---|
+| CV | `CV_STORAGE_BUCKET` (template `cvs`); provision separately | Private |
+| Avatar | `database/supabase_storage_setup.sql` -> `avatars` | Private |
+| Compliance evidence | migration `025` -> `employer-compliance-evidence` | Private |
 
-- `student_profiles.summary_embedding`
-- `internship_listings.description_embedding`
+Object paths are server-managed and are not client authorization tokens.
 
-The initial schema creates an HNSW cosine-distance index for internship description embeddings.
+## 20. Development/Production Rules
 
-Hybrid ranking combines vector similarity with skill and structured attribute scoring before persisting final match results.
+1. Never use production as a migration sandbox.
+2. Never blindly rerun a migration already applied.
+3. Never run migration `028` as part of the current release baseline.
+4. For faithful fresh development, use Supabase PostgreSQL/Auth/Storage and apply through `027` once.
+5. Keep service-role/database credentials server-only.
+6. Preserve publication/ownership/privacy constraints when adding schema fields.
 
----
+## 21. Related Documents
 
-## 5. Referential Integrity & Delete Semantics
-
-| Relationship | Delete Behavior | Purpose |
-| :--- | :--- | :--- |
-| `student_profiles.user_id -> auth.users.id` | `CASCADE` | Remove candidate-owned profile data with account deletion |
-| candidate structured tables -> `student_profiles.id` | `CASCADE` | Child records belong to candidate profile |
-| `student_skills.skill_id -> skills.id` | `RESTRICT` | Protect referenced taxonomy entries |
-| `matches.student_id -> student_profiles.id` | `CASCADE` | Match results belong to candidate |
-| `matches.internship_id -> internship_listings.id` | `CASCADE` | Match is derived from listing |
-| `applications.student_id -> student_profiles.id` | `CASCADE` | Applications belong to candidate |
-| `applications.internship_id -> internship_listings.id` | `SET NULL` | Preserve application history |
-| `saved_internships.student_id -> student_profiles.id` | `CASCADE` | Bookmark belongs to candidate |
-| `saved_internships.internship_id -> internship_listings.id` | `CASCADE` | Bookmark requires listing |
-| `application_status_events.application_id -> applications.id` | `CASCADE` | Timeline belongs to application |
-| `internship_listings.employer_user_id -> auth.users.id` | `SET NULL` | Preserve opportunity data if employer identity is removed |
-| `processing_jobs.user_id -> auth.users.id` | `CASCADE` | Job state belongs to authenticated user |
-
----
-
-## 6. Indexing Strategy
-
-The migration chain defines indexes for the primary runtime query paths, including:
-
-- HNSW cosine index on internship embeddings
-- student-profile lookup by `user_id`
-- candidate matches ordered by score
-- application lookup by candidate and status
-- processing-job lookup by user and status
-- saved internships ordered by candidate and creation time
-- saved internship lookup by internship
-- application status-event chronological lookup
-- employer-owned internship lookup
-- active internship filtering
-
-Indexes are defined by migrations and should not be recreated independently from this document.
-
----
-
-## 7. Row Level Security & PostgreSQL Privileges
-
-RLS is enabled by migration `002` on the ten original application tables:
-
-- `student_profiles`
-- `skills`
-- `student_skills`
-- `education_entries`
-- `experience_entries`
-- `project_entries`
-- `internship_listings`
-- `matches`
-- `applications`
-- `processing_jobs`
-
-Migration `006` independently enables RLS for `saved_internships`.
-
-Migration `007` independently enables RLS for `application_status_events`.
-
-Therefore, after migrations `001` through `010`, all twelve application-owned public tables have RLS enabled.
-
-### 7.1 Candidate-Owned Data
-
-Authenticated candidate access is scoped through `auth.uid()` either directly through `user_id` or indirectly through the owning `student_profiles` record.
-
-Candidate-owned mutable tables include profile data, structured education/experience/project data, student skills, application records, and saved internships according to their migration-defined privileges.
-
-### 7.2 Read-Only Data
-
-`skills` and `internship_listings` provide catalog-style `SELECT` access to `anon` and `authenticated` roles.
-
-`matches` and `processing_jobs` provide authenticated read access scoped by ownership policies.
-
-`application_status_events` provides candidate-owned timeline access according to migration `007`.
-
-### 7.3 Trusted Backend Writes
-
-Privileged backend operations use trusted server-side credentials and remain subject to application authorization rules.
-
-This is particularly important for employer-owned opportunity management and employer-controlled application transitions: direct public PostgreSQL privileges are not the authority for these workflows.
-
-Service-role credentials MUST remain server-side and MUST never be shipped to mobile or web clients.
-
----
-
-## 8. Supabase Storage Boundary
-
-`database/supabase_storage_setup.sql` currently provisions the private `avatars` bucket.
-
-Current repository-managed avatar storage contract:
-
-- bucket id/name: `avatars`
-- public access: `false`
-- maximum file size: `5 MB`
-- allowed MIME types:
-  - `image/jpeg`
-  - `image/png`
-  - `image/webp`
-
-Avatar upload, deletion, and signed-URL generation are mediated by the FastAPI backend using verified JWT identity and server-side credentials.
-
-The current `database/supabase_storage_setup.sql` file does **not** provision the CV bucket. CV storage uses the separately configured `CV_STORAGE_BUCKET` runtime contract and must not be assumed to be created by this storage SQL file.
-
----
-
-## 9. Migration & Provisioning Rules
-
-For a fresh database environment:
-
-1. Apply migrations `001` through `010` in numeric order.
-2. Apply `database/supabase_storage_setup.sql` for the repository-managed avatar storage setup.
-3. Configure any additional runtime storage required by the environment, including the configured CV storage bucket.
-4. Keep database, Supabase service-role, and storage-management credentials server-side.
-5. Do not modify an already-applied migration to represent a later schema change; add a new ordered migration instead.
-
-The migration chain is authoritative. SQL examples in documentation are explanatory only.
-
----
-
-## 10. Compatibility Boundary
-
-The migration files declare compatibility with **Supabase PostgreSQL 15+**.
-
-The canonical local Docker reference currently uses:
-
-```text
-pgvector/pgvector:0.8.6-pg17-bookworm
-```
-
-which provides the project's PostgreSQL 17 local evaluation baseline.
-
-These statements describe two different boundaries:
-
-- migration compatibility floor: Supabase PostgreSQL 15+
-- current local container baseline: PostgreSQL 17
-
-Documentation MUST NOT infer the exact PostgreSQL version of an external managed Supabase project unless that deployed environment has been independently verified.
-
----
-
-## 11. Security Invariants
-
-The database layer follows these non-negotiable rules:
-
-- Supabase `auth.users` is the identity source; the application does not create a duplicate public users table.
-- Candidate-owned data is isolated by RLS and backend ownership checks.
-- Employer mutations require authenticated employer authorization and opportunity ownership.
-- Service-role credentials stay exclusively on trusted backend infrastructure.
-- Application terminal states are employer-managed.
-- Historical application timelines are persisted in `application_status_events`.
-- Embeddings use the configured `1536`-dimension contract.
-- Repository migrations, not prose documentation, are the executable schema source of truth.
-
----
-
-**End of Database Contract**
+- [Architecture](ARCHITECTURE.md)
+- [Security](SECURITY.md)
+- [API Contract](API_CONTRACT.md)
+- [Deployment](DEPLOYMENT.md)

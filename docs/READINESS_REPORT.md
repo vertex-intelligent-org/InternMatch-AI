@@ -1,3 +1,7 @@
+> [!IMPORTANT]
+> **HISTORICAL SNAPSHOT**
+> This report reflects the project state when it was originally produced. It is preserved as historical evidence and is **not** the authoritative description of the 2026-09-24 release. For current state, see [README](../README.md), [Shipaton 2026 Submission](SHIPATON_2026_SUBMISSION.md), [Judge Runbook](JUDGE_RUNBOOK.md), and [System Architecture](ARCHITECTURE.md).
+
 # InternMatch AI — Implementation-Readiness Audit Report
 
 > [!NOTE]

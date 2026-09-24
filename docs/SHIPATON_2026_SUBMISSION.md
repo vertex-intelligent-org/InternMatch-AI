@@ -1,158 +1,339 @@
 # InternMatch AI — RevenueCat Shipaton 2026 Submission
 
-> **Competition:** RevenueCat Shipaton 2026 — Standard Track
-> **Track:** Standard Track
-> **Repository:** InternMatch AI
+**Competition:** RevenueCat Shipaton 2026
+**Entry path:** Standard Track / main competition release path
+**Documentation checkpoint:** 2026-09-24
+**Release source:** `707601d93294c891d53b900d01c644200f27292b`
+**Canonical repository:** https://github.com/vertex-intelligent-org/InternMatch-AI
+
+> **Submission-status note:** This document is the current product/submission narrative, not proof that store eligibility has already been satisfied. At this checkpoint, iOS `1.0.0` Build 9 is associated with App Review and Build 10 has been uploaded to App Store Connect / TestFlight for validation. TestFlight is not a public App Store release. Android public-store availability is not asserted here. Final Standard Track eligibility must be checked against the live store listing and RevenueCat's current Shipaton requirements before submission.
 
 ---
 
 ## Elevator Pitch
 
-InternMatch AI transforms the overwhelming and opaque student internship search into a transparent, personalized, and AI-accelerated journey. By pairing deep semantic matching with automated CV parsing, actionable skill-gap analysis ("Why You Match"), and tailored cover letter generation, InternMatch AI empowers students to find roles they genuinely fit and submit standout applications—complemented by a native RevenueCat-powered subscription experience for candidate tier management.
+**InternMatch AI** turns internship search into an explainable, two-sided workflow for students and employers. Students build a structured profile, enrich it from a private CV, receive deterministic hybrid match scores, understand *why* they match, identify skill gaps, prepare applications with AI assistance, and track interviews and outcomes. Employers operate through a verified organization workspace with moderated internship publishing, applicant/interview tooling, and RevenueCat-backed Free/Pro product policy. A separate Admin Trust & Safety Console keeps organization verification, compliance-evidence review, and listing moderation under human administrative control.
 
 ---
 
 ## The Problem
 
-1. **Fragmented Discovery:** Students spend hours scouring disparate job boards with keyword searches that miss transferable skills.
-2. **Opaque Qualification Fit:** Job descriptions list laundry lists of requirements without clarifying how well a student's actual background matches.
-3. **Application Fatigue:** Crafting tailored cover letters for dozens of applications is time-consuming, leading to generic, low-conversion submissions.
-4. **No Actionable Feedback:** When students lack specific skills, they receive zero guidance on what to learn to become competitive.
+### Students
+
+1. **Fragmented discovery:** internship search often depends on broad keyword browsing rather than the student's actual skills and profile context.
+2. **Opaque fit:** job descriptions rarely explain how a student's strengths and gaps map to a role.
+3. **Application fatigue:** repeatedly preparing tailored application material is slow and repetitive.
+4. **Little actionable feedback:** students may know that they are missing requirements without knowing which gaps to address.
+
+### Employers
+
+1. **Unstructured screening:** candidate information, CV evidence, interviews, and application state can become disconnected.
+2. **Trust requirements:** organization identity, compliance evidence, and opportunity publication are different questions and should not be collapsed into one approval flag.
+3. **Human decision support:** AI can summarize grounded candidate context, but final hiring decisions need to remain human-led.
 
 ---
 
 ## The Solution
 
-InternMatch AI provides an intelligent, end-to-end candidate copilot:
-- **Intelligent Profile & CV Parsing:** Students upload their CV (PDF/DOCX) which is parsed in the background to automatically populate education, experience, and structured skill vectors.
-- **Hybrid Vector & Skill Matching:** Combines exact/fuzzy skill overlap with pgvector semantic similarity to compute truthful match compatibility percentages.
-- **"Why You Match" Intelligence:** Breaks down exactly which candidate skills match the role, identifies missing requirements, and suggests concrete learning recommendations.
-- **AI Cover Letter Drafting:** Generates job-tailored, tone-customized application drafts that emphasize candidate strengths while allowing full human review and editing.
-- **Application Lifecycle Tracking:** Organizes saved opportunities and tracks application stages from Saved to Applied, Interviewing, and Accepted.
+InternMatch AI combines a student career copilot, an employer recruiting workflow, and an administrative trust layer.
+
+### Student experience
+
+- **Structured profile + CV enrichment:** private PDF/DOCX CV upload is processed asynchronously to extract structured career data.
+- **Hybrid matching:** exact/fuzzy skill overlap, semantic similarity through `pgvector`, and supported profile preferences contribute to deterministic computed match scores.
+- **Why You Match:** a dedicated screen presents matching skills, missing skills, and generated guidance while keeping the numeric score separate from generative AI.
+- **AI-assisted applications:** server-side Gemini workflows help draft role-specific application/cover-letter content for user review and editing.
+- **Interview preparation:** eligible interview workflows can generate structured preparation material.
+- **Application tracking:** state is persisted across `saved`, `applied`, `interviewing`, `accepted`, and `rejected`.
+- **Notifications:** durable in-app notifications are complemented by Expo push-device registration/delivery.
+- **Localization:** English, Turkish, and Arabic UI with RTL support for Arabic.
+
+### Employer experience
+
+- **Organization workspace:** employer identity/business and representative information is maintained under an employer role.
+- **Organization verification:** employers submit the organization for human Admin review.
+- **Separate compliance evidence:** jurisdiction/scope claims and private evidence use a distinct review workflow; approval is not legal certification.
+- **Moderated opportunity publishing:** employer-created/edited opportunities enter `under_review` and remain non-public until Admin approval.
+- **Request-changes loop:** Admin feedback returns a listing to `draft`; the owner edits the same prefilled listing and resubmits to `under_review`.
+- **Applicant/interview workflows:** employers can review owned-listing applicants, access authorized candidate context/CV, schedule interviews, and make valid status transitions.
+- **Employer AI/product tools:** candidate insight uses a separate AI quota; Employer Pro adds interview kits, shortlist comparison, AI-assisted internship-description drafting, pipeline analytics, and multiple published listings.
+
+### Admin Trust & Safety Console
+
+- backend-enforced Admin authorization
+- organization review
+- compliance evidence review
+- listing moderation / approval / request changes
+- user directory/search with student/employer context
+- administrative audit history for verification/compliance events
+- Admin-managed opportunity/applicant workflows where applicable
 
 ---
 
 ## Core Implemented Functionality
 
-- [x] **Supabase Authentication:** Secure signup, sign-in, email confirmation, and session management.
-- [x] **Onboarding & Profile:** Candidate profile management, headline, avatar, education, experience, and project portfolios.
-- [x] **CV Upload & Background Parsing:** Asynchronous CV processing worker extracting structured career data.
-- [x] **Internship Catalog & Search:** Filterable internship directory with keyword, location, and work-type search.
-- [x] **Saved Internships:** One-tap bookmarking and persistent management.
-- [x] **Hybrid Match Scoring:** Automated match ranking with real-time vector and skill overlap scoring.
-- [x] **Skill Gap Analysis:** Interactive explanation modals breaking down match strengths and missing competencies.
-- [x] **AI Cover Letter Generation:** Context-aware cover letter draft generator powered by Gemini AI.
-- [x] **Application Tracker:** Interactive timeline tracking application status progression.
-- [x] **RevenueCat Monetization Integration:** Pro Student candidate tier with Test Store in-app purchase flow and entitlement synchronization.
-- [x] **Multilingual UI:** Full internationalization in English (`en`), Turkish (`tr`), and Arabic (`ar`) with RTL support.
+- [x] Supabase email/password authentication, confirmation/recovery, and session handling.
+- [x] Candidate Google OAuth and native Sign in with Apple on iOS.
+- [x] Role-aware canonical InternMatch account provisioning (`intern` / `employer`).
+- [x] Structured candidate profile, skills, education, experience, projects, preferences, and avatar.
+- [x] Private CV upload with asynchronous extraction and safe replacement/cancellation flows.
+- [x] Internship catalog with current mobile work-type filtering and saved internships.
+- [x] Exact/fuzzy/semantic hybrid matching with persisted computed scores.
+- [x] Why You Match explanation and skill-gap guidance.
+- [x] AI-assisted application/cover-letter generation.
+- [x] Interview preparation and application lifecycle tracking.
+- [x] Durable notifications + Expo push-device registration/delivery.
+- [x] English, Turkish, and Arabic localization with RTL.
+- [x] Employer organization workspace and Admin verification.
+- [x] Separate employer compliance-claim/evidence workflow with private storage.
+- [x] Mandatory employer listing moderation before public publication.
+- [x] Employer applicant, CV, interview, and status workflows.
+- [x] Employer Free/Pro backend product policy and Employer AI quota enforcement.
+- [x] Student + Employer RevenueCat contracts with backend subscription state, reconciliation, and lifecycle webhook handling.
+- [x] Account deletion with recent reauthentication and Apple authorization revocation boundary when applicable.
+
+---
+
+## Matching & AI Design
+
+InternMatch AI intentionally separates **computed ranking data** from **generated explanation**.
+
+The matching engine combines:
+
+- normalized exact skill matching
+- fuzzy skill matching using server configuration
+- semantic similarity from embeddings stored in PostgreSQL with `pgvector`
+- supported candidate preference contribution
+
+The resulting match score is computed by deterministic application logic. Gemini is used for bounded server-side workflows such as CV interpretation, match explanation, application drafting, interview preparation, and employer AI assistance. Generated text does not autonomously decide whether a candidate should be hired.
+
+This gives the product an explainability boundary: the user can see the score, matching/missing skills, and a generated explanation without treating an LLM response as the numeric scoring authority.
+
+---
+
+## Trust & Moderation Design
+
+InternMatch AI keeps three trust decisions separate:
+
+1. **Organization verification** — is the employer organization accepted by the platform's identity/business review workflow?
+2. **Compliance evidence review** — was evidence for a specific claim, jurisdiction, and scope reviewed and administratively decided?
+3. **Opportunity moderation** — may this specific employer-generated listing become candidate-visible?
+
+Neither organization verification nor compliance approval automatically publishes an opportunity.
+
+Employer listing lifecycle:
+
+```text
+Employer create/edit
+      |
+      v
+ under_review  ---- Admin approve ----> published
+      |
+      +---- Admin request changes ----> draft
+                                         |
+                                         +--> owner-visible feedback
+                                         +--> same listing prefilled
+                                         +--> employer edits/resubmits
+                                         v
+                                    under_review
+```
+
+`employer_visible_feedback` is owner-only and is not part of the public internship response. Previous review feedback is cleared on successful employer resubmission.
 
 ---
 
 ## RevenueCat Integration Architecture
 
-InternMatch AI implements a native RevenueCat monetization architecture:
+InternMatch AI uses `react-native-purchases` **10.7.2** and implements separate Student and Employer monetization contracts.
 
-1. **Native SDK Integration:** Integrated using `react-native-purchases` (v10.7.2) within an Expo SDK 54 Android development client.
-2. **Canonical Contract:**
-   - **Entitlement:** `pro_student`
-   - **Offering:** `default`
-   - **Monthly Package:** `$rc_monthly`
-   - **Product:** `internmatch_pro_student_monthly`
-3. **Zero Local Trust Authority:** Subscription status is derived solely from RevenueCat-provided `CustomerInfo.entitlements.active['pro_student']`. No local flags or unverified AsyncStorage values dictate subscription status.
-4. **Identity Synchronization:** RevenueCat App User ID is strictly bound to the authenticated Supabase user UUID (`session.user.id`). Identity transitions are guarded with generation counters to prevent cross-user entitlement leaks.
-5. **Dynamic Localization & Pricing:** Store package pricing is resolved dynamically from RevenueCat at runtime (`pkg.product.priceString`), supporting multi-currency and regional pricing without hardcoded strings.
-6. **Graceful Error & Cancellation Handling:** Differentiates between user cancellations (`PURCHASE_CANCELLED_ERROR`) and actual store failures to maintain seamless UX without intrusive error popups.
-7. **Test Store Sandbox Workflow:** Fast, seamless in-app purchase demonstration without live merchant or console billing dependencies.
+| Audience | Entitlement | Offering | Package | Canonical Product |
+|---|---|---|---|---|
+| Student | `pro_student` | `default` | `$rc_monthly` | `internmatch_pro_student_monthly` |
+| Employer | `pro_employer` | `employer_default` | `$rc_monthly` | `internmatch_pro_employer_monthly` |
+
+### Mobile layer
+
+- RevenueCat is identified with the authenticated Supabase user identity.
+- Visible package/pricing information is resolved from RevenueCat/store metadata instead of a hard-coded subscription price.
+- Development can use a RevenueCat Test Store public SDK key.
+- Release environments use platform-specific iOS/Android public SDK keys.
+- The custom mobile promo-code field that directly unlocked Pro was removed from the current store application.
+
+### Backend authority
+
+The backend exposes:
+
+- `GET /api/v1/me/subscription`
+- `GET /api/v1/me/ai-usage`
+- `POST /api/v1/me/subscription/reconcile`
+- `POST /api/v1/webhooks/revenuecat`
+
+The server persists provider-derived subscription state, can reconcile directly with RevenueCat using a server-only credential, and consumes RevenueCat lifecycle events. Configured Bearer webhook authentication is required; HMAC signature/timestamp verification additionally applies when the webhook signing secret is configured.
+
+### Employer product policy
+
+**Employer Free** supports one published internship and candidate insight; candidate insight remains subject to its separately enforced AI quota.
+
+**Employer Pro** supports multiple published listings and enables interview kit, shortlist comparison, internship-description assistant, and pipeline analytics. AI quotas remain separately enforced even when the plan enables a feature.
 
 ---
 
 ## Technical Architecture
 
+```text
+┌──────────────────────────┐        ┌──────────────────────────┐
+│ Expo / React Native      │        │ Next.js Admin Console   │
+│ Student + Employer       │        │ Trust & Safety          │
+└────────────┬─────────────┘        └────────────┬─────────────┘
+             │ Supabase auth / Bearer JWT        │
+             └────────────────┬──────────────────┘
+                              v
+                   ┌──────────────────────┐
+                   │ FastAPI /api/v1     │
+                   │ auth + policy gates │
+                   └──────┬───────┬──────┘
+                          │       │
+              ┌───────────┘       └────────────┐
+              v                                v
+  ┌──────────────────────────┐      ┌──────────────────────┐
+  │ Supabase PostgreSQL      │      │ Redis + RQ Worker    │
+  │ Auth + pgvector + Storage│      │ async AI workflows   │
+  └──────────────────────────┘      └──────────┬───────────┘
+                                               v
+                                      ┌────────────────────┐
+                                      │ Google Gemini      │
+                                      └────────────────────┘
+
+Mobile ── RevenueCat public SDK ──> RevenueCat
+FastAPI <── server reconciliation / authenticated webhook ── RevenueCat
 ```
-┌─────────────────────────────────────────────────────────┐
-│                    Mobile Client                        │
-│          React Native 0.81.5 / Expo SDK 54              │
-│       RevenueCat SDK 10.7.2  •  Supabase Auth JS        │
-└────────────┬───────────────────────────────┬────────────┘
-             │ Bearer JWT                    │ SDK Sync
-             v                               v
-┌─────────────────────────┐     ┌─────────────────────────┐
-│     FastAPI Gateway     │     │    RevenueCat Engine    │
-│  REST API / Auth Verify │     │ Test Store / Entitlement│
-└────────────┬────────────┘     └─────────────────────────┘
-             │
-      ┌──────┴──────────────────────┐
-      ▼                             ▼
-┌──────────────────────────┐  ┌───────────────────────────┐
-│ PostgreSQL + pgvector │  │     Redis + RQ Worker     │
-│ Supabase DB & Storage    │  │ CV Parsing & AI Matching  │
-└──────────────────────────┘  └───────────────────────────┘
-```
+
+Production intentionally disables Swagger, ReDoc, and OpenAPI JSON. Operational health uses `/health` for process liveness and `/api/v1/health` for database/Redis/RQ readiness.
+
+---
+
+## Privacy & Security Boundaries
+
+- Protected identity comes from validated Supabase Bearer JWTs.
+- Account role is persisted server-side and is not an arbitrary client-editable role flag.
+- Employer access is scoped to employer-owned resources.
+- Admin authority is checked server-side through `ADMIN_USER_IDS`.
+- CVs, avatars, and compliance evidence are private storage objects brokered through authenticated API boundaries.
+- Raw storage paths/service-role credentials are not client authorization tokens.
+- Candidate saved drafts are not recruiter-visible submissions.
+- Account deletion requires recent reauthentication and coordinates data/storage/subscription cleanup.
+- No claim in this submission should be read as GDPR certification, legal certification, unbiased AI, or guaranteed hiring outcomes.
 
 ---
 
 ## Current Standard Track Release Position
 
-InternMatch AI is being prepared as a live Standard Track submission rather than relying on a student-track publication exemption.
+RevenueCat's current Shipaton 2026 submission guide states that main-competition entries must be fully published in a qualifying app store, available in the United States, and use RevenueCat to power at least one qualifying purchase (or the qualifying RevenueCat Ads alternative). TestFlight/testing tracks do **not** count as the public release.
 
-The final submission path includes:
+Official submission guide: https://www.revenuecat.com/blog/engineering/how-to-submit-your-app-for-shipaton
 
-- publicly distributed iOS and Android builds;
-- RevenueCat production/store purchase validation in addition to sandbox testing;
-- candidate, employer, and Admin Trust Console workflows;
-- employer organization verification and separate compliance evidence review;
-- mandatory opportunity moderation before public publication;
-- account deletion, legal/privacy surfaces, and operational security controls;
-- live product infrastructure at `internmatch.college` and `api.internmatch.college`.
+At the **2026-09-24** checkpoint:
 
-Earlier Test Store and sandbox results remain part of the engineering evidence, but they are not presented as substitutes for the final public-store release.
+| Item | Verified checkpoint state |
+|---|---|
+| Source release | Commit `707601d93294c891d53b900d01c644200f27292b` |
+| iOS app version | `1.0.0` |
+| iOS Build 9 | Associated with App Review |
+| iOS Build 10 | Uploaded to App Store Connect / TestFlight for validation |
+| Public App Store release | **Not asserted at this checkpoint** |
+| Public Google Play release | **Not asserted at this checkpoint** |
+| RevenueCat SDK | Integrated for Student + Employer product contracts |
+| Backend RevenueCat authority | Subscription state, reconciliation, webhook implemented |
+
+Therefore this document must not be used to claim that Standard Track public-store eligibility was already satisfied on September 24. Verify the final live store URL and purchase availability before the final submission is sent.
+
+RevenueCat's current submission guide lists the deadline as **September 30, 2026 at 11:45 pm PDT**.
+
+---
 
 ## Why InternMatch AI
 
-InternMatch AI was conceived and developed by a collaborative two-person student team, **Mohamad Barakat** and **Selanur Yurdakul**. Both are Software / Computer Engineering students at Üsküdar University and members of AISS (Artificial Intelligence and Intelligent Systems Club), where Mohamad serves as President and Selanur as Vice President.
+InternMatch AI differentiates itself through the combination of:
 
-Selanur originated the product vision, and Mohamad established the technical architecture and engineering foundation. Together, they designed, implemented, and refined a complete student career copilot that solves the fundamental fit problem: helping students understand *why* they match, identifying skill gaps before applying, and providing practical AI tools that turn aspirations into interview invitations.
+- explainable hybrid candidate matching instead of opaque LLM-only scoring
+- a complete student journey from profile/CV to matching, application, interview, and outcome tracking
+- an implemented employer recruiting workflow integrated with trust and monetization policy
+- human-administered organization, compliance, and listing trust boundaries
+- backend-controlled Student and Employer monetization policy
+- multilingual English/Turkish/Arabic product support
+- privacy-preserving document access and account-deletion controls
 
-*Independent Project Note:* InternMatch AI is an independent student entry created directly by the authors for the RevenueCat Shipaton 2026 standard track. It is not an official AISS Club or Üsküdar University project, and neither institution provided financial, technical, development, or material support.
+The product is designed so AI accelerates preparation and decision support while identity, publication, product entitlement, and hiring-state authority stay in deterministic/server-controlled boundaries.
+
+---
+
+## Team
+
+InternMatch AI is an independent two-person student project by **Mohamad Barakat** and **Selanur Yurdakul**, Software / Computer Engineering students at Üsküdar University and members of AISS (Artificial Intelligence and Intelligent Systems Club).
+
+Selanur originated the product vision, and Mohamad established the technical architecture and engineering foundation. Together, they designed, implemented, tested, and refined the product.
+
+InternMatch AI is submitted as an independent student project, not as an official Üsküdar University or AISS Club product.
 
 ---
 
 ## Demo Video Storyboard (< 2 Minutes)
 
-* **Target Duration:** 1 minute 55 seconds
-* **Target Aspect Ratio:** 16:9 (1080p / 4K)
+The final video should show only behavior that works in the submitted build and should use the actual final store/RevenueCat state rather than presenting Test Store as public-release proof.
 
-| Timestamp | Scene | Audio / Voiceover Narrative | On-Screen Action |
-|---|---|---|---|
-| **0:00 – 0:10** | **Hook & Problem** | *"Finding the right internship shouldn't feel like sending resumes into a black hole. Meet InternMatch AI."* | Rapid montage: app logo, student profile, and internship match score orb. |
-| **0:10 – 0:30** | **Profile & CV Enrichment** | *"Students start by uploading their CV. Our background parser automatically extracts skills and experience into a rich career profile."* | Show candidate profile, tap CV Upload, PDF parses, and extracted skills appear on profile. |
-| **0:30 – 0:50** | **Matching & Why You Match** | *"InternMatch calculates personalized compatibility scores and shows exactly why you match—highlighting key strengths and missing skills."* | Open Matchups tab, tap 94% match, explore **Why You Match** skill alignment and recommendations. |
-| **0:50 – 1:10** | **AI Cover Letter & Tracking** | *"Generate a customized, role-specific cover letter draft in seconds, edit it, and track your application status from Applied through Interviewing to Accepted."* | Tap Draft Application, select tone, generate letter, view application in Application Tracker. |
-| **1:10 – 1:30** | **Localization & Interface** | *"Built for global students with seamless switching between English, Turkish, and Arabic with full RTL support."* | Switch language in settings to Turkish and Arabic, demonstrating fluid RTL layout. |
-| **1:30 – 1:50** | **RevenueCat Pro Subscription** | *"With RevenueCat, candidates upgrade to Pro Student with one tap to manage their premium candidate subscription."* | Open Plans screen, show dynamic Test Store price, tap Upgrade, complete Test Store transaction, see Pro Student tier activate. |
-| **1:50 – 1:55** | **Conclusion & Call to Action** | *"InternMatch AI: smarter matching, better applications, faster careers. Built for RevenueCat Shipaton 2026."* | Closing title screen with GitHub link and team credits. |
+| Time | Scene | What to show |
+|---|---|---|
+| `0:00–0:10` | Problem / hook | InternMatch AI, student fit problem, quick product overview |
+| `0:10–0:32` | Profile + CV | Candidate profile, private CV upload, structured enrichment |
+| `0:32–0:52` | Matching | Match score + **Why You Match** strengths/missing skills/guidance |
+| `0:52–1:08` | Application journey | AI-assisted draft, human review/edit, application tracker/interview state |
+| `1:08–1:28` | Employer + moderation | Employer opportunity submission -> `under_review`; Admin approve/request-changes; owner feedback/resubmit |
+| `1:28–1:40` | Trust layer | Organization verification vs separate compliance-evidence review |
+| `1:40–1:52` | RevenueCat | Actual final Student/Employer subscription surface and a qualifying purchase/access flow available in the shipped app |
+| `1:52–1:58` | Global UX + close | English/Turkish/Arabic + RTL, repo/product link, team names |
+
+Do not show a custom InternMatch promo-code field; that mobile unlock mechanism was removed. If the final judging requirement uses a free trial or store/platform promo code, configure and document that through the actual store-compatible mechanism.
 
 ---
 
-## Submission Deliverables
+## Submission Deliverables Checklist
 
-1. **Public Repository:**
-   - Canonical open-source repository: [https://github.com/AISSCLUB/InternMatch-AI](https://github.com/AISSCLUB/InternMatch-AI)
-   - Licensed under the OSI-approved **MIT License**.
+### Product / release
 
-2. **Demonstration Video:**
-   - Designed as a concise walkthrough under 2 minutes (1:55 storyboard).
-   - Covers the principal candidate experience: CV upload, profile enrichment, hybrid matching, Why You Match explanations, AI cover letter drafting, multilingual RTL switching, and native RevenueCat Test Store purchase / Pro Student entitlement activation.
+- [ ] Verify at least one qualifying **public** store listing is live and available in the United States before final Standard Track submission.
+- [ ] Verify the public build works as shown in the final video.
+- [ ] Verify RevenueCat powers the qualifying purchase in that public build.
+- [ ] Provide the final live store URL in the submission.
+- [ ] Provide judge access to paid functionality using the mechanism required by the current official submission guide (for example, free trial or store-compatible promo access).
 
-3. **High-Resolution Application Icon:**
-   - 1024×1024 PNG asset conforming to hackathon submission standards without an alpha channel.
+### Submission assets
 
-4. **Mobile Screenshots:**
-   - High-resolution screen captures showcasing primary user flows including Matchups, Why You Match skill analysis, AI application workflow, and RevenueCat subscription plans.
+- [x] Public source repository: https://github.com/vertex-intelligent-org/InternMatch-AI
+- [x] MIT-licensed repository.
+- [ ] Public YouTube or Vimeo demo video with the essential product demo contained within the first 2 minutes.
+- [ ] Final `1024 × 1024` application icon.
+- [ ] At least one `1179 × 2556` application screenshot without a device frame, matching the released product.
+- [ ] RevenueCat project ID.
+- [ ] Final live store URL and any judge-access instructions after store release is verified.
+- [ ] Submission text and testing instructions are in English or include an English translation.
 
-5. **Student Eligibility Verification:**
-   - Developed by student creators Mohamad Barakat and Selanur Yurdakul, both Software / Computer Engineering students at Üsküdar University.
-   - The current submission is prepared for the Shipaton 2026 Standard Track and follows the public-store release path described above.
+### Technical evidence
 
-6. **GitHub Release Baseline:**
-   - The final GitHub release serves as the stable, reproducible Shipaton 2026 submission milestone.
+- [x] Student + Employer RevenueCat contracts in source.
+- [x] Backend RevenueCat subscription/reconciliation/webhook integration.
+- [x] Hybrid matching and AI workflows.
+- [x] Employer organization verification + separate compliance review.
+- [x] Mandatory employer listing moderation.
+- [x] Admin Trust & Safety Console.
+- [x] Development/test documentation and reproducible source baseline.
+
+---
+
+## Related Judge Documentation
+
+- [Judge Reproduction Runbook](JUDGE_RUNBOOK.md)
+- [Architecture](ARCHITECTURE.md)
+- [API Contract](API_CONTRACT.md)
+- [Security](SECURITY.md)
+- [Database](DATABASE.md)
+- [Development](DEVELOPMENT.md)

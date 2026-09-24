@@ -1,159 +1,218 @@
-# InternMatch AI — Local Development & Setup Guide
+# InternMatch AI — Development Guide
 
-**Version:** 1.0.0  
-**Status:** Approved & Authoritative  
-**Target Runtimes:** Python 3.13, Node.js 22 LTS, Docker & Docker Compose
+**Documentation checkpoint:** 2026-09-24
+**Release source:** `707601d93294c891d53b900d01c644200f27292b`
 
----
+Use development credentials and development infrastructure only. Production is not a test environment.
 
-## 1. Environment Prerequisites
+## 1. Reference Toolchain
 
-Before initiating local development, ensure the following runtimes and tools are installed on your workstation:
+The repository CI provides the most reliable runtime reference:
 
-| Tool / Runtime | Target Version | Primary Purpose |
-| :--- | :--- | :--- |
-| **Python** | `3.13.x` | Backend API & Worker |
-| **Node.js** | `22.x LTS` | Mobile Application & Web Scaffold |
-| **Docker & Compose** | `Docker with Compose v2` | Containerized Backend, Worker, Redis |
-| **Expo CLI** | Latest (`npx expo`) | React Native Mobile Development |
-| **Git** | `Current supported release` | Version Control |
+| Component | Reference / requirement |
+|---|---|
+| Python | CI runtime `3.13` |
+| Node.js | CI runtime `22` |
+| Git | modern Git; no repository-defined hard minimum |
+| Docker / Docker Compose | needed for optional containerized services; no repository-defined hard minimum |
+| Android | Android Studio / SDK tooling compatible with Expo SDK 54 |
+| iOS | macOS + Xcode for local native iOS builds |
 
+Mobile dependencies include Expo SDK 54, React Native 0.81.5, TypeScript ~5.9, and `react-native-purchases` 10.7.2.
 
----
-
-## 2. Repository Architecture & Layout
-
-```
-internmatch-ai/
-├── apps/
-│   ├── mobile/             # React Native mobile application (Expo SDK 54, TS)
-│   └── landing/            # Next.js web landing page (optional scaffold)
-├── backend/                # FastAPI Application
-├── worker/                 # Python RQ Background Worker
-├── infrastructure/         # Environment templates & Docker orchestration
-├── database/               # SQL migrations & RLS policies
-├── docs/                   # Authoritative system documentation
-├── scripts/                # Database seeders & utility scripts
-├── docker-compose.yml      # Local container orchestration
-└── .env.example            # Master environment variable template
-```
-
----
-
-## 3. Step-by-Step Initial Setup
-
-### 3.1 Clone & Environment Variables Setup
-*Note: InternMatch AI is created and developed by the collaborative two-person student team, Mohamad Barakat & Selanur Yurdakul (AISS Club — Üsküdar University). Repository is hosted at `https://github.com/AISSCLUB/InternMatch-AI`.*
+## 2. Clone
 
 ```bash
-# 1. Clone workspace repository from AISS Club GitHub Org
-git clone https://github.com/AISSCLUB/InternMatch-AI.git
+git clone https://github.com/vertex-intelligent-org/InternMatch-AI.git
 cd InternMatch-AI
+```
 
-# 2. Prepare environment file
+## 3. Full-Stack Development Data Boundary
+
+The complete application is built around Supabase PostgreSQL + Auth + Storage. Migration `001` references `auth.users`; therefore a plain PostgreSQL database alone is not a faithful complete replacement.
+
+For full-stack development:
+
+1. use a **development Supabase project**
+2. copy `.env.example` to `.env`
+3. fill only development values
+4. point `DATABASE_URL` and Supabase credentials to that project
+5. apply a fresh migration chain once through `027`
+6. provision private storage buckets
+
+Do not run `028_promo_campaigns.sql` for the current release baseline.
+
+## 4. Root Environment
+
+```bash
 cp .env.example .env
 ```
 
-### 3.2 Database Provisioning
-Before starting the application services against a fresh Supabase PostgreSQL environment:
+Important groups:
 
-1. Apply the versioned SQL migrations in numeric order from `database/migrations/`, starting with `001_initial_schema.sql` and continuing through `010_add_application_interview_schedule.sql`.
-2. Apply `database/supabase_storage_setup.sql` to provision the repository-managed private `avatars` bucket and its storage policies; configure the CV bucket separately through `CV_STORAGE_BUCKET`.
-3. Confirm the environment variables in the root `.env` point to the intended Supabase PostgreSQL, Auth, and Storage environment.
+- runtime: `ENVIRONMENT`, `PORT`, `LOG_LEVEL`
+- Supabase/database: `SUPABASE_*`, `DATABASE_URL`
+- private storage: `CV_STORAGE_BUCKET`, `AVATAR_STORAGE_BUCKET`, `COMPLIANCE_STORAGE_BUCKET`
+- queue: `REDIS_URL`
+- AI: `GEMINI_API_KEY`, model/embedding config, fuzzy threshold
+- RevenueCat server: project/secret/environment/webhook settings
+- Admin: `ADMIN_USER_IDS`, alert emails/base URL
+- SMTP settings
+- CORS allow-list
+- Sign in with Apple server revocation settings
 
-Migration execution credentials and server-side database secrets must remain outside client applications and public repository content.
+Never put real secrets into tracked files.
 
-### 3.3 Backend & Infrastructure Setup
-The backend service, background RQ worker, and Redis queue are containerized using Docker Compose.
+## 5. Database Migrations & Storage
+
+Migration source: `001` through `028`.
+Current release execution baseline: through `027`.
+
+For a new development Supabase database, apply required migrations once in numeric order through `027`. Existing databases must track their applied state and must not blindly replay migrations.
+
+Storage provisioning:
+
+- create a private `cvs` bucket (or configured `CV_STORAGE_BUCKET`) separately for development
+- apply `database/supabase_storage_setup.sql` for the private `avatars` bucket
+- migration `025` provisions private `employer-compliance-evidence`
+
+## 6. Docker Services
 
 ```bash
-# Build and launch FastAPI, Redis, and RQ Worker in detached mode
 docker compose up --build -d
-
-# Verify container status
 docker compose ps
-
-# View backend logs
-docker compose logs -f backend
-
-# Seed controlled internship dataset from a configured local Python environment
-# after database provisioning and Python dependencies are available
-python scripts/seed_internships.py
 ```
-*Backend endpoints will be accessible at `http://localhost:8000/api/v1` and interactive Swagger docs at `http://localhost:8000/docs`. The infrastructure process liveness probe is at `http://localhost:8000/health` (process liveness only), and the versioned operational readiness endpoint is at `http://localhost:8000/api/v1/health` (probes PostgreSQL database, Redis connectivity, and RQ worker readiness).*
 
+Compose provides backend, worker, Redis, and a local pgvector PostgreSQL service. For faithful full-stack behavior, backend `DATABASE_URL`/Supabase configuration should point to your development Supabase project; the plain local PostgreSQL service does not provide Supabase Auth/Storage schemas.
 
-### 3.4 Mobile Application Setup
-The mobile application operates as a standard Expo SDK 54 environment outside of Docker.
+Health:
 
 ```bash
-# Navigate to mobile directory
+curl http://localhost:8000/health
+curl http://localhost:8000/api/v1/health
+```
+
+The first is process liveness. The second checks DB/Redis/RQ worker readiness and returns HTTP 503 when a required dependency is unavailable.
+
+## 7. Mobile Development
+
+```bash
 cd apps/mobile
-
-# Prepare environment file
 cp .env.example .env
-
-# Install dependencies deterministically
 npm ci
+```
 
-# Run on Android Emulator with native development client (required for RevenueCat)
+Development variables:
+
+```text
+EXPO_PUBLIC_SUPABASE_URL
+EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+EXPO_PUBLIC_API_URL
+EXPO_PUBLIC_REVENUECAT_API_KEY
+```
+
+`EXPO_PUBLIC_*` values are publicly readable in the bundle. Never put server secrets there.
+
+### Native development client
+
+RevenueCat native functionality is not available in standard Expo Go.
+
+Android:
+
+```bash
 npx expo run:android
-
-# Or start Metro bundler in development client mode
 npx expo start --dev-client
 ```
 
-### 3.5 Landing Page Setup (Optional Scaffold)
-The landing page operates as a standard Next.js environment.
+On macOS:
 
 ```bash
-# Navigate to landing directory
-cd apps/landing
+npx expo run:ios
+```
 
-# Install dependencies
+For Android emulator access to a host backend, the template uses `http://10.0.2.2:8000/api/v1`. Physical devices need a reachable development API address.
+
+## 8. RevenueCat Development
+
+Development can use `EXPO_PUBLIC_REVENUECAT_API_KEY` with the RevenueCat Test Store. Test Store is a development path, not evidence of public-store release.
+
+Canonical contracts:
+
+- Student: `pro_student` / `default` / `$rc_monthly` / `internmatch_pro_student_monthly`
+- Employer: `pro_employer` / `employer_default` / `$rc_monthly` / `internmatch_pro_employer_monthly`
+
+The mobile code treats Test Store keys as not supporting store-level `restorePurchases`. Production builds use the platform public keys configured by the release environment.
+
+## 9. Admin Console Development
+
+```bash
+cd apps/admin
+cp .env.example .env.local
 npm ci
-
-# Start Next.js development server
 npm run dev
 ```
-*Landing page will be accessible at `http://localhost:3000`.*
 
-### 3.6 RevenueCat Test Store Development Setup
-The mobile app uses `react-native-purchases` for in-app subscription management in Test Store mode.
+Admin public variables:
 
-1. **RevenueCat Canonical Identifiers:**
-   - Entitlement: `pro_student`
-   - Offering: `default`
-   - Package: `$rc_monthly`
-   - Product: `internmatch_pro_student_monthly`
-2. **Environment Configuration (`apps/mobile/.env`):**
-   ```env
-   EXPO_PUBLIC_REVENUECAT_API_KEY=test_your_public_api_key_here
-   ```
-3. **Local Testing Execution:**
-   - Launch with the native Android development client: `npx expo run:android` or `npx expo start --dev-client`.
-   - Complete Test Store transactions in the Plans screen; entitlement state is reflected through RevenueCat `CustomerInfo`.
-   - No Apple App Store Connect or Google Play Console billing setup is required for the hackathon Test Store workflow.
+```text
+NEXT_PUBLIC_SUPABASE_URL
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+NEXT_PUBLIC_API_URL
+```
 
----
+The backend still decides whether the authenticated user is an Admin through `ADMIN_USER_IDS`.
 
-## 4. Development Conventions & Workflow Rules
+## 10. Landing Page
 
-1. **Independent Frontend/Backend Operations:** Frontend components develop cleanly against the defined endpoints in `docs/API_CONTRACT.md`.
-2. **Database Schema Changes:** All database modifications must be saved as versioned SQL scripts in `database/migrations/` (e.g. `001_initial_schema.sql`).
-3. **No Hardcoded Secrets:** Never hardcode secrets, API keys, or private URLs in code. Always load from `.env`.
-4. **Git Branching Strategy:**
-   - `main`: Primary integration branch.
-   - `feature/<scope>-<description>`: Isolated feature branches.
-5. **Quality Verification:** Before finalizing a change, run the checks applicable to the modified components. Repository CI workflows, dependency manifests, and package scripts are the source of truth for the exact current commands; documentation must not introduce stale or conflicting quality commands.
+The repository contains a Next.js landing/product surface under `apps/landing`. Use its package scripts/lockfile as source of truth for local startup. Do not conflate the landing site with backend authorization.
 
----
+## 11. Quality Checks
 
-## Current Mobile Runtime Notes
+Backend:
 
-- Current integrated mobile baseline uses Expo SDK 54 (`react-native` 0.81.5).
-- Start Metro in dev-client mode: `npx expo start --dev-client`.
-- Native RevenueCat billing requires a native development client build (`npx expo run:android`).
-- Standard Expo Go does not bundle native store billing modules.
-- React Native Web is available for rapid layout checks (`npm run web`), but native device/emulator execution is canonical for RevenueCat testing.
-- Do not add `newArchEnabled=false` to `app.json`.
+```bash
+python -m pytest
+python -m ruff check backend/app worker tests --output-format=concise
+```
+
+Mobile:
+
+```bash
+cd apps/mobile
+npm ci
+npx tsc --noEmit
+```
+
+Admin:
+
+```bash
+cd apps/admin
+npm ci
+npm run typecheck
+```
+
+CI also validates Docker Compose and non-root backend/worker container runtime.
+
+## 12. Product-Sensitive Development Rules
+
+- Do not bypass JWT identity/role dependencies to make local tests easier.
+- Do not weaken listing moderation; verified organizations still require listing review.
+- Do not expose `employer_visible_feedback` through public listing contracts.
+- Do not replace backend subscription state with a local mobile flag.
+- Do not hard-code store pricing.
+- Do not use production DB/API/RevenueCat secrets for local testing.
+- Do not run migration `028` as part of the current release baseline.
+- Keep Google OAuth on the current candidate account path; employer social signup is not enabled.
+
+## 13. Production API Documentation
+
+Swagger/ReDoc/OpenAPI are available only when enabled by non-production configuration. Production intentionally disables `/docs`, `/redoc`, and `/openapi.json`.
+
+## 14. Repository References
+
+- [Architecture](ARCHITECTURE.md)
+- [API Contract](API_CONTRACT.md)
+- [Database](DATABASE.md)
+- [Security](SECURITY.md)
+- [Deployment](DEPLOYMENT.md)
+- [Judge Runbook](JUDGE_RUNBOOK.md)

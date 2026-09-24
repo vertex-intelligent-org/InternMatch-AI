@@ -1,450 +1,353 @@
 # InternMatch AI — REST API Contract (v1)
 
-**Version:** 1.0.0  
-**Status:** Approved & Authoritative Interface Boundary  
-**Base URL:** `http://localhost:8000/api/v1` (canonical local evaluation baseline). A production base URL is deployment-specific and is not claimed as live by this repository.
-**Authentication:** HTTP Authorization Header `Bearer <Supabase_Access_Token>`
+**Documentation checkpoint:** 2026-09-24
+**Release source:** `707601d93294c891d53b900d01c644200f27292b`
+**Production base:** `https://api.internmatch.college/api/v1`
+**Local development base:** `http://localhost:8000/api/v1`
 
----
+This document describes the current FastAPI v1 surface. Endpoint authority comes from the mounted routers in `backend/app/api/v1/router.py` and their endpoint modules. Production intentionally disables Swagger/ReDoc/OpenAPI, so this document is the human-readable contract for release review.
 
-## 1. Overview & General Standards
+## 1. General Conventions
 
-The API contract defines the authoritative interface boundary between the Frontend client applications (Expo Mobile App / Web Scaffold) and the Backend API Gateway (FastAPI).
+### 1.1 Authentication
 
-### 1.1 Content Types & Headers
-- All request and response bodies MUST be formatted in valid `application/json` unless handling multipart file uploads (`multipart/form-data`).
-- Authenticated endpoints REQUIRE the header:
-  ```
-  Authorization: Bearer <SUPABASE_JWT_ACCESS_TOKEN>
-  ```
+Protected endpoints expect:
 
-### 1.2 Error Response Behavior
-
-The API does **not** guarantee one universal error-envelope shape for every failure path.
-
-- Endpoint-specific not-found handlers may return a machine-readable payload such as:
-
-```json
-{
-  "error": {
-    "code": "NOT_FOUND",
-    "message": "Resource not found.",
-    "details": null,
-    "timestamp": "2026-08-10T17:00:00+00:00"
-  }
-}
+```http
+Authorization: Bearer <Supabase access token>
 ```
 
-- FastAPI `HTTPException` paths use the standard FastAPI `detail` response shape unless an endpoint explicitly formats its own response.
-- Request validation failures use FastAPI / Pydantic HTTP 422 validation responses.
-- Clients MUST branch primarily on HTTP status and the actual response payload; they MUST NOT assume every error is wrapped in the custom `error` object.
+The backend derives user identity from the validated token. Employer/Admin authorization is an additional server-side role/allow-list check, not a client flag.
 
-### 1.3 Localization & Content Locale Parameters
+### 1.2 Content Types
 
-- **UI Localization:** English (`en`), Turkish (`tr`), and Arabic (`ar`) UI localization is handled by the mobile client, including dynamic RTL behavior for Arabic. There is no authoritative `Accept-Language` header contract in the current backend implementation.
-- **Internship Detail Locale:** `GET /internships/{id}` accepts query parameter `locale=en|tr|ar` (default `en`) for localized free-form listing content.
-- **Match Explanation Locale:** `GET /matches/{id}/explanation` accepts query parameter `content_locale=en|tr|ar` (default `en`).
-- **Application Generation Locale:** `POST /applications/generate` accepts body field `content_locale` with values `en`, `tr`, or `ar` (default `en`).
-- **Interview Preparation Locale:** `POST /applications/{id}/interview-prep` accepts query parameter `content_locale`, enabling generated interview-preparation content to use the requested supported locale.
+- JSON for ordinary request/response payloads.
+- `multipart/form-data` for CV/avatar/compliance-evidence upload endpoints.
+- Private document content endpoints stream the underlying file through authenticated server boundaries.
 
-## 2. Endpoints Specification
+### 1.3 Error Shapes
 
-### 2.1 Authentication & User Session Sync
+The API does not guarantee one universal error envelope. Endpoint-specific handlers may return a structured `error` object, while ordinary FastAPI `HTTPException` responses use `detail`. Pydantic validation errors return HTTP 422.
 
-#### `POST /auth/sync`
-Syncs user account upon first login via Supabase Auth. Backend initializes user profile if not present.
-- **Security:** Authenticated (`Bearer <JWT>`)
-- **Request Body:** None
-- **Response 200 OK:**
-  ```json
-  {
-    "user_id": "usr_987654321",
-    "email": "student@university.edu",
-    "has_profile": true,
-    "created_at": "2026-08-10T10:00:00Z"
-  }
-  ```
+Clients should branch on HTTP status and the endpoint's documented response, not assume every error has an identical body.
 
----
+### 1.4 Localization
 
-### 2.2 Student Profile & CV Operations
+The mobile UI is localized client-side for `en`, `tr`, and `ar`. Selected generated-content endpoints accept an explicit supported content locale. The API does not use one global `Accept-Language` contract for every response.
 
-#### `POST /profile/cv`
-Uploads a candidate CV (PDF or DOCX) to initiate background AI profile extraction.
-- **Security:** Authenticated (`Bearer <JWT>`)
-- **Content-Type:** `multipart/form-data`
-- **Form Data:**
-  - `file`: Binary file (PDF or DOCX, max 10MB)
-- **Response 202 Accepted:**
-  ```json
-  {
-    "job_id": "job_cv_123456",
-    "status": "queued",
-    "message": "CV processing enqueued successfully.",
-    "estimated_seconds": 15
-  }
-  ```
+## 2. Health
 
-#### `GET /profile`
-Retrieves the candidate's structured profile (skills, education, experience, projects, preferences).
-- **Security:** Authenticated (`Bearer <JWT>`)
-- **Response 200 OK:**
-  ```json
-  {
-    "id": "prof_123",
-    "user_id": "usr_987654321",
-    "full_name": "Jane Doe",
-    "headline": "Computer Science Undergraduate @ Tech Univ",
-    "skills": ["Python", "React Native", "FastAPI", "SQL", "Git"],
-    "education": [
-      {
-        "institution": "Tech University",
-        "degree": "B.S. Computer Science",
-        "start_year": 2023,
-        "end_year": 2027
-      }
-    ],
-    "experience": [
-      {
-        "role": "Software Intern",
-        "company": "Dev Solutions",
-        "description": "Built REST APIs in Python."
-      }
-    ],
-    "projects": [
-      {
-        "title": "Smart Task App",
-        "tech_stack": ["React", "FastAPI"],
-        "description": "Fullstack task management application."
-      }
-    ],
-    "preferences": {
-      "work_types": ["remote", "hybrid"],
-      "desired_locations": ["San Francisco", "Remote"],
-      "target_roles": ["Backend Intern", "AI Software Intern"]
-    },
-    "cv_url": "https://supabase.co/storage/v1/object/signed/cvs/usr_987654321.pdf"
-  }
-  ```
+| Method | Path | Access | Behavior |
+|---|---|---|---|
+| `GET` | `/health` | Public | Root process liveness; dependency-independent |
+| `GET` | `/api/v1/health` | Public | Readiness for PostgreSQL, Redis, and RQ worker; HTTP 200 ready, HTTP 503 otherwise |
 
-#### `PUT /profile`
-Manually updates fields in candidate profile.
-- **Security:** Authenticated (`Bearer <JWT>`)
-- **Request Body:** Partial or full profile fields (matching `GET /profile` schema).
-- **Response 200 OK:** Updated profile object.
+Do not use `/openapi.json` as a production health check; production disables OpenAPI.
 
----
+## 3. Authentication & Canonical Account
 
-### 2.3 Internship Catalog
+Prefix: `/api/v1/auth`
 
-#### `GET /internships`
-Retrieves the list of curated internships with optional filtering.
-- **Security:** Public read-only
-- **Query Parameters:**
-  - `work_type`: string (e.g. `remote`, `onsite`, `hybrid`)
-  - `location`: string
-  - `skill`: string
-  - `limit`: integer (default `20`, max `50`)
-  - `offset`: integer (default `0`)
-- **Response 200 OK:**
-  ```json
-  {
-    "items": [
-      {
-        "id": "int_001",
-        "title": "Backend Engineering Intern",
-        "company": "CloudTech Inc.",
-        "location": "Remote",
-        "work_type": "remote",
-        "required_skills": ["Python", "FastAPI", "PostgreSQL"],
-        "preferred_skills": ["Docker", "Redis"],
-        "posted_at": "2026-08-01T00:00:00Z"
-      }
-    ],
-    "total": 42,
-    "limit": 20,
-    "offset": 0
-  }
-  ```
+| Method | Path | Access | Purpose |
+|---|---|---|---|
+| `POST` | `/auth/sync` | Authenticated | Returns authenticated identity and whether the InternMatch profile exists |
+| `POST` | `/auth/complete-signup` | Authenticated | Creates the canonical InternMatch account once with role `intern` or `employer` |
+| `DELETE` | `/auth/account` | Recently reauthenticated user | Permanently deletes the authenticated account through guarded deletion orchestration |
 
-#### `GET /internships/{id}`
-Retrieves complete details of a specific internship listing.
-- **Security:** Public read-only
-- **Query Parameters:** `locale`: `en` | `tr` | `ar` (default `en`)
-- **Response 200 OK:**
-  ```json
-  {
-    "id": "int_001",
-    "title": "Backend Engineering Intern",
-    "company": "CloudTech Inc.",
-    "location": "Remote",
-    "work_type": "remote",
-    "description": "Join our cloud team to build high-scale APIs...",
-    "required_skills": ["Python", "FastAPI", "PostgreSQL"],
-    "preferred_skills": ["Docker", "Redis"],
-    "languages": ["English"],
-    "min_education": "Bachelor Student",
-    "posted_at": "2026-08-01T00:00:00Z"
-  }
-  ```
+`complete-signup` persists the application role server-side; provider metadata is not treated as the role authority.
 
----
+`DELETE /auth/account` requires recent reauthentication. Apple-linked deletion may additionally require `X-Apple-Authorization-Code` so server-side Apple authorization can be revoked safely.
 
-### 2.4 Hybrid Matching Engine
+## 4. Student Profile, CV, and Avatar
 
-#### `POST /matches/calculate`
-Triggers an asynchronous calculation of candidate matches against active listings.
-- **Security:** Authenticated (`Bearer <JWT>`)
-- **Response 202 Accepted:**
-  ```json
-  {
-    "job_id": "job_match_789012",
-    "status": "queued",
-    "message": "Matching calculation enqueued."
-  }
-  ```
+Prefix: `/api/v1/profile`
 
-#### `GET /matches`
-Retrieves pre-calculated matches for the authenticated student, sorted by score.
-- **Security:** Authenticated (`Bearer <JWT>`)
-- **Response 200 OK:**
-  ```json
-  {
-    "matches": [
-      {
-        "match_id": "mtc_999",
-        "internship": {
-          "id": "int_001",
-          "title": "Backend Engineering Intern",
-          "company": "CloudTech Inc.",
-          "location": "Remote"
-        },
-        "overall_score": 88,
-        "skill_score": 90,
-        "vector_score": 85,
-        "created_at": "2026-08-10T12:00:00Z"
-      }
-    ]
-  }
-  ```
+| Method | Path | Access | Purpose |
+|---|---|---|---|
+| `GET` | `/profile` | Authenticated | Read own structured profile |
+| `PUT` | `/profile` | Authenticated | Update allowed profile fields; account role remains server-owned |
+| `POST` | `/profile/cv` | Authenticated | Upload PDF/DOCX CV, persist private file, enqueue background extraction; HTTP 202 |
+| `POST` | `/profile/cv/{job_id}/cancel` | Authenticated owner | Persist a cancellation request for an active CV-analysis job |
+| `POST` | `/profile/cv/confirm` | Authenticated owner | Confirm and apply a pending CV profile replacement when the extraction flow requires confirmation |
+| `POST` | `/profile/avatar` | Authenticated | Upload validated private profile avatar |
+| `DELETE` | `/profile/avatar` | Authenticated | Delete own avatar |
+| `GET` | `/profile/avatar/content` | Authenticated/owner | Stream own avatar through product-owned endpoint |
 
-#### `GET /matches/{id}/explanation`
-Retrieves the grounded LLM explanation ("Why You Match") and Skill Gap analysis for a specific match.
-- **Security:** Authenticated (`Bearer <JWT>`)
-- **Query Parameters:** `content_locale`: `en` | `tr` | `ar` (default `en`)
-- **Data Derivation Note:** `matching_skills` and `missing_skills` in the response payload are derived directly from the canonical `matches.skill_gap_analysis` JSONB column.
-- **Response 200 OK:**
-  ```json
-  {
-    "match_id": "mtc_999",
-    "overall_score": 88,
-    "why_you_match": "Your experience building RESTful APIs in Python matches CloudTech's core stack. Your coursework in database management aligns directly with their PostgreSQL requirement.",
-    "matching_skills": ["Python", "FastAPI", "PostgreSQL"],
-    "missing_skills": ["Docker", "Redis"],
-    "skill_gap_analysis": {
-      "summary": "You are missing 2 preferred containerization & caching skills.",
-      "recommendations": [
-        "Complete a 2-hour tutorial on Docker basics and containerize a simple FastAPI service.",
-        "Learn basic Redis key-value caching patterns."
-      ]
-    }
-  }
-  ```
+CV processing includes rate limiting, file validation, durable job tracking, and idempotency/quota integration. Storage metadata such as `cv_storage_path` is server-managed and rejected as a client-owned profile field.
 
----
+The profile response includes structured skills, education, experience, projects, preferences, CV presence, and an opaque avatar content URL when present.
 
-### 2.5 Personalized Application Generation
+## 5. Internship Catalog & Employer-Owned Opportunities
 
-#### `POST /applications/generate`
-Enqueues grounded AI generation of a tailored cover letter / application note for a match.
-- **Security:** Authenticated (`Bearer <JWT>`)
-- **Request Body:**
-  ```json
-  {
-    "match_id": "mtc_999",
-    "tone": "professional",
-    "content_locale": "en"
-  }
-  ```
-- **Response 202 Accepted:**
-  ```json
-  {
-    "job_id": "job_gen_345678",
-    "status": "queued",
-    "message": "Personalized application generation enqueued."
-  }
-  ```
+Prefix: `/api/v1/internships`
 
----
+### 5.1 Public catalog
 
-### 2.6 Application Tracker & Candidate Lifecycle
+| Method | Path | Access | Purpose |
+|---|---|---|---|
+| `GET` | `/internships` | Public | Candidate-visible published catalog; backend supports work-type/location/skill filters plus pagination |
+| `GET` | `/internships/{id}` | Public | Candidate-visible detail; non-public listings are not exposed |
 
-Application status values are:
+The current mobile catalog UI primarily exposes work-type filters even though the backend catalog contract supports additional query filters.
 
-`saved | applied | interviewing | rejected | accepted`
+Public responses never expose owner-only moderation feedback.
 
-#### `GET /applications`
+### 5.2 Employer ownership
 
-Lists the authenticated candidate's tracked applications.
+| Method | Path | Access | Purpose |
+|---|---|---|---|
+| `POST` | `/internships` | Employer | Create employer-owned opportunity; requires verified organization and listing capacity; enters moderation workflow |
+| `GET` | `/internships/mine` | Employer | List own opportunities across owner-visible states |
+| `GET` | `/internships/mine/{id}` | Employer owner | Read owner detail, including employer-visible review feedback when present |
+| `PATCH` | `/internships/{id}` | Employer owner | Edit eligible owned listing; resubmission returns requested-change drafts to `under_review` |
+| `DELETE` | `/internships/{id}` | Employer owner | Permanently delete an owned opportunity only when no candidate application exists |
+| `POST` | `/internships/{id}/close` | Employer owner | Close eligible owned listing while preserving application history |
 
-- **Security:** Authenticated (`Bearer <JWT>`)
-- **Response:** `ApplicationListResponse`
+Create/update behavior is moderated. Organization verification is required for employer publishing eligibility, but verification does not itself make a listing public.
 
-#### `GET /applications/{id}`
+### 5.3 Employer applicants & interviews
 
-Retrieves full application detail, including chronological status timeline and interview scheduling metadata when present.
+| Method | Path | Access | Purpose |
+|---|---|---|---|
+| `GET` | `/internships/{id}/applicants` | Employer owner | List applicants for owned opportunity |
+| `GET` | `/internships/{id}/applicants/{application_id}` | Employer owner | Read applicant detail |
+| `GET` | `/internships/{id}/applicants/{application_id}/cv/content` | Employer owner | Stream authorized applicant CV without exposing provider path |
+| `PATCH` | `/internships/{id}/applicants/{application_id}/status` | Employer owner | Apply valid employer-controlled status transition |
+| `POST` | `/internships/{id}/applicants/{application_id}/interview` | Employer owner | Schedule/update interview workflow |
+| `POST` | `/internships/{id}/applicants/{application_id}/insight` | Employer owner | Generate grounded candidate insight; separately quota-controlled and available under the Employer product policy |
+| `POST` | `/internships/{id}/applicants/{application_id}/interview-kit` | Employer Pro owner | Generate a grounded interview kit; `Idempotency-Key` required for Employer AI execution |
+| `POST` | `/internships/{id}/shortlist-comparison` | Employer Pro owner | Compare 2–5 owned applicants without producing an autonomous hiring decision; `Idempotency-Key` required |
 
-- **Security:** Authenticated (`Bearer <JWT>`)
-- **Response:** `ApplicationDetailResponse`
-- **Timeline Fields:** status events expose `status` and `occurred_at`.
-- **Interview Fields:** `interview_scheduled_at`, `interview_mode`, `interview_location`, and `interview_message`.
+Server ownership checks prevent cross-employer applicant access. Employer AI operations also enforce durable product-unit quotas.
 
-#### `POST /applications/{id}/submit`
+### 5.4 Employer product tools
 
-Explicitly submits an eligible candidate application.
+| Method | Path | Access | Purpose |
+|---|---|---|---|
+| `POST` | `/internships/employer-tools/description-assistant` | Employer Pro | Generate an editable internship-description draft only; does not publish or mutate a listing; `Idempotency-Key` required |
+| `GET` | `/internships/employer-tools/product-policy` | Employer | Return backend-authoritative Employer Free/Pro capabilities |
+| `GET` | `/internships/employer-tools/pipeline-analytics` | Employer Pro | Return current tenant-scoped hiring-pipeline analytics |
 
-- **Security:** Authenticated (`Bearer <JWT>`)
-- **Request:** Optional edited `cover_letter` and optional candidate `notes`.
-- The backend owns the valid submit-state transition rules.
+Employer Free supports one published internship and candidate insight, with AI usage quotas enforced separately. Employer Pro removes the one-listing cap and enables interview kit, shortlist comparison, description assistant, and pipeline analytics.
 
-#### `PATCH /applications/{id}/status`
+## 6. Saved Internships
 
-Updates candidate-managed tracker state subject to backend lifecycle validation.
+Prefix: `/api/v1/saved-internships`
 
-- **Security:** Authenticated (`Bearer <JWT>`)
-- Candidates MUST NOT manually set `interviewing`, `accepted`, or `rejected`; those states are employer-managed.
-- A submitted application cannot be reverted to a `saved` draft.
-- Employer-controlled transitions are performed through employer-owned applicant endpoints.
+| Method | Path | Access | Purpose |
+|---|---|---|---|
+| `GET` | `/saved-internships` | Authenticated candidate | List own saved opportunities |
+| `POST` | `/saved-internships/{internship_id}` | Authenticated candidate | Save/bookmark; idempotent |
+| `DELETE` | `/saved-internships/{internship_id}` | Authenticated candidate | Remove bookmark; idempotent |
 
-#### `POST /applications/{id}/interview-prep`
+Saved state is tenant-scoped to the authenticated user.
 
-Generates AI interview-preparation content for an internship-linked application.
+## 7. Matching
 
-- **Security:** Authenticated (`Bearer <JWT>`)
-- **Query:** `content_locale` (supported locale, default `en`)
-- Available only while the application is in `interviewing` status.
+Prefix: `/api/v1/matches`
 
-#### `DELETE /applications/{id}`
+| Method | Path | Access | Purpose |
+|---|---|---|---|
+| `GET` | `/matches` | Authenticated candidate | Return persisted matches for current candidate |
+| `POST` | `/matches/calculate` | Authenticated candidate | Enqueue/trigger authoritative match recalculation |
+| `POST` | `/matches/{id}/explanation` | Authenticated candidate | Enqueue cancellable grounded Why You Match explanation generation for an owned match; HTTP 202 |
 
-Discards an eligible candidate application draft according to backend state rules.
+The explanation endpoint is `POST` in the current source. Numeric match scores are deterministic application data; generated explanation text does not set the authoritative score.
 
-- **Security:** Authenticated (`Bearer <JWT>`)
+## 8. Applications
 
----
+Prefix: `/api/v1/applications`
 
-### 2.7 Saved Internships
-
-Candidate bookmarks are authenticated and tenant-scoped to the current Supabase identity.
-
-#### `GET /saved-internships`
-
-Returns saved internships newest-first with real internship summary data.
-
-- **Security:** Authenticated (`Bearer <JWT>`)
-- **Query:** `limit` (default 20, max 50), `offset` (default 0)
-
-#### `POST /saved-internships/{internship_id}`
-
-Saves/bookmarks an internship.
-
-- **Security:** Authenticated (`Bearer <JWT>`)
-- Operation is idempotent.
-
-#### `DELETE /saved-internships/{internship_id}`
-
-Removes a candidate bookmark.
-
-- **Security:** Authenticated (`Bearer <JWT>`)
-- Operation is idempotent and does not delete the internship listing or application.
-
----
-
-### 2.8 Employer Opportunity & Applicant Lifecycle
-
-Employer operations require an authenticated employer identity and enforce ownership of the affected opportunity.
-
-Canonical employer lifecycle:
+Application states:
 
 ```text
-applied -> interviewing | accepted | rejected
-interviewing -> accepted | rejected
-accepted -> terminal
-rejected -> terminal
-saved -> not employer-transitionable
+saved | applied | interviewing | accepted | rejected
 ```
 
-Scheduling an interview for an `applied` candidate promotes the application into the `interviewing` state.
+| Method | Path | Access | Purpose |
+|---|---|---|---|
+| `GET` | `/applications` | Authenticated candidate | List own tracked applications |
+| `GET` | `/applications/{id}` | Authenticated candidate | Read own application detail/timeline/interview data |
+| `POST` | `/applications/generate` | Authenticated candidate | Enqueue AI-assisted application/cover-letter generation |
+| `POST` | `/applications/{id}/submit` | Authenticated candidate | Submit eligible saved application |
+| `PATCH` | `/applications/{id}/status` | Authenticated candidate | Candidate-managed tracker transition subject to lifecycle rules |
+| `POST` | `/applications/{id}/interview-prep` | Authenticated candidate | Enqueue cancellable interview-preparation generation for an eligible interviewing application; HTTP 202 |
+| `DELETE` | `/applications/{id}` | Authenticated candidate | Discard eligible saved draft according to backend state rules |
 
-Interview scheduling accepts:
+Employer-controlled transitions such as `interviewing`, `accepted`, and `rejected` are enforced through recruiter-owned applicant endpoints rather than trusting candidate input.
 
-- an ISO-8601 timestamp with timezone information,
-- mode (`online` or `onsite`),
-- a required location or meeting URL,
-- and an optional employer message.
+## 9. Processing Jobs
 
-The exact current employer routes are included in the source-derived route inventory below.
+Prefix: `/api/v1/jobs`
 
----
+| Method | Path | Access | Purpose |
+|---|---|---|---|
+| `GET` | `/jobs/{job_id}` | Authenticated owner | Poll durable async job state |
+| `POST` | `/jobs/{job_id}/cancel` | Authenticated owner | Cancel eligible processing job through server rules |
 
-### 2.9 Polling Asynchronous Jobs
+Job lookup is scoped by both job ID and authenticated owner.
 
-#### `GET /jobs/{job_id}`
+## 10. Subscription & AI Usage
 
-Retrieves an asynchronous processing job owned by the authenticated user.
+Prefix: `/api/v1/me`
 
-- **Security:** Authenticated (`Bearer <JWT>`)
-- Job lookup is scoped by both `job_id` and authenticated `user_id`.
-- **Response Model:** `ProcessingJobResponse`
+| Method | Path | Access | Purpose |
+|---|---|---|---|
+| `GET` | `/me/subscription` | Authenticated | Return backend-authoritative student/employer subscription snapshot |
+| `GET` | `/me/ai-usage` | Authenticated | Return backend-controlled AI quota/remaining usage snapshot |
+| `POST` | `/me/subscription/reconcile` | Authenticated | Refresh subscription from RevenueCat server API |
 
-Current source-defined response fields:
+The backend selects student vs employer subscription reconciliation from the persisted account role.
 
-- `job_id`: `UUID`
-- `status`: `Literal['queued', 'processing', 'completed', 'failed']`
-- `progress_percent`: `int`
-- `result`: `Optional[Dict[str, Any]]`
-- `error`: `Optional[str]`
-- `updated_at`: `datetime`
+Canonical entitlements:
 
-Endpoint-specific not-found behavior returns the machine-readable `NOT_FOUND` error object documented in Section 1.2.
+- Student: `pro_student`
+- Employer: `pro_employer`
 
----
+## 11. RevenueCat Webhook
 
-### 2.10 Current Source-Derived Route Inventory
+Prefix: `/api/v1/webhooks`
 
-The following inventory is generated from the currently mounted FastAPI route decorators in `backend/app/api/v1/endpoints/`.
+| Method | Path | Access | Purpose |
+|---|---|---|---|
+| `POST` | `/webhooks/revenuecat` | Provider-authenticated | Process RevenueCat lifecycle events into authoritative subscription state |
 
-It represents the implemented HTTP surface at the time of this documentation reconciliation.
+Configured Bearer webhook authentication is required. When `REVENUECAT_WEBHOOK_SIGNING_SECRET` is configured, HMAC signature and timestamp verification additionally apply. Event handling is idempotent.
 
-| Method | Route | Access | Source Handler |
-| :--- | :--- | :--- | :--- |
-| `GET` | `/api/v1/health` | Public | `get_readiness` |
-| `POST` | `/api/v1/auth/sync` | Authenticated JWT | `sync_authenticated_user` |
-| `GET` | `/api/v1/profile` | Authenticated JWT | `get_my_profile` |
-| `PUT` | `/api/v1/profile` | Authenticated JWT | `upsert_my_profile` |
-| `POST` | `/api/v1/profile/cv` | Authenticated JWT | `upload_candidate_cv` |
-| `POST` | `/api/v1/profile/avatar` | Authenticated JWT | `upload_profile_avatar` |
-| `DELETE` | `/api/v1/profile/avatar` | Authenticated JWT | `delete_profile_avatar` |
-| `POST` | `/api/v1/internships` | Employer JWT | `create_internship` |
-| `GET` | `/api/v1/internships` | Public | `list_internships` |
-| `GET` | `/api/v1/internships/mine` | Employer JWT | `list_my_internships` |
-| `GET` | `/api/v1/internships/{id}/applicants` | Employer JWT | `list_internship_applicants` |
-| `POST` | `/api/v1/internships/{id}/close` | Employer JWT | `close_internship_opportunity` |
-| `GET` | `/api/v1/internships/{id}/applicants/{application_id}` | Employer JWT | `get_internship_applicant_detail` |
-| `POST` | `/api/v1/internships/{id}/applicants/{application_id}/interview` | Employer JWT | `schedule_employer_applicant_interview` |
-| `PATCH` | `/api/v1/internships/{id}/applicants/{application_id}/status` | Employer JWT | `update_employer_applicant_status` |
-| `GET` | `/api/v1/internships/{id}` | Public | `get_internship_detail` |
-| `GET` | `/api/v1/saved-internships` | Authenticated JWT | `list_saved_internships` |
-| `POST` | `/api/v1/saved-internships/{internship_id}` | Authenticated JWT | `save_internship` |
-| `DELETE` | `/api/v1/saved-internships/{internship_id}` | Authenticated JWT | `unsave_internship` |
-| `GET` | `/api/v1/jobs/{job_id}` | Authenticated JWT | `get_job_status` |
-| `GET` | `/api/v1/matches` | Authenticated JWT | `get_my_matches` |
-| `POST` | `/api/v1/matches/calculate` | Authenticated JWT | `calculate_matches` |
-| `GET` | `/api/v1/matches/{id}/explanation` | Authenticated JWT | `get_match_explanation` |
-| `GET` | `/api/v1/applications` | Authenticated JWT | `get_my_applications` |
-| `GET` | `/api/v1/applications/{id}` | Authenticated JWT | `get_application_detail` |
-| `DELETE` | `/api/v1/applications/{id}` | Authenticated JWT | `discard_saved_application_draft` |
-| `POST` | `/api/v1/applications/generate` | Authenticated JWT | `generate_application` |
-| `POST` | `/api/v1/applications/{id}/submit` | Authenticated JWT | `submit_application` |
-| `PATCH` | `/api/v1/applications/{id}/status` | Authenticated JWT | `update_application_status` |
-| `POST` | `/api/v1/applications/{id}/interview-prep` | Authenticated JWT | `generate_interview_prep` |
-| `GET` | `/health` | Public | root infrastructure liveness |
+## 12. Notifications & Push Devices
+
+Prefix: `/api/v1/notifications`
+
+| Method | Path | Access | Purpose |
+|---|---|---|---|
+| `GET` | `/notifications` | Authenticated | Paginated durable inbox + unread count |
+| `GET` | `/notifications/unread-count` | Authenticated | Current unread count |
+| `GET` | `/notifications/preferences/opportunity-alerts` | Authenticated | Read opportunity-alert preference |
+| `PUT` | `/notifications/preferences/opportunity-alerts` | Authenticated | Update opportunity-alert preference |
+| `POST` | `/notifications/{notification_id}/read` | Authenticated owner | Mark read |
+| `POST` | `/notifications/{notification_id}/unread` | Authenticated owner | Mark unread |
+| `POST` | `/notifications/read-all` | Authenticated | Mark all current user's notifications read |
+| `POST` | `/notifications/devices` | Authenticated | Register Expo push device/token |
+| `DELETE` | `/notifications/devices` | Authenticated | Disable registered push token; idempotent |
+| `DELETE` | `/notifications/{notification_id}` | Authenticated owner | Delete own notification |
+
+Expo push tokens are validated server-side before registration. Push delivery supplements persisted notification state.
+
+## 13. Employer Organization Verification
+
+Employer prefix: `/api/v1/employer-organization`
+
+| Method | Path | Access | Purpose |
+|---|---|---|---|
+| `GET` | `/employer-organization` | Employer | Read own organization |
+| `POST` | `/employer-organization` | Employer | Create organization profile |
+| `PUT` | `/employer-organization` | Employer | Edit own organization while state allows |
+| `POST` | `/employer-organization/submit` | Employer | Submit unverified/rejected organization for Admin review |
+
+Organization fields include legal/display name, website, business email, country, optional registration/tax numbers, and representative name/role.
+
+Admin prefix: `/api/v1/admin/employer-organizations`
+
+| Method | Path | Access | Purpose |
+|---|---|---|---|
+| `GET` | `/admin/employer-organizations` | Admin | List organizations by review status |
+| `GET` | `/admin/employer-organizations/{organization_id}` | Admin | Read review detail |
+| `POST` | `/admin/employer-organizations/{organization_id}/approve` | Admin | Approve pending organization |
+| `POST` | `/admin/employer-organizations/{organization_id}/reject` | Admin | Reject with reason |
+| `POST` | `/admin/employer-organizations/{organization_id}/suspend` | Admin | Suspend according to server transition rules |
+
+Verification is distinct from opportunity publication and from compliance review.
+
+## 14. Employer Compliance Claims
+
+Employer prefix: `/api/v1/employer-compliance`
+
+Employer claim operations:
+
+| Method | Path | Access | Purpose |
+|---|---|---|---|
+| `GET` | `/employer-compliance/claims` | Employer | List own organization's claims |
+| `POST` | `/employer-compliance/claims` | Employer | Create jurisdiction/scope claim in draft |
+| `PUT` | `/employer-compliance/claims/{claim_id}` | Employer owner | Edit eligible draft/rejected claim with optimistic version check |
+| `POST` | `/employer-compliance/claims/{claim_id}/evidence` | Employer owner | Upload private PDF supporting evidence; `expected_version` query parameter required |
+| `GET` | `/employer-compliance/claims/{claim_id}/evidence/{evidence_id}/content` | Employer owner | Stream authorized private evidence without exposing the storage path |
+| `POST` | `/employer-compliance/claims/{claim_id}/submit` | Employer owner | Submit eligible claim with evidence for Admin review |
+
+Admin prefix: `/api/v1/admin/employer-compliance`
+
+| Method | Path | Access | Purpose |
+|---|---|---|---|
+| `GET` | `/admin/employer-compliance/claims` | Admin | List claims by review status |
+| `GET` | `/admin/employer-compliance/claims/{claim_id}` | Admin | Read claim/evidence metadata for review |
+| `GET` | `/admin/employer-compliance/claims/{claim_id}/evidence/{evidence_id}/content` | Admin | Stream private evidence through the Admin authorization boundary |
+| `POST` | `/admin/employer-compliance/claims/{claim_id}/approve` | Admin | Approve a pending claim with optimistic version check |
+| `POST` | `/admin/employer-compliance/claims/{claim_id}/reject` | Admin | Reject a pending claim with reason and optimistic version check |
+| `POST` | `/admin/employer-compliance/claims/{claim_id}/revoke` | Admin | Revoke an approved claim with reason and optimistic version check |
+
+These operations enforce claim ownership/Admin authorization, expected-version concurrency, and private storage boundaries. Raw storage paths/private internal notes are not returned in the employer response contract.
+
+Compliance approval is a review decision for a recorded claim/jurisdiction/scope, not legal certification.
+
+## 15. Admin Internship & Applicant Operations
+
+Prefix: `/api/v1/admin/internships`
+
+### Listing/moderation
+
+| Method | Path | Access | Purpose |
+|---|---|---|---|
+| `GET` | `/admin/internships` | Admin | List all publication states / moderation queue |
+| `POST` | `/admin/internships` | Admin | Create admin-curated opportunity |
+| `GET` | `/admin/internships/{id}` | Admin | Read one listing without public-visibility filtering |
+| `DELETE` | `/admin/internships/{id}` | Admin | Permanently delete an Admin-managed listing only when no application exists |
+| `POST` | `/admin/internships/{id}/close` | Admin | Close an internship listing while preserving history |
+| `POST` | `/admin/internships/{id}/reopen` | Admin | Reopen a closed listing; employer-owned reopen rechecks verification and listing capacity |
+| `POST` | `/admin/internships/{id}/approve` | Admin | Approve eligible employer listing for publication |
+| `POST` | `/admin/internships/{id}/request-changes` | Admin | Return employer listing to editable draft with employer-visible feedback |
+
+Admin request-changes feedback is explicitly owner-visible and is not copied into the public listing response.
+
+### Admin-managed applicant workflow
+
+Admin recruiter operations are restricted to Admin-created/managed listings and do not cross into employer ownership.
+
+| Method | Path | Access | Purpose |
+|---|---|---|---|
+| `GET` | `/admin/internships/{id}/applicants` | Admin | List applicants for admin-managed listing |
+| `GET` | `/admin/internships/{id}/applicants/{application_id}` | Admin | Applicant detail |
+| `GET` | `/admin/internships/{id}/applicants/{application_id}/cv/content` | Admin | Stream authorized candidate CV |
+| `PATCH` | `/admin/internships/{id}/applicants/{application_id}/status` | Admin | Valid recruiter transition |
+| `POST` | `/admin/internships/{id}/applicants/{application_id}/interview` | Admin | Schedule interview |
+
+## 16. Admin User Directory & Audit
+
+Prefix: `/api/v1/admin/users`
+
+| Method | Path | Access | Purpose |
+|---|---|---|---|
+| `GET` | `/admin/users` | Admin | Search/paginate student and employer application records; optional role filter |
+| `GET` | `/admin/users/{user_id}` | Admin | User detail plus organization verification/compliance audit events where applicable |
+
+The Admin user payload deliberately excludes authentication credentials, provider tokens, private document paths, and raw CV data.
+
+## 17. Promo Source Boundary
+
+The v1 router contains promo-code source routes under `/promo-codes` and `/admin/promo-codes`. They are **not part of the current production-applied release baseline** because migration `028_promo_campaigns.sql` has not been applied to production and the custom mobile promo Pro-unlock UI has been removed.
+
+Do not use those source routes as evidence of an active production mobile promo flow.
+
+## 18. Publication & Privacy Invariants
+
+- `draft` and `under_review` employer listings are not public catalog items.
+- Organization verification does not auto-publish listings.
+- `employer_visible_feedback` is owner-only.
+- Candidate saved applications are not recruiter-visible submissions.
+- Candidate/employer/Admin document access is revalidated at the server boundary.
+- Subscription state and AI quotas are backend-authoritative for protected server behavior.
+
+## 19. Related Documents
+
+- [Architecture](ARCHITECTURE.md)
+- [Security](SECURITY.md)
+- [Database](DATABASE.md)
+- [Judge Runbook](JUDGE_RUNBOOK.md)

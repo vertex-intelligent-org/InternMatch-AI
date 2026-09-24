@@ -1,275 +1,228 @@
-# InternMatch AI - Security & Data Isolation Policy
+# InternMatch AI — Security & Data Isolation Policy
 
-**Version:** 1.0.0
-**Status:** Approved & Mandatory
-**Scope:** Authentication, authorization, tenant isolation, secrets, file uploads, AI safety, RevenueCat boundaries, and dependency-risk documentation
+**Documentation checkpoint:** 2026-09-24
+**Release source:** `707601d93294c891d53b900d01c644200f27292b`
 
----
+This document describes implemented security boundaries. It is not a claim of absolute security or external regulatory certification.
 
-## 1. Authentication & Token Verification
+## 1. Identity & Authentication
 
-InternMatch AI uses **Supabase Auth** as the identity provider.
+Supabase Auth is the identity provider. Protected API calls use a Bearer access token; the backend validates the token and derives the acting user from authenticated claims.
 
-Protected FastAPI endpoints derive identity from the `Authorization: Bearer <JWT>` header through the shared `get_current_user` dependency.
+Core invariants:
 
-The current backend verification path uses Supabase Auth's verified-claims API:
+- clients do not choose an arbitrary `user_id` to act as
+- authentication identity and InternMatch application role are separate concepts
+- the canonical InternMatch account is provisioned through authenticated backend flow
+- account type is persisted by the backend and protected from ordinary profile edits
+- candidate Google auth uses Supabase OAuth/browser flow
+- candidate Sign in with Apple uses the iOS Apple authentication integration
+- employer signup/sign-in uses email/password; candidate social signup is not an employer signup path
 
-```text
-supabase.auth.get_claims(jwt=token)
-```
+## 2. Authorization Boundaries
 
-This verification validates the token cryptographically, including its signature, supported signing algorithm, and expiration. The backend then applies additional application-level checks:
+Authorization is enforced in FastAPI dependencies and repository ownership checks.
 
-- issuer must equal `{SUPABASE_URL}/auth/v1`
-- audience must contain or equal `authenticated`
-- `sub` must be present
-- `sub` must parse as a valid UUID
-- invalid or expired authentication returns HTTP 401
+### Candidate
 
-The verified `sub` UUID is the canonical application `user_id`.
+Candidate-owned resources are scoped to the authenticated user/student profile. This covers profile data, saved internships, processing jobs, applications, matches, notification inbox, push devices, and private file access.
 
-Raw bearer tokens and private credentials must never be written to application logs.
+### Employer
 
----
+Employer-only endpoints use the employer-role dependency. Opportunity/applicant actions additionally enforce opportunity ownership so one employer cannot manage another employer's listings or applicants.
 
-## 2. Authorization & Tenant Isolation
+A verified employer organization is required before employer opportunity creation. Organization verification alone does not publish the opportunity; listing moderation remains independent.
 
-### 2.1 Identity Rule
+### Admin
 
-Authorization MUST NOT trust a `user_id`, `student_id`, or employer identity supplied by a client request when the authenticated identity can be derived from the verified JWT.
+Admin endpoints require backend admin authorization (`ADMIN_USER_IDS` plus authenticated identity). The Next.js Admin Console does not grant authority by itself.
 
-Candidate endpoints use the authenticated `current_user.user_id` and repository ownership filters to scope user-owned resources.
+The Admin user directory intentionally reads InternMatch-owned application records and does not expose passwords, provider tokens, raw authentication credentials, raw CV content, or private storage paths in its directory payload.
 
-Employer operations use the authenticated employer gate (`require_employer_user`) together with opportunity ownership checks.
+## 3. Organization Verification vs Compliance Evidence
 
-### 2.2 Row Level Security
+Organization identity verification and compliance evidence are separate trust domains.
 
-After migrations `001` through `010`, RLS is enabled on all twelve application-owned public tables:
+Organization verification status can be `unverified`, `pending`, `verified`, `rejected`, or `suspended`. Employer identity/business fields are normalized and review actions are recorded.
 
-- `student_profiles`
-- `skills`
-- `student_skills`
-- `education_entries`
-- `experience_entries`
-- `project_entries`
-- `internship_listings`
-- `matches`
-- `applications`
-- `processing_jobs`
-- `saved_internships`
-- `application_status_events`
+Compliance claims are jurisdiction/scope-specific with states `draft`, `pending`, `approved`, `rejected`, `revoked`, and `expired`. Approval means only that supporting evidence for that recorded claim/jurisdiction/scope was reviewed. It is not legal certification and does not bypass listing moderation.
 
-RLS does not mean every table has identical privileges. Catalog-style tables can expose controlled read access while candidate-owned data remains ownership-scoped.
+## 4. Listing Moderation & Feedback Privacy
 
-Trusted backend operations may use server-side Supabase service-role credentials, but application authorization checks remain mandatory.
+Employer-created opportunities enter administrative review before they become public.
 
----
+- `under_review` listings are not public candidate listings.
+- Admin approval transitions an eligible listing to `published`.
+- Admin request-changes transitions it to `draft` and stores employer-visible feedback.
+- The owner can edit the existing listing and resubmit it to `under_review`.
+- Successful resubmission clears the previous employer-visible feedback.
+- `employer_visible_feedback` is returned only through the owner-specific detail contract; public internship detail does not expose it.
 
-## 3. Secret & Environment Boundaries
+This separates moderation communications from the public catalog surface.
 
-### 3.1 Mobile Client-Safe Configuration
+## 5. Secret & Environment Boundaries
 
-The current mobile client environment surface is limited to:
+### 5.1 Client-safe/public configuration
 
-```text
-EXPO_PUBLIC_SUPABASE_URL
-EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY
-EXPO_PUBLIC_API_URL
-EXPO_PUBLIC_REVENUECAT_API_KEY
-```
+`EXPO_PUBLIC_*` variables are bundled into the mobile client and are publicly readable. Mobile may contain only public Supabase/API/RevenueCat SDK configuration.
 
-Every `EXPO_PUBLIC_*` value is bundled into the client and MUST be treated as public configuration, not as a secret.
+Admin `NEXT_PUBLIC_*` values are likewise public browser configuration and do not grant backend admin authority.
 
-### 3.2 Server-Only Credentials
+### 5.2 Server-only credentials
 
-The following values must remain on trusted backend / worker infrastructure when configured:
+Server-only configuration includes, where enabled:
 
-```text
-SUPABASE_SERVICE_ROLE_KEY
-SUPABASE_JWT_SECRET
-DATABASE_URL
-REDIS_URL
-GEMINI_API_KEY
-REVENUECAT_SECRET_KEY
-```
+- Supabase service-role key and JWT verification material
+- database credentials
+- Gemini API key
+- RevenueCat project/secret server credentials
+- RevenueCat webhook authentication/signing secrets
+- Apple Sign in private key and related server revocation credentials
+- SMTP credentials
 
-`REVENUECAT_SECRET_KEY` is currently reserved/optional server-side configuration and is not required for the Shipaton RevenueCat Test Store mobile flow.
+These must never be placed in mobile/Admin public variables or committed with real values.
 
-Private credentials MUST NOT be copied into mobile environment files, source code, screenshots, demo material, or committed repository history.
+## 6. Storage Security
 
-Application logging must redact configured secret values rather than emitting them.
+### 6.1 Candidate CVs
 
----
+CV upload is authenticated and validates allowed document format/content boundaries, size, and ownership. Files are stored in private Supabase Storage through trusted backend credentials.
 
-## 4. File Upload & Storage Security
+The API keeps the storage object path server-owned. Candidate/recruiter document download paths re-check authorization server-side instead of returning a reusable raw provider URL as authority.
 
-### 4.1 Candidate CV Documents
+### 6.2 Avatars
 
-The authenticated CV upload flow accepts only:
+`database/supabase_storage_setup.sql` provisions a private `avatars` bucket with allowed image types and a size limit. Avatar upload/deletion/content delivery are mediated by FastAPI using authenticated ownership. Client responses use an InternMatch-owned opaque content URL rather than disclosing the object path.
 
-- `application/pdf`
-- `application/vnd.openxmlformats-officedocument.wordprocessingml.document` (`.docx`)
+### 6.3 Employer compliance evidence
 
-Security controls include:
+Migration `025` provisions `employer-compliance-evidence` as a private PDF bucket. It intentionally has no direct anon/authenticated storage policies; upload/download/delete is mediated by trusted backend employer/admin authorization.
 
-- maximum size: **10 MiB**
-- endpoint reads only `MAX_CV_SIZE_BYTES + 1` to detect oversized payloads
-- oversized requests return HTTP **413 Payload Too Large**
-- MIME allowlist validation
-- filename-extension agreement validation
-- PDF `%PDF-` binary signature validation
-- DOCX ZIP/container structure validation including `word/document.xml`
-- server-generated object keys: `{user_id}/{uuid4}.{ext}`
-- invalid type/signature/content returns HTTP 400
-- storage download/delete helpers verify the object path belongs to the target authenticated user
-- Supabase storage access uses trusted server-side service-role credentials
+### 6.4 Browser guard for private documents
 
-The configured CV bucket name is supplied through `CV_STORAGE_BUCKET` (default template value `cvs`).
+For browser navigation to inaccessible private avatar/CV/compliance document endpoints, the backend redirects to a generic branded unavailable-document page rather than exposing resource-existence/storage details. The response is non-cacheable and noindex/nofollow; machine/API callers keep their original status behavior.
 
-### 4.2 Profile Avatars
+## 7. Input, Text, and Upload Controls
 
-The avatar flow accepts JPEG, PNG, and WebP images.
+The backend applies endpoint-specific validation to:
 
-Security controls include:
+- file type/size and document signatures
+- public profile text normalization
+- employer organization fields and normalized website/email domains
+- compliance jurisdiction/scope syntax and version-based concurrency checks
+- listing/application lifecycle transitions
+- Expo push token shape
+- AI request idempotency and quotas where applicable
 
-- maximum size: **5 MB**
-- binary signature verification
-- MIME-to-binary-content agreement
-- server-generated object keys: `{user_id}/{uuid4}.{ext}`
-- ownership verification before signed URL generation or deletion
-- short-lived signed URLs with a current default lifetime of **3600 seconds**
+Rate limiting is applied to source-verified high-cost/abuse-sensitive operations such as CV processing and compliance evidence upload. Rate limits are distinct from product AI quotas.
 
-### 4.3 Storage Provisioning Boundary
+## 8. AI Security & Authority
 
-`database/supabase_storage_setup.sql` currently provisions the private `avatars` bucket and its repository-managed policies.
+Generative AI does not control the core authorization or numeric match score.
 
-That SQL file does **not** provision the CV bucket.
+- Candidate identity is resolved before AI processing.
+- Matching score is deterministic application logic; LLM explanation is downstream text.
+- CV processing writes through controlled repositories rather than trusting arbitrary model-produced identifiers.
+- Product AI usage is reserved/settled through backend quota logic.
+- Idempotency keys/fingerprints prevent reuse of one request identity for incompatible input.
+- Failures are handled without transferring authorization decisions to generated text.
 
-The CV bucket remains a separately configured runtime requirement through `CV_STORAGE_BUCKET`; documentation must not claim that `supabase_storage_setup.sql` creates both buckets.
+Model/API credentials remain server-side.
 
----
+## 9. Matching Integrity
 
-## 5. AI Guardrails & Prompt-Injection Defense
+The hybrid score is computed from exact/fuzzy skill matching, semantic vector similarity, and supported preferences. Numeric score persistence is deterministic and independent of generated prose.
 
-AI security rules are implemented per workflow rather than through one fictional universal prompt string.
+Employer-facing score/ranking logic fails closed while an authoritative match recalculation is actively queued or processing, avoiding presentation of a previously persisted score as fresh.
 
-### 5.1 CV Extraction
+## 10. RevenueCat & Payment Isolation
 
-CV extraction:
+### 10.1 Mobile boundary
 
-- extracts only facts supported by the supplied CV
-- forbids invented education, employers, dates, technologies, roles, locations, or skills
-- forbids inference of protected or sensitive personal attributes
-- uses strict Pydantic structured output
-- does not return raw CV text in the structured profile result
+The mobile app uses RevenueCat public SDK keys only. Store package price/product metadata is dynamically resolved. Local flags are not server authority.
 
-### 5.2 Cover Letter Generation
+Student and Employer canonical entitlements are `pro_student` and `pro_employer`.
 
-Cover-letter generation explicitly treats candidate data, listing descriptions, match metrics, and requested tone as **untrusted data**.
+### 10.2 Backend subscription authority
 
-The system prompt instructs the model not to execute or follow commands or system-like instructions embedded inside supplied candidate or internship data.
+The backend persists subscription state and exposes authenticated state/reconciliation endpoints. RevenueCat reconciliation uses server-only credentials; mobile cannot submit a server secret.
 
-Generated content must remain grounded in canonical candidate, internship, and match data and must not invent qualifications.
+Relevant endpoints:
 
-### 5.3 Match Explanations
+- `GET /api/v1/me/subscription`
+- `POST /api/v1/me/subscription/reconcile`
+- `POST /api/v1/webhooks/revenuecat`
 
-`Why You Match` generation is grounded in persisted candidate and internship data.
+### 10.3 Webhook authentication
 
-The model is explicitly forbidden from altering or contradicting the canonical `matching_skills` and `missing_skills` arrays.
+RevenueCat webhook ingress verifies the configured Bearer authentication token. If `REVENUECAT_WEBHOOK_SIGNING_SECRET` is configured, signature/timestamp HMAC verification additionally applies. Event processing is designed to be idempotent so repeated provider delivery does not create duplicate state transitions.
 
-A deterministic provider-independent fallback uses only persisted match score and canonical skill-gap data.
+Do not describe HMAC as unconditional when no signing secret is configured.
 
-### 5.4 Interview Preparation
+## 11. Product Quotas vs Abuse Controls
 
-Interview preparation uses only the supplied canonical candidate, internship, match, application, and interview context.
+AI usage limits are product policy. HTTP/operation rate limits are abuse/operational controls. They should not be conflated.
 
-Likely interview questions are preparation suggestions and must not be represented as claims about what an employer will definitely ask.
+Backend quota state, including Student AI usage and Employer product policy, is authoritative. Client-visible counters/status are snapshots of server state, not a bypass mechanism.
 
-### 5.5 Translation Integrity
+## 12. Account Deletion Safety
 
-Turkish and Arabic translation prompts require faithful translation without summarizing, omitting facts, or adding new information.
+Permanent account deletion is a destructive operation and requires a recent authenticated session check. Apple-linked accounts additionally require the Apple revocation boundary when necessary.
 
----
+Deletion orchestration cleans owned candidate data/private files and associated product state. Where employer listings must remain for historical candidate application integrity, ownership/publication handling is performed explicitly rather than silently destroying unrelated historical records. A RevenueCat deletion barrier prevents unsafe partial completion when subscription-provider cleanup cannot be completed safely.
 
-## 6. Deterministic Matching Authority
+After server deletion, the mobile client clears its local Supabase session.
 
-The numerical matching score is produced by deterministic application code, not by the LLM.
+## 13. Database and RLS
 
-Current hybrid formula:
+Migrations define relational constraints, Supabase `auth.users` foreign keys, RLS policies, and later trust/subscription/notification tables. Backend service-role operations are trusted-server operations; that power must remain isolated from public clients.
 
-```text
-overall_score =
-    0.50 * skill_score
-  + 0.30 * vector_score
-  + 0.20 * attribute_score
-```
+The full schema depends on Supabase-managed Auth/Storage. A plain Docker PostgreSQL instance does not by itself reproduce those security schemas.
 
-Vector scoring is derived from PostgreSQL `pgvector` cosine distance.
+## 14. API Security Headers & Production Surface
 
-Persisted `overall_score`, `skill_score`, `vector_score`, `attribute_score`, `matching_skills`, and `missing_skills` remain authoritative inputs to AI explanation and application-generation flows.
+FastAPI adds:
 
-The LLM may explain canonical matching results but must not redefine them.
+- `X-Content-Type-Options: nosniff`
+- `X-Frame-Options: DENY`
+- `Referrer-Policy: no-referrer`
+- restrictive `Permissions-Policy`
+- HSTS in production
+- request correlation IDs for observability
 
----
+When `ENVIRONMENT=production`:
 
-## 7. RevenueCat & Payment Data Isolation
+- `/docs` is disabled
+- `/redoc` is disabled
+- `/openapi.json` is disabled
 
-The current Shipaton billing baseline uses the native RevenueCat SDK in the mobile application with the public:
+Production CORS is driven by the server allow-list configuration.
 
-```text
-EXPO_PUBLIC_REVENUECAT_API_KEY
-```
+## 15. Health and Error Isolation
 
-RevenueCat `CustomerInfo` entitlement state is the mobile subscription authority for the current Test Store flow.
+`GET /health` is dependency-independent process liveness. `GET /api/v1/health` checks database, Redis, and RQ worker readiness. Readiness returns HTTP 503 when a required dependency is unavailable, without returning credentials/exception internals.
 
-The application does not store card numbers, CVVs, bank details, or raw payment credentials in its backend database.
+## 16. Dependency & CI Controls
 
-`REVENUECAT_SECRET_KEY` exists only as optional/reserved server configuration. The current backend and worker contain no active RevenueCat billing integration beyond configuration/log-redaction support.
+CI uses deterministic dependency installation where lockfiles exist and runs backend lint/tests, container checks, and mobile/Admin type checks. Containers are tested for non-root runtime. Dependency management should continue to avoid force-upgrade fixes that bypass compatibility review.
 
-There is currently **no FastAPI RevenueCat webhook endpoint**.
+## 17. Operational Invariants
 
-If a future server-side RevenueCat integration or webhook is added, it must introduce explicit server authentication/signature verification, replay/duplicate-event handling, secret isolation, authorization tests, and updated documentation before being considered part of the production security boundary.
+1. Never commit real `.env` secrets.
+2. Never expose service-role or RevenueCat server credentials to client bundles.
+3. Never infer admin authority from the Admin UI alone.
+4. Never expose compliance evidence publicly.
+5. Never expose employer review feedback through public internship responses.
+6. Never treat mobile subscription state as the only server authority.
+7. Never bypass listing moderation because an organization is verified.
+8. Never use production as a test environment.
+9. Never blindly rerun migrations against an existing environment.
+10. Migration `028_promo_campaigns.sql` is source-only relative to the current production-applied baseline and must not be assumed applied.
 
----
+## 18. Related Documents
 
-## 8. Dependency Advisory Baseline
-
-The documented Expo SDK 54 mobile production dependency audit baseline contains:
-
-```text
-12 moderate
-9 high
-0 critical
-21 total
-```
-
-The high-severity findings are inherited primarily through the Expo / Metro toolchain, and the available remediation path requires a breaking or major toolchain upgrade.
-
-For the Shipaton baseline, the tested Expo SDK 54 stack is retained rather than applying an unverified major native migration immediately before submission.
-
-This is an explicitly documented dependency risk and MUST NOT be interpreted as a claim of zero vulnerabilities.
-
-A future maintenance cycle must upgrade to an appropriate remediated Expo / React Native toolchain and repeat native build, authentication/deep-link, RevenueCat, TypeScript, and regression verification.
-
-Backend/worker dependency auditing is enforced separately in CI through `pip-audit`. The mobile npm audit baseline is tracked separately from that CI job.
-
----
-
-## 9. Operational Security Invariants
-
-The following rules are mandatory:
-
-1. Never commit real credentials, bearer tokens, service-role keys, API secrets, or private database URLs.
-2. Never expose service-role or other server secrets through `EXPO_PUBLIC_*` variables.
-3. Derive candidate and employer identity from verified authentication context, not client-supplied ownership identifiers.
-4. Preserve RLS and backend authorization together; neither layer replaces the other.
-5. Validate uploaded file size, type, and binary structure before downstream processing.
-6. Keep storage object paths scoped to authenticated user identity.
-7. Treat candidate/listing text supplied to LLM workflows as untrusted data.
-8. Keep canonical match scores and skill-gap data deterministic and outside LLM authority.
-9. Treat RevenueCat server credentials and any future webhook secrets as server-only.
-10. Re-run dependency, security, and regression verification whenever framework or native dependency versions materially change.
-
----
-
-**End of Security Policy**
+- [Architecture](ARCHITECTURE.md)
+- [API Contract](API_CONTRACT.md)
+- [Database](DATABASE.md)
+- [Deployment](DEPLOYMENT.md)
+- [Development](DEVELOPMENT.md)
