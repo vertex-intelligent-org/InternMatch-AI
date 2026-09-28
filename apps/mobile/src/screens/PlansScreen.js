@@ -6,6 +6,7 @@ import {
   ScrollView,
   Alert,
   Platform,
+  Linking,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
@@ -24,6 +25,9 @@ import { useRevenueCat } from '../context/RevenueCatProvider';
 import { useSubscription } from '../context/SubscriptionProvider';
 import { getSubscriptionSnapshot } from '../services/subscriptionService';
 import haptics from '../services/haptics';
+
+const APPLE_STANDARD_EULA_URL =
+  'https://www.apple.com/legal/internet-services/itunes/dev/stdeula/';
 
 const AI_USAGE_FEATURES = [
   {
@@ -119,6 +123,18 @@ export default function PlansScreen({ navigation }) {
     isPurchasing || isPurchaseFlowPending;
   const isRestoreFlowBusy =
     isRestoring || isRestoreFlowPending;
+
+  const handleOpenAppleEula = useCallback(async () => {
+    try {
+      await Linking.openURL(APPLE_STANDARD_EULA_URL);
+    } catch {
+      Alert.alert(
+        'Terms of Use (EULA)',
+        APPLE_STANDARD_EULA_URL,
+        [{ text: 'OK', style: 'default' }]
+      );
+    }
+  }, []);
 
   const handleEmployerUpgrade = useCallback(async () => {
     if (
@@ -744,6 +760,71 @@ export default function PlansScreen({ navigation }) {
             </Text>
           </GlassSurface>
         ) : null}
+        {/* Apple Guideline 3.1.2(c): subscription legal links */}
+        <View
+          style={{
+            marginTop: spacing.xl,
+            paddingTop: spacing.md,
+            paddingBottom: spacing.sm,
+            borderTopWidth: StyleSheet.hairlineWidth,
+            borderTopColor:
+              colors.borderSubtle || colors.border,
+          }}
+        >
+          <View
+            style={{
+              flexDirection: isRTL ? 'row-reverse' : 'row',
+              justifyContent: 'center',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+            }}
+          >
+            <Text
+              testID="plans-privacy-policy-link"
+              accessibilityRole="link"
+              accessibilityLabel={t('settings.privacyPolicy')}
+              onPress={() => navigation.navigate('PrivacyPolicy')}
+              style={{
+                ...typography.caption,
+                color: colors.primaryBlue,
+                textDecorationLine: 'underline',
+                paddingVertical: spacing.xs,
+                paddingHorizontal: spacing.xs,
+              }}
+            >
+              {t('settings.privacyPolicy')}
+            </Text>
+
+            <Text
+              accessibilityElementsHidden
+              style={{
+                ...typography.caption,
+                color:
+                  colors.textTertiary || colors.textMuted,
+                marginHorizontal: spacing.xs,
+              }}
+            >
+              •
+            </Text>
+
+            <Text
+              testID="plans-terms-eula-link"
+              accessibilityRole="link"
+              accessibilityLabel={t('settings.termsOfUse') + ' (EULA)'}
+              onPress={handleOpenAppleEula}
+              style={{
+                ...typography.caption,
+                color: colors.primaryBlue,
+                textDecorationLine: 'underline',
+                paddingVertical: spacing.xs,
+                paddingHorizontal: spacing.xs,
+              }}
+            >
+              {t('settings.termsOfUse')} (EULA)
+            </Text>
+          </View>
+        </View>
+
       </ScrollView>
     </ScreenContainer>
   );
