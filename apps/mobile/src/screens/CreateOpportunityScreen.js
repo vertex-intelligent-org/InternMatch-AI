@@ -44,20 +44,60 @@ const WORK_TYPES = [
 
 function normalizeSkillsInput(rawText) {
   if (!rawText || typeof rawText !== 'string') return [];
-  const parts = rawText
-    .split(',')
-    .map((s) => s.trim())
-    .filter(Boolean);
+
+  const trimmed = rawText.trim();
+  if (!trimmed) return [];
+
+  const explicitDelimiterPattern = /[,;\n\r|•·]/u;
+  let parts = [];
+
+  if (explicitDelimiterPattern.test(trimmed)) {
+    // Explicit separators preserve spaces inside multi-word skills:
+    // "Machine Learning, React Native, Python"
+    parts = trimmed
+      .split(/[,;\n\r|•·]+/u)
+      .map((value) => value.trim())
+      .filter(Boolean);
+  } else {
+    // When the employer enters simple skills separated only by spaces,
+    // parse each token separately. Double quotes preserve multi-word skills:
+    // Python Java SQL
+    // "Machine Learning" Python "React Native"
+    const tokenPattern = /"([^"]+)"|“([^”]+)”|(\S+)/gu;
+    let match;
+
+    while ((match = tokenPattern.exec(trimmed)) !== null) {
+      const value = (
+        match[1]
+        || match[2]
+        || match[3]
+        || ''
+      ).trim();
+
+      if (value) {
+        parts.push(value);
+      }
+    }
+  }
 
   const seen = new Set();
   const result = [];
+
   for (const part of parts) {
-    const lower = part.toLowerCase();
-    if (!seen.has(lower)) {
-      seen.add(lower);
-      result.push(part);
+    const normalized = part
+      .trim()
+      .replace(/\s+/gu, ' ');
+
+    if (!normalized) continue;
+
+    const dedupeKey = normalized.toLocaleLowerCase();
+
+    if (!seen.has(dedupeKey)) {
+      seen.add(dedupeKey);
+      result.push(normalized);
     }
   }
+
   return result;
 }
 
@@ -116,6 +156,35 @@ export default function CreateOpportunityScreen({ navigation, route }) {
       const next = { ...current };
       delete next[field];
       return next;
+    });
+  };
+
+  const handleApplyDescriptionDraft = (draftText) => {
+    if (
+      typeof draftText !== 'string'
+      || !draftText.trim()
+    ) {
+      return;
+    }
+
+    setDescription(draftText);
+    clearFieldError('description');
+    haptics.success();
+
+    requestAnimationFrame(() => {
+      const position =
+        fieldPositions.current.description;
+
+      if (typeof position === 'number') {
+        scrollRef.current?.scrollTo({
+          y: Math.max(0, position - 24),
+          animated: true,
+        });
+      }
+
+      setTimeout(() => {
+        descriptionRef.current?.focus();
+      }, 350);
     });
   };
 
@@ -918,7 +987,7 @@ export default function CreateOpportunityScreen({ navigation, route }) {
           <EmployerDescriptionAssistant
             title={title}
             rawDescription={description}
-            onApplyDescription={setDescription}
+            onApplyDescription={handleApplyDescriptionDraft}
             navigation={navigation}
             isRTL={typeof isRTL !== 'undefined' ? isRTL : false}
           />

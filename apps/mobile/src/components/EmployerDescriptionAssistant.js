@@ -61,13 +61,11 @@ function SuggestionList({
               gap: 7,
             }}
           >
-            <Text
-              style={{
-                color: colors.accentStrong || colors.tealDark,
-              }}
-            >
-              ?
-            </Text>
+            <Ionicons
+              name="checkmark-circle-outline"
+              size={16}
+              color={colors.accentStrong || colors.tealDark}
+            />
 
             <Text
               style={{
