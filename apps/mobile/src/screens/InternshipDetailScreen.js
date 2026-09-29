@@ -6,6 +6,8 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
+  Alert,
+  Linking,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
@@ -21,6 +23,82 @@ import { getInternshipDetail, ApiError } from '../services/api';
 import { useSavedInternships } from '../context/SavedInternshipsContext';
 import { useLocalization } from '../localization/LocalizationContext';
 import { formatLocalizedDate } from '../localization/formatters';
+import { blockEmployerCompany } from '../services/contentSafety';
+
+const CONTENT_REPORT_EMAIL =
+  'internmatch@vertexintelligent.com';
+
+const CONTENT_SAFETY_COPY = {
+  en: {
+    safetyTitle: 'Safety',
+    report: 'Report Opportunity',
+    block: 'Block Employer',
+    reportSubject: 'InternMatch AI - Opportunity Report',
+    reportIntro:
+      'I would like to report the following opportunity for review:',
+    reportFallbackTitle: 'Report Opportunity',
+    reportFallbackMessage:
+      'No email app is available. Please send the report to:',
+    blockTitle: 'Block Employer?',
+    blockMessage:
+      'Opportunities from {{company}} will be hidden on this device for your account.',
+    blockConfirm: 'Block Employer',
+    cancel: 'Cancel',
+    blockedTitle: 'Employer Blocked',
+    blockedMessage:
+      'This employer will no longer appear in internship, match, or saved-opportunity lists after they refresh.',
+  },
+  tr: {
+    safetyTitle: 'G?venlik',
+    report: 'F?rsat? Bildir',
+    block: '??vereni Engelle',
+    reportSubject: 'InternMatch AI - F?rsat Bildirimi',
+    reportIntro:
+      'A?a??daki f?rsat? incelenmek ?zere bildirmek istiyorum:',
+    reportFallbackTitle: 'F?rsat? Bildir',
+    reportFallbackMessage:
+      'E-posta uygulamas? kullan?lam?yor. L?tfen bildirimi ?u adrese g?nderin:',
+    blockTitle: '??veren Engellensin mi?',
+    blockMessage:
+      '{{company}} taraf?ndan yay?nlanan f?rsatlar bu cihazda hesab?n?z i?in gizlenecektir.',
+    blockConfirm: '??vereni Engelle',
+    cancel: '?ptal',
+    blockedTitle: '??veren Engellendi',
+    blockedMessage:
+      'Listeler yenilendi?inde bu i?veren staj, e?le?me ve kaydedilen f?rsat listelerinde art?k g?r?nmeyecektir.',
+  },
+  ar: {
+    safetyTitle: '??????',
+    report: '??????? ?? ??????',
+    block: '??? ???? ?????',
+    reportSubject: 'InternMatch AI - ???? ?? ????',
+    reportIntro:
+      '???? ?? ??????? ?? ?????? ??????? ?????????:',
+    reportFallbackTitle: '??????? ?? ??????',
+    reportFallbackMessage:
+      '?? ???? ????? ???? ???????? ????. ???? ????? ?????? ???:',
+    blockTitle: '??? ???? ??????',
+    blockMessage:
+      '???? ????? ????? ??????? ?? {{company}} ??? ??? ?????? ???? ??????.',
+    blockConfirm: '??? ???? ?????',
+    cancel: '?????',
+    blockedTitle: '?? ??? ???? ?????',
+    blockedMessage:
+      '?? ???? ???? ????? ??? ????? ??????? ??? ??? ??????? ?? ????????? ?? ????? ????????.',
+  },
+};
+
+function getContentSafetyCopy(locale) {
+  const normalized =
+    typeof locale === 'string'
+      ? locale.toLowerCase().split(/[-_]/)[0]
+      : 'en';
+
+  return (
+    CONTENT_SAFETY_COPY[normalized] ||
+    CONTENT_SAFETY_COPY.en
+  );
+}
 
 export default function InternshipDetailScreen({ route, navigation }) {
   const { t } = useTranslation();
@@ -100,6 +178,106 @@ export default function InternshipDetailScreen({ route, navigation }) {
       />
     );
   };
+
+  const handleReportOpportunity =
+    useCallback(async () => {
+      if (!internship) return;
+
+      const copy =
+        getContentSafetyCopy(locale);
+
+      const subject =
+        copy.reportSubject;
+
+      const body = [
+        copy.reportIntro,
+        '',
+        `Opportunity ID: ${internship.id}`,
+        `Title: ${internship.title}`,
+        `Employer: ${internship.company}`,
+        `Location: ${internship.location}`,
+        '',
+        'Reason for report:',
+        '',
+      ].join('\n');
+
+      const reportUrl =
+        `mailto:${CONTENT_REPORT_EMAIL}` +
+        `?subject=${encodeURIComponent(subject)}` +
+        `&body=${encodeURIComponent(body)}`;
+
+      try {
+        const supported =
+          await Linking.canOpenURL(reportUrl);
+
+        if (supported) {
+          await Linking.openURL(reportUrl);
+          return;
+        }
+      } catch (_) {}
+
+      Alert.alert(
+        copy.reportFallbackTitle,
+        `${copy.reportFallbackMessage}\n\n${CONTENT_REPORT_EMAIL}`
+      );
+    }, [internship, locale]);
+
+  const handleBlockEmployer =
+    useCallback(() => {
+      if (!internship?.company) return;
+
+      const copy =
+        getContentSafetyCopy(locale);
+
+      const company =
+        internship.company.trim();
+
+      Alert.alert(
+        copy.blockTitle,
+        copy.blockMessage.replace(
+          '{{company}}',
+          company
+        ),
+        [
+          {
+            text: copy.cancel,
+            style: 'cancel',
+          },
+          {
+            text: copy.blockConfirm,
+            style: 'destructive',
+            onPress: async () => {
+              try {
+                await blockEmployerCompany(
+                  company
+                );
+
+                Alert.alert(
+                  copy.blockedTitle,
+                  copy.blockedMessage,
+                  [
+                    {
+                      text: 'OK',
+                      onPress: () =>
+                        navigation.goBack(),
+                    },
+                  ]
+                );
+              } catch (_) {
+                Alert.alert(
+                  copy.blockedTitle,
+                  CONTENT_REPORT_EMAIL
+                );
+              }
+            },
+          },
+        ]
+      );
+    }, [internship, locale, navigation]);
+
+  const contentSafetyCopy =
+    getContentSafetyCopy(locale);
+
 
   return (
     <ScreenContainer edges={['top', 'bottom']}>
@@ -253,6 +431,83 @@ export default function InternshipDetailScreen({ route, navigation }) {
                 </Card>
               </>
             )}
+
+            {/* Apple UGC/content-safety controls */}
+            <Text
+              style={[
+                styles.sectionTitle,
+                isRTL && styles.rtlText,
+              ]}
+            >
+              {contentSafetyCopy.safetyTitle}
+            </Text>
+
+            <Card
+              style={styles.safetyCard}
+              padding="sm"
+            >
+              <TouchableOpacity
+                style={[
+                  styles.safetyAction,
+                  isRTL && styles.rowRTL,
+                ]}
+                onPress={handleReportOpportunity}
+                accessibilityRole="button"
+                accessibilityLabel={
+                  contentSafetyCopy.report
+                }
+              >
+                <Ionicons
+                  name="flag-outline"
+                  size={20}
+                  color={
+                    colors.textSecondary ||
+                    colors.textMuted
+                  }
+                />
+                <Text
+                  style={[
+                    styles.safetyActionText,
+                    isRTL && styles.rtlText,
+                  ]}
+                >
+                  {contentSafetyCopy.report}
+                </Text>
+              </TouchableOpacity>
+
+              <View style={styles.safetyDivider} />
+
+              <TouchableOpacity
+                style={[
+                  styles.safetyAction,
+                  isRTL && styles.rowRTL,
+                ]}
+                onPress={handleBlockEmployer}
+                accessibilityRole="button"
+                accessibilityLabel={
+                  contentSafetyCopy.block
+                }
+              >
+                <Ionicons
+                  name="ban-outline"
+                  size={20}
+                  color={
+                    colors.danger ||
+                    '#EF4444'
+                  }
+                />
+                <Text
+                  style={[
+                    styles.safetyActionText,
+                    styles.safetyDangerText,
+                    isRTL && styles.rtlText,
+                  ]}
+                >
+                  {contentSafetyCopy.block}
+                </Text>
+              </TouchableOpacity>
+            </Card>
+
           </>
         )}
       </ScrollView>
@@ -394,6 +649,31 @@ const styles = StyleSheet.create({
     ...typography.bodyEmphasis,
     color: colors.textPrimary || colors.textDark,
     marginTop: spacing.xxs,
+  },
+  safetyCard: {
+    marginBottom: spacing.lg,
+  },
+  safetyAction: {
+    minHeight: spacing.minimumTouchTarget,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.sm,
+  },
+  safetyActionText: {
+    ...typography.bodyEmphasis,
+    flex: 1,
+    color: colors.textPrimary || colors.textDark,
+  },
+  safetyDangerText: {
+    color: colors.danger || '#EF4444',
+  },
+  safetyDivider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor:
+      colors.borderSubtle || colors.border,
+    marginHorizontal: spacing.sm,
   },
   rowRTL: {
     flexDirection: 'row-reverse',

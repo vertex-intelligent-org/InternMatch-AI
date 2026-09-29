@@ -2,6 +2,12 @@ import Constants from 'expo-constants';
 import { supabase } from '../lib/supabase';
 import * as FileSystem from 'expo-file-system/legacy';
 import { normalizeLocale, DEFAULT_LOCALE } from '../localization/i18n';
+import { ensureAIProcessingConsent } from './aiConsent';
+import {
+  filterBlockedInternships,
+  filterBlockedMatches,
+  filterBlockedSavedInternships,
+} from './contentSafety';
 
 function resolveExpoDevelopmentHost(): string | null {
   const hostUri = Constants.expoConfig?.hostUri?.trim();
@@ -54,6 +60,19 @@ export class ApiError extends Error {
     this.status = status;
     this.code = code;
     this.details = details;
+  }
+}
+
+async function requireAIProcessingConsent(): Promise<void> {
+  const granted =
+    await ensureAIProcessingConsent();
+
+  if (!granted) {
+    throw new ApiError(
+      'AI processing permission was not granted.',
+      0,
+      'AI_CONSENT_REQUIRED'
+    );
   }
 }
 
@@ -351,6 +370,8 @@ export async function uploadCV(file: {
   name: string;
   type?: string;
 }): Promise<CVProcessingResponse> {
+  await requireAIProcessingConsent();
+
   const formData = new FormData();
   appendReactNativeFile(formData, 'file', {
     uri: file.uri,
@@ -479,10 +500,21 @@ export async function getInternships(
 
   const queryString = queryParts.length > 0 ? `?${queryParts.join('&')}` : '';
 
-  return apiRequest<InternshipListResponse>(`/internships${queryString}`, {
-    method: 'GET',
-    authenticated: false,
-  });
+  const response =
+    await apiRequest<InternshipListResponse>(
+      `/internships${queryString}`,
+      {
+        method: 'GET',
+        authenticated: false,
+      }
+    );
+
+  return {
+    ...response,
+    items: await filterBlockedInternships(
+      response.items
+    ),
+  };
 }
 
 export async function getInternshipDetail(
@@ -546,9 +578,21 @@ export async function getSavedInternships(
 
   const queryString = queryParts.length > 0 ? `?${queryParts.join('&')}` : '';
 
-  return apiRequest<SavedInternshipListResponse>(`/saved-internships${queryString}`, {
-    method: 'GET',
-  });
+  const response =
+    await apiRequest<SavedInternshipListResponse>(
+      `/saved-internships${queryString}`,
+      {
+        method: 'GET',
+      }
+    );
+
+  return {
+    ...response,
+    items:
+      await filterBlockedSavedInternships(
+        response.items
+      ),
+  };
 }
 
 export async function saveInternship(
@@ -620,12 +664,25 @@ export type MatchExplanationResponse = {
 };
 
 export async function getMatches(): Promise<MatchListResponse> {
-  return apiRequest<MatchListResponse>('/matches', {
-    method: 'GET',
-  });
+  const response =
+    await apiRequest<MatchListResponse>(
+      '/matches',
+      {
+        method: 'GET',
+      }
+    );
+
+  return {
+    ...response,
+    matches: await filterBlockedMatches(
+      response.matches
+    ),
+  };
 }
 
 export async function calculateMatches(): Promise<MatchCalculationAcceptedResponse> {
+  await requireAIProcessingConsent();
+
   return apiRequest<MatchCalculationAcceptedResponse>('/matches/calculate', {
     method: 'POST',
   });
@@ -635,6 +692,8 @@ export async function getMatchExplanation(
   matchId: string,
   contentLocale?: string
 ): Promise<AIJobAcceptedResponse> {
+  await requireAIProcessingConsent();
+
   const normalizedLocale = normalizeLocale(contentLocale) || DEFAULT_LOCALE;
   return apiRequest<AIJobAcceptedResponse>(
     `/matches/${encodeURIComponent(matchId)}/explanation?content_locale=${encodeURIComponent(normalizedLocale)}`, {
@@ -737,6 +796,8 @@ export async function generateInterviewPrep(
   applicationId: string,
   contentLocale?: string
 ): Promise<AIJobAcceptedResponse> {
+  await requireAIProcessingConsent();
+
   const normalizedLocale =
     normalizeLocale(contentLocale) || DEFAULT_LOCALE;
 
@@ -751,6 +812,8 @@ export async function generateInterviewPrep(
 export async function generateApplication(
   payload: GenerateApplicationParams
 ): Promise<ApplicationGenerateAcceptedResponse> {
+  await requireAIProcessingConsent();
+
   return apiRequest<ApplicationGenerateAcceptedResponse>('/applications/generate', {
     method: 'POST',
     body: JSON.stringify(payload),
@@ -955,6 +1018,8 @@ export async function generateEmployerInternshipDescription(
   idempotencyKey: string,
   locale?: string
 ): Promise<EmployerInternshipDescriptionResponse> {
+  await requireAIProcessingConsent();
+
   const contentLocale = normalizeLocale(locale) || DEFAULT_LOCALE;
 
   return apiRequest<EmployerInternshipDescriptionResponse>(
@@ -972,6 +1037,8 @@ export async function generateEmployerInternshipDescription(
 export async function createEmployerInternship(
   payload: EmployerCreateInternshipPayload
 ): Promise<InternshipDetail> {
+  await requireAIProcessingConsent();
+
   return apiRequest<InternshipDetail>('/internships', {
     method: 'POST',
     body: JSON.stringify(payload),
@@ -995,6 +1062,8 @@ export async function updateEmployerInternship(
   id: string,
   payload: EmployerCreateInternshipPayload
 ): Promise<InternshipDetail> {
+  await requireAIProcessingConsent();
+
   return apiRequest<InternshipDetail>(
     `/internships/${encodeURIComponent(id)}`,
     {
@@ -1107,6 +1176,8 @@ export async function compareEmployerShortlist(
   idempotencyKey: string,
   locale?: string
 ): Promise<EmployerShortlistComparisonResponse> {
+  await requireAIProcessingConsent();
+
   const contentLocale = normalizeLocale(locale) || DEFAULT_LOCALE;
 
   return apiRequest<EmployerShortlistComparisonResponse>(
@@ -1363,6 +1434,8 @@ export async function getEmployerCandidateInsight(
   idempotencyKey: string,
   locale?: string
 ): Promise<EmployerCandidateInsightResponse> {
+  await requireAIProcessingConsent();
+
   const contentLocale = normalizeLocale(locale) || DEFAULT_LOCALE;
 
   return apiRequest<EmployerCandidateInsightResponse>(
@@ -1382,6 +1455,8 @@ export async function getEmployerInterviewKit(
   idempotencyKey: string,
   locale?: string
 ): Promise<EmployerInterviewKitResponse> {
+  await requireAIProcessingConsent();
+
   const contentLocale = normalizeLocale(locale) || DEFAULT_LOCALE;
 
   return apiRequest<EmployerInterviewKitResponse>(
@@ -1468,6 +1543,8 @@ export async function submitApplication(
   applicationId: string,
   payload?: { cover_letter?: string; notes?: string }
 ): Promise<ApplicationDetailResponse> {
+  await requireAIProcessingConsent();
+
   return apiRequest<ApplicationDetailResponse>(
     `/applications/${encodeURIComponent(applicationId)}/submit`,
     {
