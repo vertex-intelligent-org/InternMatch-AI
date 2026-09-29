@@ -205,7 +205,19 @@ jobs:
           PGPASSWORD: internmatch_dev_password
         run: |
           set -euo pipefail
+
+          CURRENT_RELEASE_MIGRATION_BASELINE=27
+
           for migration in $(ls database/migrations/[0-9][0-9][0-9]_*.sql | sort); do
+            migration_name="$(basename "$migration")"
+            migration_prefix="${migration_name%%_*}"
+            migration_number=$((10#$migration_prefix))
+
+            if [ "$migration_number" -gt "$CURRENT_RELEASE_MIGRATION_BASELINE" ]; then
+              echo "Skipping migration outside current release baseline: $migration"
+              continue
+            fi
+
             echo "Applying migration: $migration"
             psql -h localhost -U internmatch -d internmatch -v ON_ERROR_STOP=1 -f "$migration"
           done
