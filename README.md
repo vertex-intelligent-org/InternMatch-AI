@@ -260,6 +260,9 @@ Runbook provide the extended technical evaluation path.
 ## Team
 
 InternMatch AI was conceived and developed by a collaborative two-person student team: **Mohamad Barakat** and **Selenur Yurdakul**, Software / Computer Engineering students at Üsküdar University. Selenur originated the product vision; Mohamad established the technical architecture and engineering foundation; together they designed, implemented, tested, and refined the product.
+### Demo Video Production
+
+**Atallah Cazbah** — Chemical Engineering student who contributed to the RevenueCat Shipaton 2026 submission through demo video production, filming, and editing.
 
 ## License
 
