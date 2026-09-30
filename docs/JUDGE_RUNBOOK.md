@@ -8,6 +8,8 @@
 
 **Product website:** https://internmatch.college/
 
+**Demo video:** https://youtu.be/FOoJVTpqCOg?feature=shared
+
 **Submission checkpoint:** 2026-09-30
 
 > This runbook provides two paths: fast engineering verification without
@@ -411,7 +413,7 @@ At the **2026-09-30 submission checkpoint**:
 | Public repository | Available |
 | MIT license | Available |
 | Product website | https://internmatch.college/ |
-| Demo video | To be added before final submission |
+| Demo video | https://youtu.be/FOoJVTpqCOg?feature=shared |
 | Apple App Store | Public review pending |
 | Google Play | Public review pending |
 
