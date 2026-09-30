@@ -284,9 +284,13 @@ The product is designed so AI accelerates preparation and decision support while
 
 ## Team
 
-InternMatch AI is an independent two-person student project by **Mohamad Barakat** and **Selenur Yurdakul**, Software / Computer Engineering students at Üsküdar University and members of AISS (Artificial Intelligence and Intelligent Systems Club).
+InternMatch AI is an independent student project created by a two-person product team: **Mohamad Barakat** and **Selenur Yurdakul**, Software / Computer Engineering students at Üsküdar University and members of AISS (Artificial Intelligence and Intelligent Systems Club).
 
-Selenur originated the product vision, and Mohamad established the technical architecture and engineering foundation. Together, they designed, implemented, tested, and refined the product.
+**Selenur Yurdakul** originated the InternMatch AI product concept and created the initial frontend prototype, mobile screen layouts, visual direction, and UI foundation.
+
+**Mohamad Barakat** led the technical architecture and end-to-end engineering, transformed and substantially expanded the initial prototype into the final product, designed the product UX flows, and built the backend, database/vector systems, AI and matching systems, RevenueCat integration, Employer platform, Admin Trust & Safety Console, email automation, infrastructure, security, testing, and release workflows.
+
+Both contributed to shaping and refining the overall product.
 ### Demo Video Production Credit
 
 **Atallah Cazbah**, a Chemical Engineering student, contributed to the final RevenueCat Shipaton 2026 submission through demo video production, filming, and editing. This credit reflects his demo and media contribution; the product itself was conceived and developed by the student product team described above.
