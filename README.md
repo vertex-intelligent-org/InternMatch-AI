@@ -250,7 +250,7 @@ npm run typecheck
 |---|---|
 | Product website | https://internmatch.college/ |
 | Public repository | https://github.com/vertex-intelligent-org/InternMatch-AI |
-| Demo video | **TO ADD BEFORE FINAL SHIPATON SUBMISSION** |
+| Demo video | https://youtu.be/FOoJVTpqCOg?feature=shared |
 | Apple App Store | Public review pending — link will be added when public |
 | Google Play | Public review pending — link will be added when public |
 
