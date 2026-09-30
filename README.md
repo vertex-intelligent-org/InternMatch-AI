@@ -1,11 +1,35 @@
+<p align="center">
+  <img src="apps/mobile/assets/branding/app-icon.png" width="128" alt="InternMatch AI app icon">
+</p>
 # InternMatch AI
 
-InternMatch AI is a multilingual internship platform that connects **students**, **employers**, and an **administrative trust layer** in one end-to-end workflow. It combines structured candidate profiles, explainable hybrid matching, AI-assisted application preparation, employer recruiting tools, moderated opportunity publishing, and RevenueCat-backed subscription surfaces.
+> **RevenueCat Shipaton 2026 — Next Gen Award**
 
-**Release documentation checkpoint:** 2026-09-24
-**Source release commit:** `707601d93294c891d53b900d01c644200f27292b`
+InternMatch AI is a multilingual internship platform connecting **students**,
+**employers**, and a human-operated **administrative trust layer** in one
+end-to-end workflow.
 
-> Release status is intentionally separated from product capability. At this checkpoint iOS version `1.0.0` Build 9 is associated with App Review, while Build 10 was built from the release commit and uploaded to App Store Connect / TestFlight for validation. TestFlight is not a public App Store release. Public iOS/Android store URLs must be verified separately before a final Standard Track submission.
+It combines structured candidate profiles, private CV intelligence,
+explainable hybrid matching, AI-assisted application preparation, employer
+recruiting tools, moderated opportunity publishing, and RevenueCat-backed
+subscription surfaces.
+
+**Product website:** https://internmatch.college/
+
+**Judge shortcuts:** [Shipaton Submission](docs/SHIPATON_2026_SUBMISSION.md) ·
+[Judge Runbook](docs/JUDGE_RUNBOOK.md) ·
+[Architecture](docs/ARCHITECTURE.md) ·
+[Security](docs/SECURITY.md)
+
+**Submission checkpoint — September 30, 2026**
+
+- Apple App Store: **Public review pending**
+- Google Play: **Public review pending**
+- Public source repository: **Available**
+- MIT license: **Available**
+
+Public store links will be added here if they become available during the
+judging period.
 
 ## Why InternMatch AI
 
@@ -75,7 +99,7 @@ Employer create / edit
 InternMatch AI keeps deterministic scoring separate from generative explanation:
 
 - Exact and fuzzy skill matching with configurable fuzzy threshold.
-- Semantic similarity using Gemini embeddings persisted in PostgreSQL with `pgvector`.
+- Semantic similarity using one configured canonical embedding provider, persisted in PostgreSQL with `pgvector`.
 - Candidate preference contribution for work type/location where applicable.
 - Server-side Gemini workflows for CV extraction, match explanations, cover-letter drafting, and interview preparation.
 - Redis + RQ for asynchronous processing where the workflow is background-oriented.
@@ -134,7 +158,7 @@ For faithful full-stack development, the application depends on Supabase-managed
 | Backend | FastAPI, Python 3.13 CI reference runtime, SQLAlchemy, Pydantic |
 | Data | Supabase PostgreSQL, `pgvector`, Supabase Storage |
 | Async | Redis 7, RQ worker |
-| AI | Google Gemini (`LLM_MODEL_NAME` / `EMBEDDING_MODEL_NAME` configured server-side) |
+| AI | Gemini generation + configurable canonical embedding provider (OpenAI or Gemini) |
 | Monetization | RevenueCat React Native SDK + backend reconciliation/webhook integration |
 | CI / Release | GitHub Actions, Docker / Docker Compose, EAS Build |
 
@@ -144,7 +168,7 @@ For faithful full-stack development, the application depends on Supabase-managed
 .
 ├── apps/
 │   ├── admin/              # Next.js Trust & Safety Console
-│   ├── landing/            # Product/marketing web surface
+│   ├── landing/            # Legal/support web source in this repository
 │   └── mobile/             # Expo / React Native student + employer app
 ├── backend/                # FastAPI API, repositories, services, security
 ├── database/               # Migrations, seeds, storage setup
@@ -220,9 +244,22 @@ npm run typecheck
 - [Development](docs/DEVELOPMENT.md)
 - [Deployment](docs/DEPLOYMENT.md)
 
+## Demo & Store Links
+
+| Resource | Link / Status |
+|---|---|
+| Product website | https://internmatch.college/ |
+| Public repository | https://github.com/vertex-intelligent-org/InternMatch-AI |
+| Demo video | **TO ADD BEFORE FINAL SHIPATON SUBMISSION** |
+| Apple App Store | Public review pending — link will be added when public |
+| Google Play | Public review pending — link will be added when public |
+
+The short demo cannot show every implemented Student, Employer, Admin,
+matching, AI, trust, and monetization workflow. The repository and Judge
+Runbook provide the extended technical evaluation path.
 ## Team
 
-InternMatch AI was conceived and developed by a collaborative two-person student team: **Mohamad Barakat** and **Selanur Yurdakul**, Software / Computer Engineering students at Üsküdar University. Selanur originated the product vision; Mohamad established the technical architecture and engineering foundation; together they designed, implemented, tested, and refined the product.
+InternMatch AI was conceived and developed by a collaborative two-person student team: **Mohamad Barakat** and **Selenur Yurdakul**, Software / Computer Engineering students at Üsküdar University. Selenur originated the product vision; Mohamad established the technical architecture and engineering foundation; together they designed, implemented, tested, and refined the product.
 
 ## License
 

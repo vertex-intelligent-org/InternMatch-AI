@@ -1,15 +1,29 @@
 # InternMatch AI — RevenueCat Shipaton 2026 Submission
 
 **Competition:** RevenueCat Shipaton 2026
-**Entry path:** Standard Track / main competition release path
-**Documentation checkpoint:** 2026-09-24
-**Release source:** `707601d93294c891d53b900d01c644200f27292b`
+
+**Entry path:** Next Gen Award
+
+**Submission checkpoint:** 2026-09-30
+
 **Canonical repository:** https://github.com/vertex-intelligent-org/InternMatch-AI
 
-> **Submission-status note:** This document is the current product/submission narrative, not proof that store eligibility has already been satisfied. At this checkpoint, iOS `1.0.0` Build 9 is associated with App Review and Build 10 has been uploaded to App Store Connect / TestFlight for validation. TestFlight is not a public App Store release. Android public-store availability is not asserted here. Final Standard Track eligibility must be checked against the live store listing and RevenueCat's current Shipaton requirements before submission.
+**Product website:** https://internmatch.college/
+
+**Demo video:** TO ADD BEFORE FINAL SUBMISSION
+
+**Apple App Store:** Public review pending
+
+**Google Play:** Public review pending
+
+> **Submission-status note:** InternMatch AI is submitted through the Next Gen
+> open-source path while public iOS and Android store review remains pending.
+> TestFlight or testing-track availability is not represented as a public
+> store release. If a public store listing becomes available during judging,
+> its live URL may be added for judge convenience without changing the
+> historical submission-time status.
 
 ---
-
 ## Elevator Pitch
 
 **InternMatch AI** turns internship search into an explainable, two-sided workflow for students and employers. Students build a structured profile, enrich it from a private CV, receive deterministic hybrid match scores, understand *why* they match, identify skill gaps, prepare applications with AI assistance, and track interviews and outcomes. Employers operate through a verified organization workspace with moderated internship publishing, applicant/interview tooling, and RevenueCat-backed Free/Pro product policy. A separate Admin Trust & Safety Console keeps organization verification, compliance-evidence review, and listing moderation under human administrative control.
@@ -226,28 +240,29 @@ Production intentionally disables Swagger, ReDoc, and OpenAPI JSON. Operational 
 
 ---
 
-## Current Standard Track Release Position
+## Next Gen Submission Position
 
-RevenueCat's current Shipaton 2026 submission guide states that main-competition entries must be fully published in a qualifying app store, available in the United States, and use RevenueCat to power at least one qualifying purchase (or the qualifying RevenueCat Ads alternative). TestFlight/testing tracks do **not** count as the public release.
+InternMatch AI is submitted through the **Next Gen Award** path.
 
-Official submission guide: https://www.revenuecat.com/blog/engineering/how-to-submit-your-app-for-shipaton
+The application is implemented across the Student, Employer, Admin Trust &
+Safety, AI, matching, moderation, and RevenueCat monetization surfaces.
 
-At the **2026-09-24** checkpoint:
+At the **2026-09-30 submission checkpoint**, public iOS and Android store
+publication remains under store review. The public source repository and demo
+therefore provide the primary judging and reproduction path.
 
-| Item | Verified checkpoint state |
+| Item | Submission checkpoint state |
 |---|---|
-| Source release | Commit `707601d93294c891d53b900d01c644200f27292b` |
-| iOS app version | `1.0.0` |
-| iOS Build 9 | Associated with App Review |
-| iOS Build 10 | Uploaded to App Store Connect / TestFlight for validation |
-| Public App Store release | **Not asserted at this checkpoint** |
-| Public Google Play release | **Not asserted at this checkpoint** |
+| Public source repository | Available |
+| Open-source license | MIT |
 | RevenueCat SDK | Integrated for Student + Employer product contracts |
 | Backend RevenueCat authority | Subscription state, reconciliation, webhook implemented |
+| Product website | https://internmatch.college/ |
+| Apple App Store | Public review pending |
+| Google Play | Public review pending |
+| Demo video | To be added before final submission |
 
-Therefore this document must not be used to claim that Standard Track public-store eligibility was already satisfied on September 24. Verify the final live store URL and purchase availability before the final submission is sent.
-
-RevenueCat's current submission guide lists the deadline as **September 30, 2026 at 11:45 pm PDT**.
+Public store URLs may be added later if they become available during judging.
 
 ---
 
@@ -269,9 +284,9 @@ The product is designed so AI accelerates preparation and decision support while
 
 ## Team
 
-InternMatch AI is an independent two-person student project by **Mohamad Barakat** and **Selanur Yurdakul**, Software / Computer Engineering students at Üsküdar University and members of AISS (Artificial Intelligence and Intelligent Systems Club).
+InternMatch AI is an independent two-person student project by **Mohamad Barakat** and **Selenur Yurdakul**, Software / Computer Engineering students at Üsküdar University and members of AISS (Artificial Intelligence and Intelligent Systems Club).
 
-Selanur originated the product vision, and Mohamad established the technical architecture and engineering foundation. Together, they designed, implemented, tested, and refined the product.
+Selenur originated the product vision, and Mohamad established the technical architecture and engineering foundation. Together, they designed, implemented, tested, and refined the product.
 
 InternMatch AI is submitted as an independent student project, not as an official Üsküdar University or AISS Club product.
 
@@ -279,7 +294,7 @@ InternMatch AI is submitted as an independent student project, not as an officia
 
 ## Demo Video Storyboard (< 2 Minutes)
 
-The final video should show only behavior that works in the submitted build and should use the actual final store/RevenueCat state rather than presenting Test Store as public-release proof.
+The final video should show behavior that works in the submitted product and clearly demonstrate the core experience, RevenueCat integration, and Next Gen category fit.
 
 | Time | Scene | What to show |
 |---|---|---|
@@ -289,7 +304,7 @@ The final video should show only behavior that works in the submitted build and 
 | `0:52–1:08` | Application journey | AI-assisted draft, human review/edit, application tracker/interview state |
 | `1:08–1:28` | Employer + moderation | Employer opportunity submission -> `under_review`; Admin approve/request-changes; owner feedback/resubmit |
 | `1:28–1:40` | Trust layer | Organization verification vs separate compliance-evidence review |
-| `1:40–1:52` | RevenueCat | Actual final Student/Employer subscription surface and a qualifying purchase/access flow available in the shipped app |
+| `1:40–1:52` | RevenueCat | Student/Employer subscription surfaces and RevenueCat-backed product policy |
 | `1:52–1:58` | Global UX + close | English/Turkish/Arabic + RTL, repo/product link, team names |
 
 Do not show a custom InternMatch promo-code field; that mobile unlock mechanism was removed. If the final judging requirement uses a free trial or store/platform promo code, configure and document that through the actual store-compatible mechanism.
@@ -300,11 +315,14 @@ Do not show a custom InternMatch promo-code field; that mobile unlock mechanism 
 
 ### Product / release
 
-- [ ] Verify at least one qualifying **public** store listing is live and available in the United States before final Standard Track submission.
-- [ ] Verify the public build works as shown in the final video.
-- [ ] Verify RevenueCat powers the qualifying purchase in that public build.
-- [ ] Provide the final live store URL in the submission.
-- [ ] Provide judge access to paid functionality using the mechanism required by the current official submission guide (for example, free trial or store-compatible promo access).
+- [x] Public source repository is available.
+- [x] MIT license is visible in the repository.
+- [x] Student + Employer RevenueCat integration is implemented.
+- [x] Judge reproduction documentation is included.
+- [x] Product website is available at https://internmatch.college/.
+- [ ] Add the final public YouTube/Vimeo demo URL before submission.
+- [ ] Add Apple App Store URL if it becomes publicly available.
+- [ ] Add Google Play URL if it becomes publicly available.
 
 ### Submission assets
 
@@ -312,9 +330,9 @@ Do not show a custom InternMatch promo-code field; that mobile unlock mechanism 
 - [x] MIT-licensed repository.
 - [ ] Public YouTube or Vimeo demo video with the essential product demo contained within the first 2 minutes.
 - [ ] Final `1024 × 1024` application icon.
-- [ ] At least one `1179 × 2556` application screenshot without a device frame, matching the released product.
+- [ ] At least one `1179 × 2556` application screenshot without a device frame, matching the submitted product.
 - [ ] RevenueCat project ID.
-- [ ] Final live store URL and any judge-access instructions after store release is verified.
+- [ ] Use a verifiable academic email address for Next Gen student verification.
 - [ ] Submission text and testing instructions are in English or include an English translation.
 
 ### Technical evidence

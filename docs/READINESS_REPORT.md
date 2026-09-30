@@ -9,7 +9,7 @@
 
 **Date:** August 10, 2026  
 **Auditor:** Implementation Agent (Antigravity AI)  
-**Project Authors:** Mohamad Barakat & Selanur Yurdakul (Two-Person Student Team, Affiliation: AISS Club — Üsküdar University)
+**Project Authors:** Mohamad Barakat & Selenur Yurdakul (Two-Person Student Team, Affiliation: AISS Club — Üsküdar University)
 **Target Repository:** repository root
 **Status:** Audit & Architecture Phase Complete — Awaiting Human Engineering Team Approval
 

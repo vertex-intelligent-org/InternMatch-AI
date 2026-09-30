@@ -2,7 +2,7 @@
 
 Expo / React Native application for both **Student / Candidate** and **Employer** product surfaces.
 
-**Release source:** `707601d93294c891d53b900d01c644200f27292b`
+**Shipaton 2026 submission:** Next Gen Award
 **App version:** `1.0.0`
 
 ## Current Stack
@@ -130,9 +130,16 @@ npm ci
 npx tsc --noEmit
 ```
 
-## Release Checkpoint
+## Shipaton 2026 Submission Checkpoint
 
-At the 2026-09-24 documentation checkpoint, iOS Build 9 is associated with App Review and Build 10 from the release commit has been uploaded to App Store Connect/TestFlight for validation. TestFlight is not public App Store availability.
+InternMatch AI is submitted through the **RevenueCat Shipaton 2026 Next Gen
+Award** path.
+
+At the 2026-09-30 submission checkpoint, public iOS and Android store
+publication remains under review.
+
+The public repository and Judge Runbook provide the technical reproduction
+path. Public store links may be added later when available.
 
 ## Full Project Documentation
 

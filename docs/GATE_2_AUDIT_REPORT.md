@@ -10,7 +10,7 @@
 **Project:** InternMatch AI  
 **Date:** August 10, 2026  
 **Auditor:** Senior Staff Software Architect & Production Readiness Auditor  
-**Authors:** Mohamad Barakat & Selanur Yurdakul (Two-Person Student Team, Affiliation: AISS Club — Üsküdar University)
+**Authors:** Mohamad Barakat & Selenur Yurdakul (Two-Person Student Team, Affiliation: AISS Club — Üsküdar University)
 **Status:** Audit Resolved & Verified — Awaiting Human Authorization to Begin Database Migrations
 
 ---

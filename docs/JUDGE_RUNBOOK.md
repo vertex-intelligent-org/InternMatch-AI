@@ -1,15 +1,20 @@
 # InternMatch AI — Judge Reproduction Runbook
 
-**Documentation checkpoint:** 2026-09-24
-**Release source:** `707601d93294c891d53b900d01c644200f27292b`
+**Audience:** RevenueCat Shipaton judges, technical evaluators, and developers
+
+**Submission path:** Shipaton 2026 — Next Gen Award
+
 **Canonical repository:** https://github.com/vertex-intelligent-org/InternMatch-AI
 
-> **Audience:** Shipaton judges, technical evaluators, and developers reproducing InternMatch AI on a fresh **development** environment.
->
-> This runbook documents technical reproduction. It does **not** treat TestFlight, a Google Play testing track, or RevenueCat Test Store as proof of a public Shipaton Standard Track release. At this checkpoint, iOS `1.0.0` Build 9 is associated with App Review and Build 10 has been uploaded to App Store Connect / TestFlight for validation. Public-store eligibility must be verified separately at final submission time.
+**Product website:** https://internmatch.college/
+
+**Submission checkpoint:** 2026-09-30
+
+> This runbook provides two paths: fast engineering verification without
+> production credentials, and full product reproduction using development-only
+> infrastructure. Production is not a test environment.
 
 ---
-
 ## 1. What This Runbook Reproduces
 
 InternMatch AI has three connected product surfaces:
@@ -37,7 +42,6 @@ For local iOS native builds, use macOS with the appropriate Apple/Xcode tooling.
 ```bash
 git clone https://github.com/vertex-intelligent-org/InternMatch-AI.git
 cd InternMatch-AI
-git checkout 707601d93294c891d53b900d01c644200f27292b
 ```
 
 High-level structure:
@@ -103,6 +107,10 @@ REDIS_URL=redis://redis:6379/0
 
 GEMINI_API_KEY=...
 LLM_MODEL_NAME=gemini-3.5-flash
+
+EMBEDDING_PROVIDER=openai
+OPENAI_API_KEY=...
+OPENAI_EMBEDDING_MODEL_NAME=text-embedding-3-small
 EMBEDDING_MODEL_NAME=gemini-embedding-2
 EMBEDDING_DIMENSION=1536
 SKILL_FUZZY_THRESHOLD=85
@@ -261,7 +269,13 @@ The backend is also part of the subscription authority:
 
 `REVENUECAT_SECRET_KEY` is server-only. Webhooks require configured Bearer authentication; HMAC signature/timestamp validation additionally applies when `REVENUECAT_WEBHOOK_SIGNING_SECRET` is configured.
 
-> **Shipaton release note:** RevenueCat Test Store is useful for development reproduction, but the official 2026 main-competition submission requirements call for a qualifying public store release and a working RevenueCat-powered purchase (or qualifying RevenueCat Ads path). TestFlight/testing-track availability alone does not satisfy that release requirement. See RevenueCat's current submission guide: https://www.revenuecat.com/blog/engineering/how-to-submit-your-app-for-shipaton
+> **Shipaton Next Gen note:** RevenueCat Test Store is appropriate for
+> development reproduction. Eligible Next Gen student teams may submit a
+> public open-source repository and demo video instead of a public store
+> listing. Public store availability is tracked separately.
+>
+> Official submission guide:
+> https://www.revenuecat.com/blog/engineering/how-to-submit-your-app-for-shipaton
 
 The current mobile custom promo-code field that directly unlocked Pro was removed. Do not look for or depend on an InternMatch-specific in-app promo unlock flow.
 
@@ -388,10 +402,24 @@ For deeper review:
 
 ---
 
-## 15. Release-Status Check Before Shipaton Judging
+## 15. Shipaton Next Gen Submission Status
 
-At the 2026-09-24 documentation checkpoint, do **not** infer public-store availability from this repository or this runbook. Verify the final store listing independently before the Shipaton submission is treated as Standard Track-ready.
+At the **2026-09-30 submission checkpoint**:
 
-RevenueCat's current 2026 submission guide states that main-competition entries must be publicly released in a qualifying store, available in the United States, and use RevenueCat to power the qualifying monetization path; TestFlight/testing tracks do not count as the public release. The same guide lists the submission deadline as **September 30, 2026 at 11:45 pm PDT**.
+| Resource | Status |
+|---|---|
+| Public repository | Available |
+| MIT license | Available |
+| Product website | https://internmatch.college/ |
+| Demo video | To be added before final submission |
+| Apple App Store | Public review pending |
+| Google Play | Public review pending |
 
-For paid-feature judge access, follow the final official submission requirement (for example, a configured free trial or store-compatible promo mechanism). Do not reintroduce the removed custom InternMatch in-app promo unlock field merely for judging.
+The repository is the technical reproduction source for the Next Gen
+submission.
+
+TestFlight or testing-track availability must not be interpreted as a public
+store release.
+
+If a public store link becomes available during judging, it may be added to
+the root README for convenience.
