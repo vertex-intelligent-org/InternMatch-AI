@@ -259,7 +259,13 @@ matching, AI, trust, and monetization workflow. The repository and Judge
 Runbook provide the extended technical evaluation path.
 ## Team
 
-InternMatch AI was conceived and developed by a collaborative two-person student team: **Mohamad Barakat** and **Selenur Yurdakul**, Software / Computer Engineering students at Üsküdar University. Selenur originated the product vision; Mohamad established the technical architecture and engineering foundation; together they designed, implemented, tested, and refined the product.
+InternMatch AI was conceived and developed by a two-person student product team: **Mohamad Barakat** and **Selenur Yurdakul**, Software / Computer Engineering students at Üsküdar University.
+
+**Selenur Yurdakul** originated the InternMatch AI product concept and created the initial frontend prototype, mobile screen layouts, visual direction, and UI foundation.
+
+**Mohamad Barakat** led the technical architecture and end-to-end engineering, transformed and substantially expanded the initial prototype into the final product, designed the product UX flows, and built the backend, database/vector systems, AI and matching systems, RevenueCat integration, Employer platform, Admin Trust & Safety Console, email automation, infrastructure, security, testing, and release workflows.
+
+Both contributed to shaping and refining the overall product.
 ### Demo Video Production
 
 **Atallah Cazbah** — Chemical Engineering student who contributed to the RevenueCat Shipaton 2026 submission through demo video production, filming, and editing.
