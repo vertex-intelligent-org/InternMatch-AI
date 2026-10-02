@@ -14,10 +14,9 @@
 
 **Apple App Store:** Public review pending
 
-**Google Play:** Public review pending
+**Google Play:** https://play.google.com/store/apps/details?id=com.aissclub.internmatchai
 
-> **Submission-status note:** InternMatch AI is submitted through the Next Gen
-> open-source path while public iOS and Android store review remains pending.
+> **Submission-status note:** InternMatch AI was submitted through the **Next Gen Award** open-source path before the public Android store release became available. The Google Play link above is a **post-submission live reference** added solely so judges can experience the product in its current live state. It does not change or retroactively modify the original submission state.
 > TestFlight or testing-track availability is not represented as a public
 > store release. If a public store listing becomes available during judging,
 > its live URL may be added for judge convenience without changing the
@@ -259,7 +258,7 @@ therefore provide the primary judging and reproduction path.
 | Backend RevenueCat authority | Subscription state, reconciliation, webhook implemented |
 | Product website | https://internmatch.college/ |
 | Apple App Store | Public review pending |
-| Google Play | Public review pending |
+| Google Play | https://play.google.com/store/apps/details?id=com.aissclub.internmatchai *(post-submission live reference)* |
 | Demo video | To be added before final submission |
 
 Public store URLs may be added later if they become available during judging.
@@ -329,7 +328,7 @@ Do not show a custom InternMatch promo-code field; that mobile unlock mechanism 
 - [x] Product website is available at https://internmatch.college/.
 - [ ] Add the final public YouTube/Vimeo demo URL before submission.
 - [ ] Add Apple App Store URL if it becomes publicly available.
-- [ ] Add Google Play URL if it becomes publicly available.
+- [x] Google Play live reference added post-submission: https://play.google.com/store/apps/details?id=com.aissclub.internmatchai
 
 ### Submission assets
 

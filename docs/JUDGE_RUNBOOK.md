@@ -415,7 +415,9 @@ At the **2026-09-30 submission checkpoint**:
 | Product website | https://internmatch.college/ |
 | Demo video | https://youtu.be/FOoJVTpqCOg?feature=shared |
 | Apple App Store | Public review pending |
-| Google Play | Public review pending |
+| Google Play | https://play.google.com/store/apps/details?id=com.aissclub.internmatchai *(post-submission live reference)* |
+
+> **Post-submission live availability:** The Android release became publicly available after the Shipaton submission deadline, following the timing of our release process and the store-review process. This link is provided solely so judges can experience the product in its current live state. It does not change or retroactively modify the original submission state. InternMatch AI is being evaluated through the **Next Gen Award** path.
 
 The repository is the technical reproduction source for the Next Gen
 submission.

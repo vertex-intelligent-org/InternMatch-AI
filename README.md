@@ -24,12 +24,15 @@ subscription surfaces.
 **Submission checkpoint — September 30, 2026**
 
 - Apple App Store: **Public review pending**
-- Google Play: **Public review pending**
+- Google Play: **Public review pending at submission checkpoint**
 - Public source repository: **Available**
 - MIT license: **Available**
 
-Public store links will be added here if they become available during the
-judging period.
+### Post-Submission Live Store Availability
+
+**Google Play:** https://play.google.com/store/apps/details?id=com.aissclub.internmatchai
+
+The Android release became publicly available after the Shipaton submission deadline, following the timing of our release process and the store-review process. We are providing this live link solely so judges can experience the product in its current live state. It does not change or retroactively modify the original submission state. InternMatch AI is being evaluated through the **Next Gen Award** path.
 
 ## Why InternMatch AI
 
@@ -252,7 +255,7 @@ npm run typecheck
 | Public repository | https://github.com/vertex-intelligent-org/InternMatch-AI |
 | Demo video | https://youtu.be/FOoJVTpqCOg?feature=shared |
 | Apple App Store | Public review pending — link will be added when public |
-| Google Play | Public review pending — link will be added when public |
+| Google Play | https://play.google.com/store/apps/details?id=com.aissclub.internmatchai *(post-submission live reference)* |
 
 The short demo cannot show every implemented Student, Employer, Admin,
 matching, AI, trust, and monetization workflow. The repository and Judge
