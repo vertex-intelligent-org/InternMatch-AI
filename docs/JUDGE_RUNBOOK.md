@@ -427,3 +427,19 @@ store release.
 
 If a public store link becomes available during judging, it may be added to
 the root README for convenience.
+
+
+---
+
+## Post-Submission Live Store Availability
+
+The following live store links are provided **after the Shipaton submission window closed** solely for judge convenience and live product evaluation.
+
+The InternMatch AI submission was completed before these public store listings became available. This repository update does **not** change or rewrite the historical submission-time status, and these links are **not** presented as being publicly available at the time of submission.
+
+The purpose of this post-submission update is simply to allow judges to experience the finished product directly in its live production environment.
+
+- **Apple App Store:** https://apps.apple.com/us/app/internmatch-ai/id6809902796
+- **Google Play:** https://play.google.com/store/apps/details?id=com.aissclub.internmatchai
+
+> **Judge note:** These are post-submission live-access references only. They are provided so judges can install and experience the finished InternMatch AI application directly.
