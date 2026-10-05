@@ -12,16 +12,14 @@
 
 **Demo video:** TO ADD BEFORE FINAL SUBMISSION
 
-**Apple App Store:** Public review pending
+**Apple App Store:** https://apps.apple.com/us/app/internmatch-ai/id6809902796
 
 **Google Play:** https://play.google.com/store/apps/details?id=com.aissclub.internmatchai
 
-> **Submission-status note:** InternMatch AI was submitted through the **Next Gen Award** open-source path before the public Android store release became available. The Google Play link above is a **post-submission live reference** added solely so judges can experience the product in its current live state. It does not change or retroactively modify the original submission state.
+> **Submission-status note:** InternMatch AI was submitted through the **Next Gen Award** open-source path before the public store releases became available. The Apple App Store and Google Play links above are **post-submission live references** added solely so judges can experience the finished product in its current live state. They do not change or retroactively modify the original submission state.
 > TestFlight or testing-track availability is not represented as a public
-> store release. If a public store listing becomes available during judging,
-> its live URL may be added for judge convenience without changing the
-> historical submission-time status.
-
+> store release. The live store links above are provided only for judge
+> convenience and do not change the historical submission-time status.
 ---
 ## Elevator Pitch
 
@@ -327,7 +325,7 @@ Do not show a custom InternMatch promo-code field; that mobile unlock mechanism 
 - [x] Judge reproduction documentation is included.
 - [x] Product website is available at https://internmatch.college/.
 - [ ] Add the final public YouTube/Vimeo demo URL before submission.
-- [ ] Add Apple App Store URL if it becomes publicly available.
+- [x] Apple App Store live reference added post-submission: https://apps.apple.com/us/app/internmatch-ai/id6809902796
 - [x] Google Play live reference added post-submission: https://play.google.com/store/apps/details?id=com.aissclub.internmatchai
 
 ### Submission assets

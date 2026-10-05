@@ -30,9 +30,11 @@ subscription surfaces.
 
 ### Post-Submission Live Store Availability
 
+**Apple App Store:** https://apps.apple.com/us/app/internmatch-ai/id6809902796
+
 **Google Play:** https://play.google.com/store/apps/details?id=com.aissclub.internmatchai
 
-The Android release became publicly available after the Shipaton submission deadline, following the timing of our release process and the store-review process. We are providing this live link solely so judges can experience the product in its current live state. It does not change or retroactively modify the original submission state. InternMatch AI is being evaluated through the **Next Gen Award** path.
+The public Apple App Store and Google Play releases became available after the Shipaton submission deadline, following the timing of our release and store-review processes. We are providing these live links solely so judges can experience the finished product directly in its current live state. They do not change or retroactively modify the original submission state. InternMatch AI is being evaluated through the **Next Gen Award** path.
 
 ## Why InternMatch AI
 
@@ -254,7 +256,7 @@ npm run typecheck
 | Product website | https://internmatch.college/ |
 | Public repository | https://github.com/vertex-intelligent-org/InternMatch-AI |
 | Demo video | https://youtu.be/FOoJVTpqCOg?feature=shared |
-| Apple App Store | Public review pending — link will be added when public |
+| Apple App Store | https://apps.apple.com/us/app/internmatch-ai/id6809902796 *(post-submission live reference)* |
 | Google Play | https://play.google.com/store/apps/details?id=com.aissclub.internmatchai *(post-submission live reference)* |
 
 The short demo cannot show every implemented Student, Employer, Admin,
