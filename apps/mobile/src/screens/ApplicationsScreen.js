@@ -28,6 +28,11 @@ import {
   ApiError,
 } from '../services/api';
 import haptics from '../services/haptics';
+import {
+  hasPendingReviewCandidate,
+  clearPendingReviewCandidate,
+  requestAppStoreReviewIfEligible,
+} from '../services/appReview';
 import { useTabScroll, useTabScrollReporter } from '../context/TabScrollContext';
 import { useLocalization } from '../localization/LocalizationContext';
 import { formatLocalizedDate } from '../localization/formatters';
@@ -69,6 +74,11 @@ export default function ApplicationsScreen({ navigation }) {
   const requestGenerationRef = useRef(0);
   const statusUpdateInFlightRef = useRef(new Set());
 
+  // Native review is intentionally deferred until the Applications
+  // screen is stable after navigation.
+  const reviewTimerRef = useRef(null);
+  const reviewRequestInFlightRef = useRef(false);
+
   const fetchApplicationsData = useCallback(async () => {
     const generation = ++requestGenerationRef.current;
     setError(null);
@@ -76,6 +86,7 @@ export default function ApplicationsScreen({ navigation }) {
       const res = await getApplications();
       if (generation !== requestGenerationRef.current) return;
       setApplications(res.applications || []);
+      return true;
     } catch (err) {
       if (generation !== requestGenerationRef.current) return;
       console.warn('Failed to fetch applications:', err);
@@ -92,11 +103,64 @@ export default function ApplicationsScreen({ navigation }) {
 
   useFocusEffect(
     useCallback(() => {
-      fetchApplicationsData();
-      return () => {
-        requestGenerationRef.current += 1;
+      let isActive = true;
+
+      const loadApplications = async () => {
+        const loadedSuccessfully = await fetchApplicationsData();
+
+        if (
+          !isActive ||
+          !loadedSuccessfully ||
+          !navigation.isFocused() ||
+          !hasPendingReviewCandidate()
+        ) {
+          return;
+        }
+
+        // Allow the navigation transition and Applications UI to settle.
+        reviewTimerRef.current = setTimeout(async () => {
+          if (
+            !isActive ||
+            !navigation.isFocused() ||
+            reviewRequestInFlightRef.current
+          ) {
+            return;
+          }
+
+          reviewRequestInFlightRef.current = true;
+
+          try {
+            const requested =
+              await requestAppStoreReviewIfEligible();
+
+            if (requested) {
+              clearPendingReviewCandidate();
+            }
+          } catch (error) {
+            // Review must never affect the Applications screen.
+            console.warn(
+              'Failed to evaluate App Store review eligibility:',
+              error
+            );
+          } finally {
+            reviewRequestInFlightRef.current = false;
+            reviewTimerRef.current = null;
+          }
+        }, 2000);
       };
-    }, [fetchApplicationsData])
+
+      loadApplications();
+
+      return () => {
+        isActive = false;
+        requestGenerationRef.current += 1;
+
+        if (reviewTimerRef.current !== null) {
+          clearTimeout(reviewTimerRef.current);
+          reviewTimerRef.current = null;
+        }
+      };
+    }, [fetchApplicationsData, navigation])
   );
 
   const handleRefresh = async () => {

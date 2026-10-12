@@ -22,6 +22,7 @@ import Card from '../components/Card';
 import GradientButton from '../components/GradientButton';
 import { submitApplication, updateApplicationStatus, ApiError } from '../services/api';
 import haptics from '../services/haptics';
+import { recordMeaningfulAppAction } from '../services/appReview';
 
 export default function CoverLetterScreen({ route, navigation }) {
   const { t } = useTranslation();
@@ -61,6 +62,10 @@ export default function CoverLetterScreen({ route, navigation }) {
 
       haptics.success();
       setCurrentStatus(updated.status || 'applied');
+
+      // Record the successful application as a meaningful action.
+      // This does NOT request the native review here.
+      await recordMeaningfulAppAction();
 
       Alert.alert(
         t('coverLetter.submittedSuccessTitle', 'Application Submitted'),
