@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useCallback, useState } from 'react';
+import { useAppTheme } from '../context/ThemeProvider';
 import { Linking } from 'react-native';
 import { NavigationContainer, createNavigationContainerRef } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -73,6 +74,7 @@ function isEmailConfirmationUrl(url) {
 }
 
 export default function RootNavigator() {
+  const { navigationTheme } = useAppTheme();
   const lastProcessedUrlRef = useRef(null);
   const currentProcessingIdRef = useRef(0);
   const {
@@ -316,6 +318,7 @@ export default function RootNavigator() {
 
   return (
     <NavigationContainer
+      theme={navigationTheme}
       ref={navigationRef}
       onReady={() => {
         setInitialRecoveryParams(null);

@@ -98,4 +98,69 @@ export const semanticColors = {
   infoSoft: colors.infoSoft,
 };
 
+export const lightThemeColors = colors;
+
+export const darkThemeColors = {
+  ...colors,
+
+  // Semantic surfaces
+  background: '#07171D',
+  screenBg: '#07171D',
+  surface: '#0D232A',
+  surfaceElevated: '#112B33',
+  surfaceSubtle: '#10262D',
+  surfaceMuted: '#16313A',
+
+  // Semantic text
+  textPrimary: '#F2F7F8',
+  textSecondary: '#C0D0D5',
+  textTertiary: '#94A9B0',
+  textDark: '#F2F7F8',
+  textMuted: '#A7BBC1',
+  textInverse: '#07171D',
+
+  // Accent
+  accent: '#20B9D2',
+  accentStrong: '#5AD4E5',
+  accentSoft: '#113A43',
+
+  // Borders
+  border: '#27434B',
+  borderSubtle: '#24414A',
+  borderStrong: '#36545D',
+
+  // Status
+  success: '#34D399',
+  successSoft: '#10382C',
+  warning: '#F59E0B',
+  warningSoft: '#3A2A0D',
+  danger: '#F87171',
+  dangerSoft: '#3C1719',
+  info: '#38BDF8',
+  infoSoft: '#0C3342',
+
+  // Legacy semantic backgrounds
+  greenBg: '#10382C',
+  orangeBg: '#3A2A0D',
+  purpleBg: '#2A2448',
+  redBg: '#3C1719',
+
+  // Inputs
+  inputBg: '#112B33',
+
+  // Glass
+  glass: {
+    ...colors.glass,
+    bgLight: 'rgba(13, 35, 42, 0.72)',
+    bgFallback: 'rgba(13, 35, 42, 0.96)',
+    borderLight: 'rgba(255, 255, 255, 0.10)',
+    borderHairline: 'rgba(255, 255, 255, 0.08)',
+    activePill: 'rgba(32, 185, 210, 0.14)',
+    shadow: 'rgba(0, 0, 0, 0.32)',
+  },
+};
+
+export const getThemeColors = (mode) =>
+  mode === 'dark' ? darkThemeColors : lightThemeColors;
+
 export default colors;

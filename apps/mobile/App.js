@@ -1,4 +1,5 @@
 import React from 'react';
+import { ThemeProvider, useAppTheme } from './src/context/ThemeProvider';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'react-native';
 import RootNavigator from './src/navigation/RootNavigator';
@@ -24,10 +25,20 @@ function AuthenticatedDataProviders({ children }) {
   );
 }
 
+
+function ThemedStatusBar() {
+  const { isDark } = useAppTheme();
+
+  return (
+    <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
+  );
+}
+
 export default function App() {
   return (
     <SafeAreaProvider>
-      <StatusBar barStyle="dark-content" />
+      <ThemeProvider>
+      <ThemedStatusBar />
       <LocalizationProvider>
         <RevenueCatProvider>
           <ProfileProvider>
@@ -37,6 +48,7 @@ export default function App() {
           </ProfileProvider>
         </RevenueCatProvider>
       </LocalizationProvider>
+          </ThemeProvider>
     </SafeAreaProvider>
   );
 }
