@@ -3,7 +3,8 @@
         "name": "InternMatch AI",
         "slug": "internmatch-ai",
         "scheme": "internmatch",
-        "version": "1.0.0",
+        "version": "1.0.1",
+        "userInterfaceStyle": "automatic",
         "orientation": "portrait",
         "platforms": [
             "ios",
@@ -89,7 +90,13 @@
             "bundleIdentifier": "com.aissclub.internmatchai",
             "usesAppleSignIn": true,
             "infoPlist": {
-                "ITSAppUsesNonExemptEncryption": false
+                "ITSAppUsesNonExemptEncryption": false,
+                "CFBundleDevelopmentRegion": "en",
+                "CFBundleLocalizations": [
+                    "en",
+                    "tr",
+                    "ar"
+                ]
             },
             "icon": "./assets/branding/app-icon.png"
         },
