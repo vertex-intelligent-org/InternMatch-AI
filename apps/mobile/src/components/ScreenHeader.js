@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import BackButton from './BackButton';
 import colors from '../theme/colors';
+import { useAppTheme } from '../context/ThemeProvider';
 import { spacing } from '../theme/spacing';
 import { typography } from '../theme/typography';
 import { useLocalization } from '../localization/LocalizationContext';
@@ -20,6 +21,7 @@ export default function ScreenHeader({
 }) {
   const isStart = alignment === 'start';
   const { isRTL } = useLocalization();
+  const { colors } = useAppTheme();
 
   return (
     <View
@@ -52,6 +54,7 @@ export default function ScreenHeader({
           <Text
             style={[
               styles.title,
+              { color: colors.textPrimary || colors.textDark },
               isStart && styles.titleStart,
               isRTL && styles.titleRTL,
               isStart && isRTL && styles.titleStartRTL,
@@ -67,6 +70,7 @@ export default function ScreenHeader({
           <Text
             style={[
               styles.subtitle,
+              { color: colors.textSecondary || colors.textMuted },
               isStart && styles.subtitleStart,
               isRTL && styles.subtitleRTL,
               isStart && isRTL && styles.subtitleStartRTL,

@@ -1198,6 +1198,7 @@ export default {
     accessibility: {
       editProfile: 'Profili Düzenle ekranına git',
       language: 'Uygulama dilini değiştir',
+      appearance: 'Uygulama görünümünü değiştir',
       manageCv: 'CV Yükleme ekranına git',
       passwordReset: 'Şifre sıfırlama bağlantısı gönder',
       plansAndUpgrade: 'Planlar ve Yükseltme ekranına git',
@@ -1213,6 +1214,16 @@ export default {
     editProfile: 'Profili Düzenle',
     emailAddress: 'E-posta Adresi',
     language: 'Dil',
+    appearance: {
+      label: 'Görünüm',
+      title: 'Görünümü Seçin',
+      message: 'InternMatch AI arayüzünün nasıl görüntüleneceğini seçin.',
+      options: {
+        system: 'Sistem',
+        light: 'Açık',
+        dark: 'Koyu',
+      },
+    },
     plansAndUpgrade: 'Planlar ve Yükseltme',
     languagePicker: {
       changeFailedMessage: 'Dil değiştirilirken bir hata oluştu. Lütfen tekrar deneyin.',

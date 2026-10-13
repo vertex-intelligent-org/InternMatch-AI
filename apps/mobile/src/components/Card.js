@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import colors from '../theme/colors';
+import { useAppTheme } from '../context/ThemeProvider';
 import { spacing } from '../theme/spacing';
 
 export default function Card({
@@ -9,6 +10,7 @@ export default function Card({
   padding = 'md',
   variant = 'default',
 }) {
+  const { colors } = useAppTheme();
   const paddingValue = {
     none: 0,
     sm: spacing.sm,
@@ -24,7 +26,24 @@ export default function Card({
   }[variant] ?? styles.default;
 
   return (
-    <View style={[styles.base, variantStyle, { padding: paddingValue }, style]}>
+    <View
+      style={[
+        styles.base,
+        variantStyle,
+        {
+          padding: paddingValue,
+          backgroundColor:
+            variant === 'subtle'
+              ? colors.surfaceSubtle
+              : colors.surface,
+          borderColor:
+            variant === 'highlight'
+              ? colors.accent
+              : colors.borderSubtle,
+        },
+        style,
+      ]}
+    >
       {children}
     </View>
   );

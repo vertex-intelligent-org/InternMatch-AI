@@ -12,7 +12,7 @@ import {
   Switch,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import colors from '../theme/colors';
+import { useAppTheme } from '../context/ThemeProvider';
 import { spacing } from '../theme/spacing';
 import { typography } from '../theme/typography';
 import ScreenContainer from '../components/ScreenContainer';
@@ -46,6 +46,12 @@ const LANGUAGE_OPTIONS = [
   { code: 'ar', label: '\u0627\u0644\u0639\u0631\u0628\u064a\u0629' },
 ];
 
+const APPEARANCE_OPTIONS = [
+  { code: 'system', icon: 'phone-portrait-outline' },
+  { code: 'light', icon: 'sunny-outline' },
+  { code: 'dark', icon: 'moon-outline' },
+];
+
 function SettingsRow({
   icon,
   iconColor,
@@ -60,6 +66,8 @@ function SettingsRow({
   const isPressable = typeof onPress === 'function';
   const Wrapper = isPressable ? TouchableOpacity : View;
   const { isRTL } = useLocalization();
+  const { colors } = useAppTheme();
+  const styles = createStyles(colors);
 
   return (
     <Wrapper
@@ -117,7 +125,11 @@ export default function SettingsScreen({ navigation }) {
   const { backendSubscription } = useSubscription();
   const { t } = useTranslation();
   const { locale, isRTL, setLocale } = useLocalization();
+  const { appearance, colors, setAppearance } = useAppTheme();
+  const styles = createStyles(colors);
+
   const [languagePickerVisible, setLanguagePickerVisible] = useState(false);
+  const [appearancePickerVisible, setAppearancePickerVisible] = useState(false);
   const [supportFallbackVisible, setSupportFallbackVisible] = useState(false);
   const [changingLanguage, setChangingLanguage] = useState(false);
   const [resettingPassword, setResettingPassword] = useState(false);
@@ -185,6 +197,17 @@ export default function SettingsScreen({ navigation }) {
       languageChangeInFlightRef.current = false;
       setChangingLanguage(false);
     }
+  };
+
+  const handleAppearanceChange = async (nextAppearance) => {
+    setAppearancePickerVisible(false);
+
+    if (nextAppearance === appearance) {
+      return;
+    }
+
+    await setAppearance(nextAppearance);
+    haptics.success();
   };
 
   const handlePasswordReset = async () => {
@@ -485,6 +508,13 @@ export default function SettingsScreen({ navigation }) {
             accessibilityLabel={t('settings.accessibility.language')}
           />
           <SettingsRow
+            icon="color-palette-outline"
+            label={t('settings.appearance.label')}
+            value={t(`settings.appearance.options.${appearance}`)}
+            onPress={() => setAppearancePickerVisible(true)}
+            accessibilityLabel={t('settings.accessibility.appearance')}
+          />
+          <SettingsRow
             icon="key-outline"
             label={t('settings.changePassword')}
             onPress={handlePasswordReset}
@@ -672,6 +702,88 @@ export default function SettingsScreen({ navigation }) {
       </ScrollView>
 
       <Modal
+        visible={appearancePickerVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setAppearancePickerVisible(false)}
+      >
+        <View style={styles.languageModalBackdrop}>
+          <GlassSurface variant="card" style={styles.languageSheet}>
+            <Text style={[styles.languageTitle, isRTL && styles.textRTL]}>
+              {t('settings.appearance.title')}
+            </Text>
+
+            <Text style={[styles.languageMessage, isRTL && styles.textRTL]}>
+              {t('settings.appearance.message')}
+            </Text>
+
+            {APPEARANCE_OPTIONS.map((option) => {
+              const selected = option.code === appearance;
+
+              return (
+                <TouchableOpacity
+                  key={option.code}
+                  style={[
+                    styles.languageOption,
+                    selected && styles.languageOptionSelected,
+                  ]}
+                  onPress={() => handleAppearanceChange(option.code)}
+                  accessibilityRole="radio"
+                  accessibilityLabel={t(`settings.appearance.options.${option.code}`)}
+                  accessibilityState={{ selected }}
+                  activeOpacity={0.72}
+                >
+                  <View style={styles.languageFlagCol}>
+                    <Ionicons
+                      name={option.icon}
+                      size={21}
+                      color={
+                        selected
+                          ? colors.accent || colors.teal
+                          : colors.textSecondary || colors.textMuted
+                      }
+                    />
+                  </View>
+
+                  <View style={styles.languageNameCol}>
+                    <Text
+                      style={[
+                        styles.languageOptionText,
+                        selected && styles.languageOptionTextSelected,
+                      ]}
+                    >
+                      {t(`settings.appearance.options.${option.code}`)}
+                    </Text>
+                  </View>
+
+                  <View style={styles.languageCheckCol}>
+                    {selected ? (
+                      <Ionicons
+                        name="checkmark-circle"
+                        size={20}
+                        color={colors.accent || colors.teal}
+                      />
+                    ) : null}
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+
+            <TouchableOpacity
+              style={styles.languageCancel}
+              onPress={() => setAppearancePickerVisible(false)}
+              accessibilityRole="button"
+              accessibilityLabel={t('common.cancel')}
+            >
+              <Text style={[styles.languageCancelText, isRTL && styles.textRTL]}>
+                {t('common.cancel')}
+              </Text>
+            </TouchableOpacity>
+          </GlassSurface>
+        </View>
+      </Modal>
+
+      <Modal
         visible={supportFallbackVisible}
         transparent={true}
         animationType="fade"
@@ -795,7 +907,7 @@ export default function SettingsScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors) => StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: colors.background || colors.screenBg,
@@ -903,11 +1015,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.borderSubtle || 'rgba(14, 116, 144, 0.12)',
     marginBottom: spacing.sm,
-    backgroundColor: 'rgba(255, 255, 255, 0.65)',
+    backgroundColor: colors.surfaceElevated || colors.surface || colors.cardBg,
   },
   languageOptionSelected: {
     borderColor: colors.accent || colors.teal,
-    backgroundColor: 'rgba(14, 116, 144, 0.10)',
+    backgroundColor: colors.accentSoft || 'rgba(14, 116, 144, 0.10)',
   },
   languageFlagCol: {
     width: 36,

@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { StyleSheet } from 'react-native';
 import { useLocalization } from '../localization/LocalizationContext';
 import { Ionicons } from '@expo/vector-icons';
-import colors from '../theme/colors';
+import { useAppTheme } from '../context/ThemeProvider';
 import { spacing } from '../theme/spacing';
 import motionTokens from '../motion/motionTokens';
 import PressableScale from './PressableScale';
@@ -11,13 +11,15 @@ import PressableScale from './PressableScale';
 export default function BackButton({
   navigation,
   onPress,
-  color = colors.textPrimary || colors.textDark,
+  color,
   style,
   accessibilityLabel,
   accessibilityHint,
 }) {
   const { t } = useTranslation();
   const { isRTL } = useLocalization();
+  const { colors } = useAppTheme();
+  const resolvedColor = color || colors.textPrimary || colors.textDark;
   const resolvedAccessibilityLabel = accessibilityLabel ?? t('navigation.back.label');
   const resolvedAccessibilityHint = accessibilityHint ?? t('navigation.back.hint');
 
@@ -41,7 +43,7 @@ export default function BackButton({
       accessibilityHint={resolvedAccessibilityHint}
       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
     >
-      <Ionicons name={isRTL ? 'arrow-forward' : 'arrow-back'} size={22} color={color} />
+      <Ionicons name={isRTL ? 'arrow-forward' : 'arrow-back'} size={22} color={resolvedColor} />
     </PressableScale>
   );
 }

@@ -1198,6 +1198,7 @@ export default {
     accessibility: {
       editProfile: 'Navigate to Edit Profile',
       language: 'Change app language',
+      appearance: 'Change app appearance',
       manageCv: 'Navigate to CV Upload',
       passwordReset: 'Send password reset link',
       plansAndUpgrade: 'Navigate to Plans and Upgrade',
@@ -1213,6 +1214,16 @@ export default {
     editProfile: 'Edit Profile',
     emailAddress: 'Email Address',
     language: 'Language',
+    appearance: {
+      label: 'Appearance',
+      title: 'Choose Appearance',
+      message: 'Choose how InternMatch AI should display its interface.',
+      options: {
+        system: 'System',
+        light: 'Light',
+        dark: 'Dark',
+      },
+    },
     plansAndUpgrade: 'Plans & Upgrade',
     languagePicker: {
       changeFailedMessage: 'Something went wrong while changing the language. Please try again.',

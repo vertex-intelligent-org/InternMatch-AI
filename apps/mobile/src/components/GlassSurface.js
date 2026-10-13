@@ -6,7 +6,7 @@ import {
   isLiquidGlassAvailable,
   isGlassEffectAPIAvailable,
 } from 'expo-glass-effect';
-import colors from '../theme/colors';
+import { useAppTheme } from '../context/ThemeProvider';
 import { spacing } from '../theme/spacing';
 
 /**
@@ -24,6 +24,7 @@ export default function GlassSurface({
   intensity = 75,
   tintColor,
 }) {
+  const { isDark } = useAppTheme();
   const isLiquidSupported =
     Platform.OS === 'ios' &&
     ((typeof isLiquidGlassAvailable === 'function' && isLiquidGlassAvailable()) &&
@@ -36,12 +37,19 @@ export default function GlassSurface({
     subtle: styles.subtleContainer,
   }[variant] ?? styles.panelContainer;
 
-  const defaultTintColor = {
-    panel: 'rgba(255, 255, 255, 0.72)',
-    control: 'rgba(255, 255, 255, 0.65)',
-    card: 'rgba(255, 255, 255, 0.80)',
-    subtle: 'rgba(255, 255, 255, 0.50)',
-  }[variant];
+  const defaultTintColor = isDark
+    ? {
+        panel: 'rgba(13, 35, 42, 0.72)',
+        control: 'rgba(17, 43, 51, 0.72)',
+        card: 'rgba(13, 35, 42, 0.80)',
+        subtle: 'rgba(16, 38, 45, 0.70)',
+      }[variant]
+    : {
+        panel: 'rgba(255, 255, 255, 0.72)',
+        control: 'rgba(255, 255, 255, 0.65)',
+        card: 'rgba(255, 255, 255, 0.80)',
+        subtle: 'rgba(255, 255, 255, 0.50)',
+      }[variant];
 
   const effectiveTintColor = tintColor || defaultTintColor;
 
@@ -53,7 +61,7 @@ export default function GlassSurface({
           <GlassView
             style={StyleSheet.absoluteFillObject}
             glassEffectStyle={glassEffectStyle}
-            colorScheme="light"
+            colorScheme={isDark ? "dark" : "light"}
             tintColor={effectiveTintColor}
           />
           <View
@@ -68,7 +76,7 @@ export default function GlassSurface({
         <>
           <BlurView
             style={StyleSheet.absoluteFillObject}
-            tint="systemUltraThinMaterialLight"
+            tint={isDark ? "systemUltraThinMaterialDark" : "systemUltraThinMaterialLight"}
             intensity={intensity}
           />
           <View

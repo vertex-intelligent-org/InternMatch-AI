@@ -16,6 +16,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import colors from '../theme/colors';
+import { useAppTheme } from '../context/ThemeProvider';
 import { spacing } from '../theme/spacing';
 import motionTokens from '../motion/motionTokens';
 import useReducedMotion from '../hooks/useReducedMotion';
@@ -64,6 +65,7 @@ export default function CustomTabBar({ state, descriptors, navigation }) {
   const { profile } = useProfile();
   const { t } = useTranslation();
   const { isRTL } = useLocalization();
+  const { isDark } = useAppTheme();
 
   const [avatarLoadError, setAvatarLoadError] = useState(false);
 
@@ -120,7 +122,7 @@ export default function CustomTabBar({ state, descriptors, navigation }) {
           <GlassView
             style={StyleSheet.absoluteFillObject}
             glassEffectStyle="regular"
-            colorScheme="light"
+            colorScheme={isDark ? "dark" : "light"}
             tintColor={
               isScrolled
                 ? 'rgba(14, 116, 144, 0.40)'
@@ -185,7 +187,7 @@ export default function CustomTabBar({ state, descriptors, navigation }) {
               <GlassView
                 style={StyleSheet.absoluteFillObject}
                 glassEffectStyle="regular"
-                colorScheme="light"
+                colorScheme={isDark ? "dark" : "light"}
                 tintColor="rgba(255, 255, 255, 0.75)"
               />
               <View style={[StyleSheet.absoluteFillObject, styles.liquidLensOverlay]} />

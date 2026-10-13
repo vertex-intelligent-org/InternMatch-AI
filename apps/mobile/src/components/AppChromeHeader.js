@@ -1,14 +1,25 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import colors from '../theme/colors';
+import { useAppTheme } from '../context/ThemeProvider';
 import { spacing } from '../theme/spacing';
 import InternMatchLogo from './InternMatchLogo';
 import PlanBadge from './PlanBadge';
 
 import NotificationBell from './NotificationBell';
 export default function AppChromeHeader({ style, rightAction, plan = 'free', onPlanPress }) {
+  const { colors } = useAppTheme();
   return (
-    <View style={[styles.headerContainer, style]}>
+    <View
+      style={[
+        styles.headerContainer,
+        {
+          backgroundColor: colors.surface,
+          borderBottomColor: colors.borderSubtle,
+        },
+        style,
+      ]}
+    >
       <View style={styles.contentRow}>
         <InternMatchLogo style={styles.logoItem} />
         <View style={styles.rightGroup}>
