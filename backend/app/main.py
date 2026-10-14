@@ -12,7 +12,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.api.internal import router as internal_router
-
 from app.api.router import api_router
 from app.api.v1.endpoints.health import HealthResponse, get_liveness
 from app.core.config import settings, validate_runtime_config
