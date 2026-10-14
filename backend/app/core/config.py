@@ -61,6 +61,10 @@ class Settings(BaseSettings):
     REVENUECAT_SECRET_KEY: str = ""
     REVENUECAT_ENVIRONMENT: str = "sandbox"
 
+    # Server-only shared secret for the scheduled database heartbeat.
+    # Never expose this value to mobile/web clients or logs.
+    HEARTBEAT_SECRET: str = ""
+
     # InternMatch-controlled promotional access.
     # Raw codes are never persisted; grants are issued server-side.
     REVENUECAT_PROMO_SECRET_KEY: str = ""

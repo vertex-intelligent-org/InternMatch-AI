@@ -11,6 +11,8 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from app.api.internal import router as internal_router
+
 from app.api.router import api_router
 from app.api.v1.endpoints.health import HealthResponse, get_liveness
 from app.core.config import settings, validate_runtime_config
@@ -497,6 +499,7 @@ async def private_document_browser_guard(
     )
 
 
+app.include_router(internal_router)
 app.include_router(api_router, prefix="/api")
 
 # Mount Root Liveness Endpoint (/health)

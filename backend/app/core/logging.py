@@ -18,6 +18,7 @@ class SecretMaskingFormatter(logging.Formatter):
         "REVENUECAT_SECRET_KEY",
         "REVENUECAT_WEBHOOK_AUTH_TOKEN",
         "REVENUECAT_WEBHOOK_SIGNING_SECRET",
+        "HEARTBEAT_SECRET",
         "Bearer ",
     ]
 
@@ -30,6 +31,7 @@ class SecretMaskingFormatter(logging.Formatter):
             settings.REVENUECAT_SECRET_KEY,
             settings.REVENUECAT_WEBHOOK_AUTH_TOKEN,
             settings.REVENUECAT_WEBHOOK_SIGNING_SECRET,
+            settings.HEARTBEAT_SECRET,
         ]:
             if secret_val and len(secret_val) > 4 and secret_val in formatted:
                 formatted = formatted.replace(secret_val, "***REDACTED_SECRET***")
