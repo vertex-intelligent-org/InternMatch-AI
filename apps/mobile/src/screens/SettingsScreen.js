@@ -1,3 +1,4 @@
+import { presentPlans } from '../navigation/paywallNavigation';
 import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
@@ -491,7 +492,7 @@ export default function SettingsScreen({ navigation }) {
             icon="sparkles-outline"
             label={t('settings.plansAndUpgrade')}
             value={currentPlanLabel}
-            onPress={() => navigation.navigate('Plans')}
+            onPress={() => presentPlans(navigation)}
             accessibilityLabel={t('settings.accessibility.plansAndUpgrade')}
           />
           <SettingsRow

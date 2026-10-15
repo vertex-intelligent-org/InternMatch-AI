@@ -11,6 +11,9 @@ export const colors = {
 
   // Backgrounds
   screenBg: '#EAF6F8',
+  authGradientStart: '#DBF1F5',
+  authGradientMid: '#EAF6F8',
+  authGradientEnd: '#E3F4F6',
   cardBg: '#FFFFFF',
   inputBg: '#E2E2E2',
 
@@ -106,6 +109,9 @@ export const darkThemeColors = {
   // Semantic surfaces
   background: '#07171D',
   screenBg: '#07171D',
+  authGradientStart: '#061419',
+  authGradientMid: '#0A2027',
+  authGradientEnd: '#0D2931',
   surface: '#0D232A',
   surfaceElevated: '#112B33',
   surfaceSubtle: '#10262D',

@@ -95,7 +95,7 @@ def test_cv_checks_quota_before_document_picker():
     )
 
     assert (
-        "navigation.navigate('Plans')"
+        "presentPlans(navigation)"
         in block
     )
 
@@ -119,7 +119,7 @@ def test_application_support_checks_before_generation():
     )
 
     assert (
-        "navigation.navigate('Plans')"
+        "presentPlans(navigation)"
         in block
     )
 
@@ -142,7 +142,7 @@ def test_match_explanation_checks_before_enqueue():
         "runExplanationJob(",
     )
 
-    assert "'Plans'" in block
+    assert "presentPlans(navigation)" in block
 
 
 def test_interview_prep_checks_before_enqueue():
@@ -169,7 +169,7 @@ def test_interview_prep_checks_before_enqueue():
     )
 
     assert (
-        "navigation.navigate('Plans')"
+        "presentPlans(navigation)"
         in block
     )
 
@@ -226,7 +226,7 @@ def test_employer_candidate_free_quota_routes_to_plans():
     )
 
     assert (
-        "navigation.navigate('Plans')"
+        "presentPlans(navigation)"
         in insight
     )
 
@@ -253,7 +253,7 @@ def test_employer_pro_only_ai_routes_directly():
     )
 
     assert (
-        "navigation.navigate('Plans')"
+        "presentPlans(navigation)"
         in candidate
     )
 
@@ -263,7 +263,7 @@ def test_employer_pro_only_ai_routes_directly():
     )
 
     assert (
-        "navigation.navigate('Plans')"
+        "presentPlans(navigation)"
         in description
     )
 
@@ -273,7 +273,7 @@ def test_employer_pro_only_ai_routes_directly():
     )
 
     assert (
-        "navigation.navigate('Plans')"
+        "presentPlans(navigation)"
         in shortlist
     )
 

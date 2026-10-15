@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import colors from '../theme/colors';
+import { useAppTheme } from '../context/ThemeProvider';
 import { spacing } from '../theme/spacing';
 import { typography } from '../theme/typography';
 import motionTokens from '../motion/motionTokens';
@@ -17,6 +17,8 @@ export default function AuthSegmentedControl({
   onTabChange,
   style,
 }) {
+  const { colors } = useAppTheme();
+  const styles = createStyles(colors);
   const { t } = useTranslation();
   const isSignIn = activeTab === 'signIn';
 
@@ -84,14 +86,14 @@ export default function AuthSegmentedControl({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors) => StyleSheet.create({
   container: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(14, 116, 144, 0.08)',
+    backgroundColor: colors.glass.activePill,
     borderRadius: spacing.radii.pill,
     padding: 3,
     borderWidth: 1,
-    borderColor: 'rgba(14, 116, 144, 0.12)',
+    borderColor: colors.glass.borderHairline,
     marginBottom: spacing.lg,
   },
   tab: {

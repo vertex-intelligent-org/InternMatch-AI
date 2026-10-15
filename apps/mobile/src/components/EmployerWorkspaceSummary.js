@@ -1,3 +1,4 @@
+import { presentPlans } from '../navigation/paywallNavigation';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -231,7 +232,7 @@ export default function EmployerWorkspaceSummary({
 
         {!isPro && (
           <TouchableOpacity
-            onPress={() => navigation.navigate('Plans')}
+            onPress={() => presentPlans(navigation)}
             accessibilityRole="button"
             style={{
               alignItems: 'center',

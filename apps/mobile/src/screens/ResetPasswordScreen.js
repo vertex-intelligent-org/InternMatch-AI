@@ -15,7 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { useLocalization } from '../localization/LocalizationContext';
-import colors from '../theme/colors';
+import { useAppTheme } from '../context/ThemeProvider';
 import { spacing } from '../theme/spacing';
 import { typography } from '../theme/typography';
 import InternMatchLogo from '../components/InternMatchLogo';
@@ -28,6 +28,8 @@ import { useProfile } from '../context/ProfileContext';
 import haptics from '../services/haptics';
 
 export default function ResetPasswordScreen({ navigation, route }) {
+  const { colors, isDark } = useAppTheme();
+  const styles = createStyles(colors);
   const { t } = useTranslation();
   const { isRTL } = useLocalization();
   const insets = useSafeAreaInsets();
@@ -136,7 +138,19 @@ export default function ResetPasswordScreen({ navigation, route }) {
 
   return (
     <LinearGradient
-      colors={['#DBF1F5', '#EAF6F8', '#E3F4F6']}
+      colors={
+        isDark
+          ? [
+              colors.authGradientStart,
+              colors.authGradientMid,
+              colors.authGradientEnd,
+            ]
+          : [
+              colors.authGradientStart,
+              colors.authGradientMid,
+              colors.authGradientEnd,
+            ]
+      }
       style={styles.container}
     >
       <KeyboardAvoidingView
@@ -230,7 +244,7 @@ export default function ResetPasswordScreen({ navigation, route }) {
                       onBlur={() => setFocusedField(null)}
                       secureTextEntry={!showPassword}
                       placeholder={t('passwordRecovery.resetPassword.newPasswordPlaceholder')}
-                      placeholderTextColor="rgba(22, 35, 46, 0.40)"
+                      placeholderTextColor={colors.textTertiary}
                       accessibilityLabel={t('passwordRecovery.accessibility.newPassword')}
                     />
                     <TouchableOpacity
@@ -268,7 +282,7 @@ export default function ResetPasswordScreen({ navigation, route }) {
                       onBlur={() => setFocusedField(null)}
                       secureTextEntry={!showConfirmPassword}
                       placeholder={t('passwordRecovery.resetPassword.confirmPasswordPlaceholder')}
-                      placeholderTextColor="rgba(22, 35, 46, 0.40)"
+                      placeholderTextColor={colors.textTertiary}
                       accessibilityLabel={t('passwordRecovery.accessibility.confirmPassword')}
                     />
                     <TouchableOpacity
@@ -326,7 +340,7 @@ export default function ResetPasswordScreen({ navigation, route }) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors) => StyleSheet.create({
   container: {
     flex: 1,
   },
@@ -382,7 +396,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   input: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     borderRadius: spacing.radii.md,
     minHeight: 48,
     paddingHorizontal: spacing.md,
@@ -396,7 +410,7 @@ const styles = StyleSheet.create({
   },
   inputFocused: {
     borderColor: colors.accent || colors.teal,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     shadowColor: colors.accent || colors.teal,
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.12,

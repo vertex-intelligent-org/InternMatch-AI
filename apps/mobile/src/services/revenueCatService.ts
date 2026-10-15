@@ -112,13 +112,36 @@ function normalizePublicApiKey(
     : '';
 }
 
-function getPublicApiKey(): string {
+interface RevenueCatApiKeyResolution {
+  apiKey: string;
+  reason: string | null;
+}
+
+function resolvePublicApiKey(): RevenueCatApiKeyResolution {
   const developmentKey = normalizePublicApiKey(
     process.env.EXPO_PUBLIC_REVENUECAT_API_KEY
   );
 
+  // The shared Test Store key is permitted only in development builds.
   if (__DEV__ && developmentKey) {
-    return developmentKey;
+    return {
+      apiKey: developmentKey,
+      reason: null,
+    };
+  }
+
+  const expectedPlatformPrefix =
+    Platform.OS === 'ios'
+      ? 'appl_'
+      : Platform.OS === 'android'
+        ? 'goog_'
+        : null;
+
+  if (!expectedPlatformPrefix) {
+    return {
+      apiKey: '',
+      reason: 'unsupported_platform',
+    };
   }
 
   const platformKey =
@@ -126,17 +149,41 @@ function getPublicApiKey(): string {
       ? normalizePublicApiKey(
           process.env.EXPO_PUBLIC_REVENUECAT_IOS_API_KEY
         )
-      : Platform.OS === 'android'
-        ? normalizePublicApiKey(
-            process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY
-          )
-        : '';
+      : normalizePublicApiKey(
+          process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY
+        );
 
-  if (!platformKey || platformKey.startsWith('test_')) {
-    return '';
+  if (!platformKey) {
+    return {
+      apiKey: '',
+      reason: 'missing_platform_api_key',
+    };
   }
 
-  return platformKey;
+  // RevenueCat intentionally terminates release builds configured with
+  // Test Store keys, including TestFlight and Play testing releases.
+  if (platformKey.startsWith('test_')) {
+    return {
+      apiKey: '',
+      reason: 'test_store_key_blocked_in_release',
+    };
+  }
+
+  if (!platformKey.startsWith(expectedPlatformPrefix)) {
+    return {
+      apiKey: '',
+      reason: 'wrong_platform_api_key',
+    };
+  }
+
+  return {
+    apiKey: platformKey,
+    reason: null,
+  };
+}
+
+function getPublicApiKey(): string {
+  return resolvePublicApiKey().apiKey;
 }
 
 /**
@@ -293,9 +340,12 @@ export async function initializeRevenueCat(
     return await syncRevenueCatUser(appUserId);
   }
 
-  const apiKey = getPublicApiKey();
+  const apiKeyResolution = resolvePublicApiKey();
+  const apiKey = apiKeyResolution.apiKey;
+
   if (!apiKey) {
-    configurationReason = 'missing_api_key';
+    configurationReason =
+      apiKeyResolution.reason || 'missing_api_key';
     return getRevenueCatRuntimeState();
   }
 

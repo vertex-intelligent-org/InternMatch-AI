@@ -1,3 +1,4 @@
+import { presentPlans } from '../navigation/paywallNavigation';
 import React, { useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -208,7 +209,7 @@ export default function EmployerCandidateIntelligence({
           if (
             currentPolicy?.is_pro !== true
           ) {
-            navigation.navigate('Plans');
+            presentPlans(navigation);
             return;
           }
 
@@ -247,7 +248,7 @@ export default function EmployerCandidateIntelligence({
       const nextPolicy = await ensurePolicy();
 
       if (!nextPolicy.interview_kit_available) {
-        navigation.navigate('Plans');
+        presentPlans(navigation);
         return;
       }
 
@@ -270,7 +271,7 @@ export default function EmployerCandidateIntelligence({
     } catch (error) {
       if (error instanceof ApiError) {
         if (error.status === 403) {
-          navigation.navigate('Plans');
+          presentPlans(navigation);
           return;
         } else if (error.status === 429) {
           setKitError(
@@ -661,7 +662,7 @@ export default function EmployerCandidateIntelligence({
 
             {kitError.includes('Employer Pro') ? (
               <TouchableOpacity
-                onPress={() => navigation.navigate('Plans')}
+                onPress={() => presentPlans(navigation)}
                 accessibilityRole="button"
                 style={{
                   marginTop: spacing.sm,

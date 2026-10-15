@@ -294,6 +294,12 @@ type ReactNativeFormDataFile = {
   type: string;
 };
 
+type ReactNativeFormDataAppend = (
+  this: FormData,
+  fieldName: string,
+  file: ReactNativeFormDataFile
+) => void;
+
 /**
  * React Native's native FormData implementation accepts URI-backed file
  * descriptors, while the DOM TypeScript declaration only models string/Blob.
@@ -306,13 +312,17 @@ function appendReactNativeFile(
   fieldName: string,
   file: ReactNativeFormDataFile
 ): void {
-  const nativeAppend = Reflect.get(formData, 'append');
+  const nativeAppend: unknown = Reflect.get(formData, 'append');
 
   if (typeof nativeAppend !== 'function') {
     throw new Error('FormData.append is unavailable.');
   }
 
-  nativeAppend.call(formData, fieldName, file);
+  (nativeAppend as ReactNativeFormDataAppend).call(
+    formData,
+    fieldName,
+    file
+  );
 }
 
 export type AvatarUploadResponse = {

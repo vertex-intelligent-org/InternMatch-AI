@@ -1,3 +1,4 @@
+import { presentPlans } from '../navigation/paywallNavigation';
 import React, { useCallback } from 'react';
 import { useNavigation } from '@react-navigation/native';
 import { useProfile } from '../context/ProfileContext';
@@ -20,7 +21,7 @@ export default function AuthenticatedAppChromeHeader({ style, rightAction }) {
   const currentPlanId = subscriptionSnapshot.currentPlan.id;
 
   const handlePlanPress = useCallback(() => {
-    navigation.navigate('Plans');
+    presentPlans(navigation);
   }, [navigation]);
 
   return (

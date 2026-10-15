@@ -1,3 +1,4 @@
+import { presentPlans } from '../navigation/paywallNavigation';
 import React, { useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -127,7 +128,7 @@ export default function EmployerDescriptionAssistant({
       const policy = await getEmployerProductPolicy();
 
       if (!policy.internship_description_available) {
-        navigation.navigate('Plans');
+        presentPlans(navigation);
         return;
       }
 
@@ -158,7 +159,7 @@ export default function EmployerDescriptionAssistant({
     } catch (generateError) {
       if (generateError instanceof ApiError) {
         if (generateError.status === 403) {
-          navigation.navigate('Plans');
+          presentPlans(navigation);
           return;
         } else if (generateError.status === 429) {
           setError(
@@ -298,7 +299,7 @@ export default function EmployerDescriptionAssistant({
 
           {error.includes('Employer Pro') ? (
             <TouchableOpacity
-              onPress={() => navigation.navigate('Plans')}
+              onPress={() => presentPlans(navigation)}
               accessibilityRole="button"
               style={{
                 marginTop: spacing.sm,

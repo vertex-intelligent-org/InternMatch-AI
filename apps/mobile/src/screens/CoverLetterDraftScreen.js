@@ -1,3 +1,4 @@
+import { presentPlans } from '../navigation/paywallNavigation';
 import React, { useState, useEffect, useCallback, useRef} from 'react';
 import {
   View,
@@ -239,7 +240,7 @@ export default function CoverLetterDraftScreen({ route, navigation }) {
       }
     );
 
-    navigation.navigate('Plans');
+    presentPlans(navigation);
   }, [
     generationError,
     navigation,
@@ -267,7 +268,7 @@ export default function CoverLetterDraftScreen({ route, navigation }) {
         );
 
       if (!canUseApplicationSupport) {
-        navigation.navigate('Plans');
+        presentPlans(navigation);
         return;
       }
 

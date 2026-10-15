@@ -1,3 +1,4 @@
+import { presentPlans } from '../navigation/paywallNavigation';
 import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
@@ -205,7 +206,7 @@ export default function CVUploadScreen({ route, navigation }) {
         );
 
       if (!canUseCVAnalysis) {
-        navigation.navigate('Plans');
+        presentPlans(navigation);
         return;
       }
 
@@ -312,7 +313,7 @@ export default function CVUploadScreen({ route, navigation }) {
           }
         );
 
-        navigation.navigate('Plans');
+        presentPlans(navigation);
         return;
       }
 

@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useLocalization } from '../localization/LocalizationContext';
-import colors from '../theme/colors';
+import { useAppTheme } from '../context/ThemeProvider';
 import { spacing } from '../theme/spacing';
 import { typography } from '../theme/typography';
 import haptics from '../services/haptics';
@@ -31,6 +31,8 @@ export default function PreAuthLanguageSwitcher({
   disabled = false,
   style,
 }) {
+  const { colors } = useAppTheme();
+  const styles = createStyles(colors);
   const { t } = useTranslation();
   const { locale, setLocale } = useLocalization();
 
@@ -256,16 +258,16 @@ export default function PreAuthLanguageSwitcher({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors) => StyleSheet.create({
   wrapper: {
     alignSelf: 'flex-end',
     height: COLLAPSED_WIDTH,
     borderRadius: COLLAPSED_WIDTH / 2,
     backgroundColor:
-      'rgba(255, 255, 255, 0.62)',
+      colors.glass.bgLight,
     borderWidth: 1,
     borderColor:
-      'rgba(14, 116, 144, 0.12)',
+      colors.glass.borderHairline,
     overflow: 'hidden',
     direction: 'ltr',
   },
@@ -295,7 +297,7 @@ const styles = StyleSheet.create({
 
   optionSelected: {
     backgroundColor:
-      'rgba(14, 116, 144, 0.14)',
+      colors.glass.activePill,
   },
 
   optionDisabled: {

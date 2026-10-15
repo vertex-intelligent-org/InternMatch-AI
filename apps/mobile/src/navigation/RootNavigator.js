@@ -358,7 +358,7 @@ export default function RootNavigator() {
         <Stack.Screen name="ApplicationDetail" component={ApplicationDetailScreen} />
         <Stack.Screen name="EditProfile" component={EditProfileScreen} />
         <Stack.Screen name="Settings" component={SettingsScreen} />
-        <Stack.Screen name="Plans" component={PlansScreen} />
+        <Stack.Screen name="Plans" component={PlansScreen} options={{ presentation: 'fullScreenModal' }} />
         <Stack.Screen name="SavedInternships" component={SavedInternshipsScreen} />
         <Stack.Screen name="CVUpload" component={CVUploadScreen} options={{ presentation: 'modal' }} />
         {/* Employer flow screens */}

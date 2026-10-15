@@ -17,7 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { useLocalization } from '../localization/LocalizationContext';
-import colors from '../theme/colors';
+import { useAppTheme } from '../context/ThemeProvider';
 import { spacing } from '../theme/spacing';
 import { typography } from '../theme/typography';
 import InternMatchLogo from '../components/InternMatchLogo';
@@ -47,6 +47,8 @@ import { useProfile } from '../context/ProfileContext';
 import haptics from '../services/haptics';
 
 export default function SignInScreen({ navigation, route }) {
+  const { colors, isDark } = useAppTheme();
+  const styles = createStyles(colors);
   const { t } = useTranslation();
   const { isRTL } = useLocalization();
   const insets = useSafeAreaInsets();
@@ -364,7 +366,19 @@ export default function SignInScreen({ navigation, route }) {
 
   return (
     <LinearGradient
-      colors={['#DBF1F5', '#EAF6F8', '#E3F4F6']}
+      colors={
+        isDark
+          ? [
+              colors.authGradientStart,
+              colors.authGradientMid,
+              colors.authGradientEnd,
+            ]
+          : [
+              colors.authGradientStart,
+              colors.authGradientMid,
+              colors.authGradientEnd,
+            ]
+      }
       style={styles.container}
     >
       <KeyboardAvoidingView
@@ -482,7 +496,7 @@ export default function SignInScreen({ navigation, route }) {
                 autoCorrect={false}
                 keyboardType="email-address"
                 placeholder="name@example.com"
-                placeholderTextColor="rgba(22, 35, 46, 0.40)"
+                placeholderTextColor={colors.textTertiary}
                 accessibilityLabel={t('auth.email')}
               />
             </View>
@@ -504,7 +518,7 @@ export default function SignInScreen({ navigation, route }) {
                   onBlur={() => setFocusedField(null)}
                   secureTextEntry={!passwordVisible}
                   placeholder={t('auth.passwordPlaceholder')}
-                  placeholderTextColor="rgba(22, 35, 46, 0.40)"
+                  placeholderTextColor={colors.textTertiary}
                   accessibilityLabel={t('auth.password')}
                 />
                 <TouchableOpacity
@@ -661,7 +675,7 @@ export default function SignInScreen({ navigation, route }) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors) => StyleSheet.create({
   container: {
     flex: 1,
   },
@@ -717,7 +731,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xs,
   },
   input: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     borderRadius: spacing.radii.md,
     minHeight: 48,
     paddingHorizontal: spacing.md,
@@ -753,7 +767,7 @@ const styles = StyleSheet.create({
   },
   inputFocused: {
     borderColor: colors.accent || colors.teal,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     shadowColor: colors.accent || colors.teal,
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.12,
@@ -858,7 +872,7 @@ const styles = StyleSheet.create({
   authLoadingButton: {
     minHeight: 50,
     borderRadius: 14,
-    backgroundColor: '#94A3B8',
+    backgroundColor: colors.textTertiary,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',

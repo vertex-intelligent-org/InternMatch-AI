@@ -1,3 +1,4 @@
+import { presentPlans } from '../navigation/paywallNavigation';
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View,
@@ -331,7 +332,7 @@ export default function ApplicationDetailScreen({ route, navigation }) {
 
         if (!canUseInterviewPrep) {
           setInterviewPrepLoading(false);
-          navigation.navigate('Plans');
+          presentPlans(navigation);
           return;
         }
 
@@ -369,9 +370,7 @@ export default function ApplicationDetailScreen({ route, navigation }) {
             }
           );
 
-          navigation.navigate(
-            'Plans'
-          );
+          presentPlans(navigation);
           return;
         }
 
@@ -406,9 +405,7 @@ export default function ApplicationDetailScreen({ route, navigation }) {
             }
           );
 
-          navigation.navigate(
-            'Plans'
-          );
+          presentPlans(navigation);
           return;
         }
 
@@ -523,9 +520,7 @@ export default function ApplicationDetailScreen({ route, navigation }) {
                       () => {}
                     );
 
-                    navigation.navigate(
-                      'Plans'
-                    );
+                    presentPlans(navigation);
                     return;
                   }
 

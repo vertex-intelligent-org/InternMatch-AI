@@ -17,7 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { useLocalization } from '../localization/LocalizationContext';
-import colors from '../theme/colors';
+import { useAppTheme } from '../context/ThemeProvider';
 import { spacing } from '../theme/spacing';
 import { typography } from '../theme/typography';
 import InternMatchLogo from '../components/InternMatchLogo';
@@ -40,6 +40,8 @@ import { useProfile } from '../context/ProfileContext';
 import haptics from '../services/haptics';
 
 export default function SignUpScreen({ navigation }) {
+  const { colors, isDark } = useAppTheme();
+  const styles = createStyles(colors);
   const { t } = useTranslation();
   const { isRTL } = useLocalization();
   const insets = useSafeAreaInsets();
@@ -378,7 +380,19 @@ export default function SignUpScreen({ navigation }) {
 
   return (
     <LinearGradient
-      colors={['#DBF1F5', '#EAF6F8', '#E3F4F6']}
+      colors={
+        isDark
+          ? [
+              colors.authGradientStart,
+              colors.authGradientMid,
+              colors.authGradientEnd,
+            ]
+          : [
+              colors.authGradientStart,
+              colors.authGradientMid,
+              colors.authGradientEnd,
+            ]
+      }
       style={styles.container}
     >
       <KeyboardAvoidingView
@@ -540,7 +554,7 @@ export default function SignUpScreen({ navigation }) {
                   fieldErrors.fullName && styles.inputError,
                 ]}
                 placeholder={t('auth.fullNamePlaceholder')}
-                placeholderTextColor="rgba(22, 35, 46, 0.40)"
+                placeholderTextColor={colors.textTertiary}
                 ref={fullNameRef}
                 value={fullName}
                 onChangeText={(value) => {
@@ -579,7 +593,7 @@ export default function SignUpScreen({ navigation }) {
                   fieldErrors.email && styles.inputError,
                 ]}
                 placeholder={t('auth.emailPlaceholder')}
-                placeholderTextColor="rgba(22, 35, 46, 0.40)"
+                placeholderTextColor={colors.textTertiary}
                 autoCapitalize="none"
                 autoCorrect={false}
                 keyboardType="email-address"
@@ -624,7 +638,7 @@ export default function SignUpScreen({ navigation }) {
                     isRTL && styles.passwordInputRTL,
                   ]}
                   placeholder={t('auth.passwordMin')}
-                  placeholderTextColor="rgba(22, 35, 46, 0.40)"
+                  placeholderTextColor={colors.textTertiary}
                   secureTextEntry={!passwordVisible}
                   ref={passwordRef}
                   value={password}
@@ -676,7 +690,7 @@ export default function SignUpScreen({ navigation }) {
                   focusedField === 'department' && styles.inputFocused,
                 ]}
                 placeholder={t('auth.departmentPlaceholder')}
-                placeholderTextColor="rgba(22, 35, 46, 0.40)"
+                placeholderTextColor={colors.textTertiary}
                 value={department}
                 onChangeText={setDepartment}
                 onFocus={() => setFocusedField('department')}
@@ -837,7 +851,7 @@ export default function SignUpScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors) => StyleSheet.create({
   container: {
     flex: 1,
   },
@@ -912,7 +926,7 @@ const styles = StyleSheet.create({
     borderColor: colors.accent || colors.teal,
   },
   typeCardInactive: {
-    backgroundColor: 'rgba(255, 255, 255, 0.70)',
+    backgroundColor: colors.surfaceElevated,
     borderColor: 'rgba(14, 116, 144, 0.14)',
   },
   typeText: {
@@ -929,7 +943,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   input: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     borderRadius: spacing.radii.md,
     minHeight: 48,
     paddingHorizontal: spacing.md,
@@ -965,7 +979,7 @@ const styles = StyleSheet.create({
   },
   inputFocused: {
     borderColor: colors.accent || colors.teal,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     shadowColor: colors.accent || colors.teal,
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.12,
@@ -1018,7 +1032,7 @@ const styles = StyleSheet.create({
     width: '100%',
     minHeight: 48,
     borderRadius: spacing.radii.pill,
-    backgroundColor: '#94A3B8',
+    backgroundColor: colors.textTertiary,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',

@@ -24,7 +24,7 @@ export default function GlassSurface({
   intensity = 75,
   tintColor,
 }) {
-  const { isDark } = useAppTheme();
+  const { colors, isDark } = useAppTheme();
   const isLiquidSupported =
     Platform.OS === 'ios' &&
     ((typeof isLiquidGlassAvailable === 'function' && isLiquidGlassAvailable()) &&
@@ -52,9 +52,31 @@ export default function GlassSurface({
       }[variant];
 
   const effectiveTintColor = tintColor || defaultTintColor;
+  const effectiveBorderColor = colors.glass.borderLight;
+  const effectiveShadowColor = colors.glass.shadow;
+  const liquidOverlayColor = isDark
+    ? 'rgba(7, 23, 29, 0.18)'
+    : variant === 'panel'
+      ? 'rgba(255, 255, 255, 0.52)'
+      : 'rgba(255, 255, 255, 0.40)';
+  const blurOverlayColor = isDark
+    ? 'rgba(7, 23, 29, 0.24)'
+    : variant === 'panel'
+      ? 'rgba(255, 255, 255, 0.52)'
+      : 'rgba(255, 255, 255, 0.60)';
 
   return (
-    <View style={[styles.baseContainer, variantContainerStyle, style]}>
+    <View
+      style={[
+        styles.baseContainer,
+        variantContainerStyle,
+        {
+          borderColor: effectiveBorderColor,
+          shadowColor: effectiveShadowColor,
+        },
+        style,
+      ]}
+    >
       {/* Background layer */}
       {isLiquidSupported ? (
         <>
@@ -69,6 +91,7 @@ export default function GlassSurface({
               StyleSheet.absoluteFillObject,
               styles.liquidOverlay,
               variant === 'panel' && styles.panelOverlay,
+              { backgroundColor: liquidOverlayColor },
             ]}
           />
         </>
@@ -84,6 +107,7 @@ export default function GlassSurface({
               StyleSheet.absoluteFillObject,
               styles.blurOverlay,
               variant === 'panel' && styles.panelOverlay,
+              { backgroundColor: blurOverlayColor },
             ]}
           />
         </>
@@ -93,6 +117,7 @@ export default function GlassSurface({
             StyleSheet.absoluteFillObject,
             styles.fallbackSurface,
             variant === 'subtle' && styles.fallbackSubtle,
+            { backgroundColor: effectiveTintColor },
           ]}
         />
       )}

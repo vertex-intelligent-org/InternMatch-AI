@@ -1,3 +1,4 @@
+import { presentPlans } from '../navigation/paywallNavigation';
 import React, { useCallback, useRef } from 'react';
 import {
   View,
@@ -196,7 +197,7 @@ export default function ProfileScreen({ navigation }) {
                 <GradientButton
                   title={t('profile.employer.viewPlans')}
                   color={colors.accent || colors.teal}
-                  onPress={() => navigation.navigate('Plans')}
+                  onPress={() => presentPlans(navigation)}
                   style={{ marginTop: spacing.md, width: '100%' }}
                 />
               </GlassSurface>

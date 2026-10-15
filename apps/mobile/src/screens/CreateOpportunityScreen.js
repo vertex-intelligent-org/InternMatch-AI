@@ -1,3 +1,4 @@
+import { presentPlans } from '../navigation/paywallNavigation';
 import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
@@ -406,7 +407,7 @@ export default function CreateOpportunityScreen({ navigation, route }) {
               'Upgrade to Employer Pro'
             ),
             onPress: () => {
-              navigation.navigate('Plans');
+              presentPlans(navigation);
             },
           },
         ]
@@ -708,7 +709,7 @@ export default function CreateOpportunityScreen({ navigation, route }) {
               <Text
                 accessibilityRole="button"
                 onPress={() => {
-                  navigation.navigate('Plans');
+                  presentPlans(navigation);
                 }}
                 style={{
                   color: colors.accentStrong || colors.tealDark,

@@ -146,7 +146,7 @@ def test_mobile_quota_and_verification_failures_are_separate():
     )
 
     assert (
-        "navigation.navigate('Plans')"
+        "presentPlans(navigation)"
         in source
     )
 

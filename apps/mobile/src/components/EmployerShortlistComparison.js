@@ -1,3 +1,4 @@
+import { presentPlans } from '../navigation/paywallNavigation';
 import React, { useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -147,7 +148,7 @@ export default function EmployerShortlistComparison({
       const policy = await getEmployerProductPolicy();
 
       if (!policy.shortlist_comparison_available) {
-        navigation.navigate('Plans');
+        presentPlans(navigation);
         return;
       }
 
@@ -179,7 +180,7 @@ export default function EmployerShortlistComparison({
     } catch (compareError) {
       if (compareError instanceof ApiError) {
         if (compareError.status === 403) {
-          navigation.navigate('Plans');
+          presentPlans(navigation);
           return;
         } else if (compareError.status === 409) {
           setError(
@@ -416,7 +417,7 @@ export default function EmployerShortlistComparison({
 
           {error.includes('Employer Pro') ? (
             <TouchableOpacity
-              onPress={() => navigation.navigate('Plans')}
+              onPress={() => presentPlans(navigation)}
               accessibilityRole="button"
               style={{
                 marginTop: spacing.sm,

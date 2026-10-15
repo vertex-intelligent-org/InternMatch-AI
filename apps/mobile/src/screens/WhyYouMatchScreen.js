@@ -1,3 +1,4 @@
+import { presentPlans } from '../navigation/paywallNavigation';
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View,
@@ -126,9 +127,7 @@ export default function WhyYouMatchScreen({ route, navigation }) {
       if (!canUseMatchExplanation) {
         setLoading(false);
 
-        navigation.navigate(
-          'Plans'
-        );
+        presentPlans(navigation);
         return;
       }
 
@@ -178,9 +177,7 @@ export default function WhyYouMatchScreen({ route, navigation }) {
             }
           );
 
-          navigation.navigate(
-            'Plans'
-          );
+          presentPlans(navigation);
           return;
         }
 
@@ -223,9 +220,7 @@ export default function WhyYouMatchScreen({ route, navigation }) {
             }
           );
 
-          navigation.navigate(
-            'Plans'
-          );
+          presentPlans(navigation);
         } else if (
           err instanceof ApiError &&
           err.status === 404
@@ -356,9 +351,7 @@ export default function WhyYouMatchScreen({ route, navigation }) {
                       () => {}
                     );
 
-                    navigation.navigate(
-                      'Plans'
-                    );
+                    presentPlans(navigation);
                     return;
                   }
 
