@@ -7,7 +7,7 @@ export default function ScreenContainer({
   children,
   style,
   edges = ['top', 'bottom'],
-  backgroundColor = colors.background || colors.screenBg,
+  backgroundColor,
   paddingHorizontal = 0,
 }) {
   const insets = useSafeAreaInsets();
@@ -15,7 +15,7 @@ export default function ScreenContainer({
 
   const safeStyle = {
     flex: 1,
-    backgroundColor: backgroundColor ?? colors.background,
+    backgroundColor: backgroundColor ?? colors.background ?? colors.screenBg,
     paddingTop: edges.includes('top') ? insets.top : 0,
     paddingBottom: edges.includes('bottom') ? insets.bottom : 0,
     paddingStart: edges.includes('left') || edges.includes('start') ? insets.left : paddingHorizontal,
