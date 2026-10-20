@@ -36,7 +36,7 @@ import ScreenHeader from '../components/ScreenHeader';
 import SwipeableNotificationRow from '../components/SwipeableNotificationRow';
 
 
-import colors from '../theme/colors';
+import { useAppTheme } from '../context/ThemeProvider';
 import { spacing } from '../theme/spacing';
 import { typography } from '../theme/typography';
 
@@ -198,6 +198,8 @@ function eventCopy(
 
 
 export default function NotificationsScreen({ navigation }) {
+  const { colors } = useAppTheme();
+  const styles = createStyles(colors);
   const {
     t,
   } = useTranslation();
@@ -397,7 +399,7 @@ export default function NotificationsScreen({ navigation }) {
 }
 
 
-const styles = StyleSheet.create({
+const createStyles = (colors) => StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: colors.background || colors.screenBg,

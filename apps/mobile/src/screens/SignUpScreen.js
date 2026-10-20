@@ -922,12 +922,12 @@ const createStyles = (colors) => StyleSheet.create({
     overflow: 'hidden',
   },
   typeCardActive: {
-    backgroundColor: 'rgba(14, 116, 144, 0.12)',
+    backgroundColor: colors.accentSoft,
     borderColor: colors.accent || colors.teal,
   },
   typeCardInactive: {
     backgroundColor: colors.surfaceElevated,
-    borderColor: 'rgba(14, 116, 144, 0.14)',
+    borderColor: colors.borderSubtle,
   },
   typeText: {
     marginStart: spacing.xs + 2,
@@ -948,7 +948,7 @@ const createStyles = (colors) => StyleSheet.create({
     minHeight: 48,
     paddingHorizontal: spacing.md,
     borderWidth: 1.5,
-    borderColor: 'rgba(14, 116, 144, 0.16)',
+    borderColor: colors.borderSubtle,
     color: colors.textDark,
     ...typography.body,
   },
@@ -1002,7 +1002,7 @@ const createStyles = (colors) => StyleSheet.create({
   divider: {
     flex: 1,
     height: 1,
-    backgroundColor: 'rgba(14, 116, 144, 0.15)',
+    backgroundColor: colors.borderSubtle,
   },
   dividerText: {
     ...typography.caption,

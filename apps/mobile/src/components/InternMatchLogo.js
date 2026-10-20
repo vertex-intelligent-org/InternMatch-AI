@@ -8,13 +8,15 @@ import Animated, {
   withTiming,
   Easing,
 } from 'react-native-reanimated';
-import colors from '../theme/colors';
+import { useAppTheme } from '../context/ThemeProvider';
 import { spacing } from '../theme/spacing';
 import { typography } from '../theme/typography';
 import useReducedMotion from '../hooks/useReducedMotion';
 
 export default function InternMatchLogo({ style }) {
   const { t } = useTranslation();
+  const { colors } = useAppTheme();
+  const styles = createStyles(colors);
   const isReducedMotion = useReducedMotion();
   const rotation = useSharedValue(0);
 
@@ -118,7 +120,7 @@ export default function InternMatchLogo({ style }) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors) => StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -10,17 +10,19 @@ import Animated, {
   cancelAnimation,
   Easing,
 } from 'react-native-reanimated';
-import colors from '../../theme/colors';
+import { useAppTheme } from '../../context/ThemeProvider';
 import motionTokens from '../../motion/motionTokens';
 import useReducedMotion from '../../hooks/useReducedMotion';
 
 export default function BrandedAILoader({
   size = 28,
-  color = colors.accent || colors.teal,
+  color,
   active = true,
   duration = motionTokens.durations.loaderRotation,
   style,
 }) {
+  const { colors } = useAppTheme();
+  const effectiveColor = color ?? colors.accent;
   const { t } = useTranslation();
   const isReducedMotion = useReducedMotion();
   const rotation = useSharedValue(0);
@@ -71,7 +73,7 @@ export default function BrandedAILoader({
             cx="16"
             cy="16"
             r="8.5"
-            stroke={color}
+            stroke={effectiveColor}
             strokeWidth="2.2"
             fill="none"
           />
@@ -81,7 +83,7 @@ export default function BrandedAILoader({
             y1="2"
             x2="16"
             y2="5.5"
-            stroke={color}
+            stroke={effectiveColor}
             strokeWidth="2.2"
             strokeLinecap="round"
           />
@@ -91,7 +93,7 @@ export default function BrandedAILoader({
             y1="26.5"
             x2="16"
             y2="30"
-            stroke={color}
+            stroke={effectiveColor}
             strokeWidth="2.2"
             strokeLinecap="round"
           />
@@ -101,7 +103,7 @@ export default function BrandedAILoader({
             y1="16"
             x2="5.5"
             y2="16"
-            stroke={color}
+            stroke={effectiveColor}
             strokeWidth="2.2"
             strokeLinecap="round"
           />
@@ -111,7 +113,7 @@ export default function BrandedAILoader({
             y1="16"
             x2="30"
             y2="16"
-            stroke={color}
+            stroke={effectiveColor}
             strokeWidth="2.2"
             strokeLinecap="round"
           />

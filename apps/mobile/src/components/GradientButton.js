@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { Animated, Text, StyleSheet, View } from 'react-native';
-import colors from '../theme/colors';
+import { useAppTheme } from '../context/ThemeProvider';
 import { spacing } from '../theme/spacing';
 import { typography } from '../theme/typography';
 import motionTokens from '../motion/motionTokens';
@@ -88,14 +88,20 @@ function DottedSpinner({ color }) {
 export default function GradientButton({
   title,
   onPress,
-  color = colors.primaryBlue,
-  textColor = colors.white,
+  color: providedColor,
+  textColor: providedTextColor,
   style,
   outline = false,
   disabled = false,
   loading = false,
   accessibilityLabel,
 }) {
+  const { colors, isDark } = useAppTheme();
+  const color = providedColor ??
+    (isDark ? colors.accentStrong : colors.primaryBlue);
+  const textColor = providedTextColor ??
+    (isDark ? colors.textInverse : colors.white);
+
   if (outline) {
     return (
       <PressableScale

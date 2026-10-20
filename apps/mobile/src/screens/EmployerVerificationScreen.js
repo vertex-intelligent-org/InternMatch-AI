@@ -17,7 +17,7 @@ import ScreenContainer from '../components/ScreenContainer';
 import ScreenHeader from '../components/ScreenHeader';
 import Card from '../components/Card';
 import GradientButton from '../components/GradientButton';
-import colors from '../theme/colors';
+import { useAppTheme } from '../context/ThemeProvider';
 import { spacing } from '../theme/spacing';
 import { typography } from '../theme/typography';
 import { useLocalization } from '../localization/LocalizationContext';
@@ -82,6 +82,8 @@ function isValidEmail(value) {
 }
 
 export default function EmployerVerificationScreen({ navigation }) {
+  const { colors } = useAppTheme();
+  const styles = createStyles(colors);
   const { t } = useTranslation();
   const { isRTL } = useLocalization();
 
@@ -774,7 +776,7 @@ export default function EmployerVerificationScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors) => StyleSheet.create({
   flex: {
     flex: 1,
   },

@@ -15,7 +15,7 @@ import {
   getEmployerProductPolicy,
 } from '../services/api';
 import { useTranslation } from 'react-i18next';
-import colors from '../theme/colors';
+import { useAppTheme } from '../context/ThemeProvider';
 import { spacing } from '../theme/spacing';
 import Card from './Card';
 
@@ -135,6 +135,7 @@ export default function EmployerCandidateIntelligence({
   navigation,
   isRTL = false,
 }) {
+  const { colors } = useAppTheme();
   const { t } = useTranslation();
 
   const [policy, setPolicy] = useState(null);

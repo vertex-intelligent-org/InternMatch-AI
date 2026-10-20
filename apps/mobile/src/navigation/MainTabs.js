@@ -11,11 +11,13 @@ import ProfileScreen from '../screens/ProfileScreen';
 import { TabScrollProvider } from '../context/TabScrollContext';
 import { useProfile } from '../context/ProfileContext';
 import { normalizeAccountType } from '../services/subscriptionService';
-import colors from '../theme/colors';
+import { useAppTheme } from '../context/ThemeProvider';
 
 const Tab = createBottomTabNavigator();
 
 export default function MainTabs() {
+  const { colors } = useAppTheme();
+  const styles = createStyles(colors);
   const { profile } = useProfile();
 
   if (!profile) {
@@ -57,7 +59,7 @@ export default function MainTabs() {
 }
 
 
-const styles = StyleSheet.create({
+const createStyles = (colors) => StyleSheet.create({
   loadingContainer: {
     flex: 1,
     backgroundColor: colors.background || colors.screenBg,

@@ -11,7 +11,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import colors from '../theme/colors';
+import { useAppTheme } from '../context/ThemeProvider';
 import { spacing } from '../theme/spacing';
 import { typography } from '../theme/typography';
 import { useLocalization } from '../localization/LocalizationContext';
@@ -25,7 +25,7 @@ import Reveal from '../components/motion/Reveal';
 import { getEmployerApplicants } from '../services/api';
 import EmployerShortlistComparison from '../components/EmployerShortlistComparison';
 
-function getStatusBadgeStyle(status) {
+function getStatusBadgeStyle(status, colors) {
   switch (status) {
     case 'applied':
       return {
@@ -49,13 +49,15 @@ function getStatusBadgeStyle(status) {
       };
     default:
       return {
-        bg: '#EDEDED',
+        bg: colors.surfaceMuted,
         fg: colors.textMuted,
       };
   }
 }
 
 export default function EmployerApplicantsScreen({ route, navigation }) {
+  const { colors } = useAppTheme();
+  const styles = createStyles(colors);
   const { t } = useTranslation();
   const { locale, isRTL } = useLocalization();
   const insets = useSafeAreaInsets();
@@ -199,7 +201,7 @@ export default function EmployerApplicantsScreen({ route, navigation }) {
         {!loading && !error && applicants.length > 0 && (
           <View style={styles.listContainer}>
             {applicants.map((item, index) => {
-              const statusStyle = getStatusBadgeStyle(item.status);
+              const statusStyle = getStatusBadgeStyle(item.status, colors);
               const appliedDateStr = item.applied_date
                 ? formatLocalizedDate(item.applied_date, locale)
                 : '';
@@ -340,7 +342,7 @@ export default function EmployerApplicantsScreen({ route, navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors) => StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: colors.background || colors.screenBg,

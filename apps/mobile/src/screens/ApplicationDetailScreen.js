@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
-import colors from '../theme/colors';
+import { useAppTheme } from '../context/ThemeProvider';
 import { spacing } from '../theme/spacing';
 import { typography } from '../theme/typography';
 import ScreenContainer from '../components/ScreenContainer';
@@ -43,7 +43,7 @@ const CANONICAL_STATUSES = [
   'accepted',
 ];
 
-const STATUS_CONFIG = {
+const createStatusConfig = (colors) => ({
   saved: {
     bg: colors.surfaceMuted || '#F1F5F9',
     fg: colors.textSecondary || '#475569',
@@ -69,9 +69,12 @@ const STATUS_CONFIG = {
     fg: colors.success || '#16A34A',
     icon: 'checkmark-circle-outline',
   },
-};
+});
 
 function StatusPill({ status }) {
+  const { colors } = useAppTheme();
+  const styles = createStyles(colors);
+  const STATUS_CONFIG = createStatusConfig(colors);
   const { t } = useTranslation();
   const { isRTL } = useLocalization();
   const config = STATUS_CONFIG[status] || STATUS_CONFIG.saved;
@@ -92,6 +95,9 @@ function StatusPill({ status }) {
 }
 
 export default function ApplicationDetailScreen({ route, navigation }) {
+  const { colors } = useAppTheme();
+  const styles = createStyles(colors);
+  const STATUS_CONFIG = createStatusConfig(colors);
   const { t } = useTranslation();
   const {
     refreshAIUsage,
@@ -1439,7 +1445,7 @@ export default function ApplicationDetailScreen({ route, navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors) => StyleSheet.create({
   container: {
     flex: 1,
   },

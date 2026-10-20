@@ -736,7 +736,7 @@ const createStyles = (colors) => StyleSheet.create({
     minHeight: 48,
     paddingHorizontal: spacing.md,
     borderWidth: 1.5,
-    borderColor: 'rgba(14, 116, 144, 0.16)',
+    borderColor: colors.borderSubtle,
     color: colors.textDark,
     ...typography.body,
   },
@@ -796,7 +796,7 @@ const createStyles = (colors) => StyleSheet.create({
   divider: {
     flex: 1,
     height: 1,
-    backgroundColor: 'rgba(14, 116, 144, 0.15)',
+    backgroundColor: colors.borderSubtle,
   },
   dividerText: {
     ...typography.caption,
@@ -823,10 +823,10 @@ const createStyles = (colors) => StyleSheet.create({
     fontWeight: '700',
   },
   confirmationPanel: {
-    backgroundColor: 'rgba(14, 116, 144, 0.08)',
+    backgroundColor: colors.accentSoft,
     borderRadius: spacing.radii.md,
     borderWidth: 1,
-    borderColor: 'rgba(14, 116, 144, 0.20)',
+    borderColor: colors.border,
     padding: spacing.md,
     marginTop: spacing.md,
     marginBottom: spacing.xs,
@@ -856,10 +856,10 @@ const createStyles = (colors) => StyleSheet.create({
     paddingVertical: spacing.xs,
     paddingHorizontal: spacing.sm + 2,
     borderRadius: spacing.radii.sm,
-    backgroundColor: 'rgba(14, 116, 144, 0.12)',
+    backgroundColor: colors.glass.activePill,
   },
   resendBtnDisabled: {
-    backgroundColor: 'rgba(14, 116, 144, 0.05)',
+    backgroundColor: colors.surfaceMuted,
   },
   resendBtnText: {
     ...typography.caption,

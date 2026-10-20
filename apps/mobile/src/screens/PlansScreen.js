@@ -11,7 +11,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { useFocusEffect } from '@react-navigation/native';
-import colors from '../theme/colors';
+import { useAppTheme } from '../context/ThemeProvider';
 import { spacing } from '../theme/spacing';
 import { typography } from '../theme/typography';
 import ScreenContainer from '../components/ScreenContainer';
@@ -49,6 +49,8 @@ const AI_USAGE_FEATURES = [
 ];
 
 export default function PlansScreen({ navigation }) {
+  const { colors } = useAppTheme();
+  const styles = createStyles(colors);
   const { t } = useTranslation();
   const { isRTL } = useLocalization();
   const { profile } = useProfile();
@@ -830,7 +832,7 @@ export default function PlansScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors) => StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: colors.background || '#F8FAFC',

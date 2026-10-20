@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
-import colors from '../theme/colors';
+import { useAppTheme } from '../context/ThemeProvider';
 import { spacing } from '../theme/spacing';
 import { typography } from '../theme/typography';
 import ScreenContainer from '../components/ScreenContainer';
@@ -25,6 +25,8 @@ import haptics from '../services/haptics';
 import { recordMeaningfulAppAction } from '../services/appReview';
 
 export default function CoverLetterScreen({ route, navigation }) {
+  const { colors } = useAppTheme();
+  const styles = createStyles(colors);
   const { t } = useTranslation();
   const applicationId = route?.params?.applicationId;
   const initialDraft = route?.params?.draft ?? '';
@@ -224,7 +226,7 @@ export default function CoverLetterScreen({ route, navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors) => StyleSheet.create({
   flex: {
     flex: 1,
   },

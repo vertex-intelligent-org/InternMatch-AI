@@ -16,7 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { useLocalization } from '../localization/LocalizationContext';
 import * as ImagePicker from 'expo-image-picker';
-import colors from '../theme/colors';
+import { useAppTheme } from '../context/ThemeProvider';
 import { spacing } from '../theme/spacing';
 import { typography } from '../theme/typography';
 import ScreenContainer from '../components/ScreenContainer';
@@ -79,6 +79,8 @@ function normalizeUrl(rawUrl) {
 }
 
 export default function EditProfileScreen({ navigation }) {
+  const { colors } = useAppTheme();
+  const styles = createStyles(colors);
   const { t } = useTranslation();
   const { isRTL } = useLocalization();
   const { profile, setProfile, refreshProfile } = useProfile();
@@ -918,7 +920,7 @@ export default function EditProfileScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors) => StyleSheet.create({
   flex: {
     flex: 1,
   },

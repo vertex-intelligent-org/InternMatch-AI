@@ -39,10 +39,10 @@ export default function GlassSurface({
 
   const defaultTintColor = isDark
     ? {
-        panel: 'rgba(13, 35, 42, 0.72)',
-        control: 'rgba(17, 43, 51, 0.72)',
-        card: 'rgba(13, 35, 42, 0.80)',
-        subtle: 'rgba(16, 38, 45, 0.70)',
+        panel: 'rgba(11, 37, 44, 0.94)',
+        control: 'rgba(16, 50, 58, 0.94)',
+        card: 'rgba(11, 37, 44, 0.96)',
+        subtle: 'rgba(13, 42, 50, 0.92)',
       }[variant]
     : {
         panel: 'rgba(255, 255, 255, 0.72)',
@@ -55,12 +55,12 @@ export default function GlassSurface({
   const effectiveBorderColor = colors.glass.borderLight;
   const effectiveShadowColor = colors.glass.shadow;
   const liquidOverlayColor = isDark
-    ? 'rgba(7, 23, 29, 0.18)'
+    ? 'rgba(6, 25, 31, 0.78)'
     : variant === 'panel'
       ? 'rgba(255, 255, 255, 0.52)'
       : 'rgba(255, 255, 255, 0.40)';
   const blurOverlayColor = isDark
-    ? 'rgba(7, 23, 29, 0.24)'
+    ? 'rgba(6, 25, 31, 0.84)'
     : variant === 'panel'
       ? 'rgba(255, 255, 255, 0.52)'
       : 'rgba(255, 255, 255, 0.60)';

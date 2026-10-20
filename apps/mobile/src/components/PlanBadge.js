@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import colors from '../theme/colors';
+import { useAppTheme } from '../context/ThemeProvider';
 import { spacing } from '../theme/spacing';
 import { typography } from '../theme/typography';
 
@@ -23,6 +23,8 @@ function getPlanLabel(plan, t) {
 
 export default function PlanBadge({ plan = 'free', style, onPress }) {
   const { t } = useTranslation();
+  const { colors } = useAppTheme();
+  const styles = createStyles(colors);
   const label = getPlanLabel(plan, t);
 
   const content = (
@@ -61,7 +63,7 @@ export default function PlanBadge({ plan = 'free', style, onPress }) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors) => StyleSheet.create({
   badge: {
     maxWidth: 130,
     paddingHorizontal: spacing.sm,

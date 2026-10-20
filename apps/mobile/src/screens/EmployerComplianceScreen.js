@@ -22,7 +22,7 @@ import { useTranslation } from 'react-i18next';
 import { useLocalization } from '../localization/LocalizationContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import colors from '../theme/colors';
+import { useAppTheme } from '../context/ThemeProvider';
 import { spacing } from '../theme/spacing';
 import {
   ApiError,
@@ -61,32 +61,32 @@ function nullable(value) {
   return cleaned || null;
 }
 
-function statusTone(status) {
+function statusTone(status, colors, isDark) {
   switch (status) {
     case 'approved':
       return {
-        backgroundColor: '#E8F7F1',
-        color: '#156B50',
+        backgroundColor: colors.successSoft,
+        color: isDark ? colors.success : '#156B50',
       };
 
     case 'pending':
       return {
-        backgroundColor: '#FFF5DD',
-        color: '#845B00',
+        backgroundColor: colors.warningSoft,
+        color: isDark ? colors.warning : '#765200',
       };
 
     case 'rejected':
     case 'revoked':
     case 'expired':
       return {
-        backgroundColor: '#FDECEC',
-        color: '#9B3030',
+        backgroundColor: colors.dangerSoft,
+        color: isDark ? colors.danger : '#943636',
       };
 
     default:
       return {
-        backgroundColor: '#EEF2F4',
-        color: '#52616B',
+        backgroundColor: colors.surfaceMuted,
+        color: colors.textSecondary,
       };
   }
 }
@@ -120,6 +120,8 @@ function ActionButton({
   danger = false,
   icon,
 }) {
+  const { colors, isDark } = useAppTheme();
+  const styles = createStyles(colors, isDark);
   const accent =
     colors.accentStrong
     || colors.accent
@@ -129,7 +131,7 @@ function ActionButton({
     ? '#A63A3A'
     : secondary
       ? (
-          colors.backgroundSecondary
+          colors.surfaceSubtle
           || '#F4F7F8'
         )
       : accent;
@@ -140,7 +142,7 @@ function ActionButton({
         || colors.text
         || '#16232E'
       )
-    : '#FFFFFF';
+    : danger ? '#FFFFFF' : colors.textInverse;
 
   const { isRTL } = useLocalization();
 
@@ -190,6 +192,8 @@ function ActionButton({
 export default function EmployerComplianceScreen({
   navigation,
 }) {
+  const { colors, isDark } = useAppTheme();
+  const styles = createStyles(colors, isDark);
   const { t } = useTranslation();
   const { isRTL } = useLocalization();
   const insets = useSafeAreaInsets();
@@ -933,7 +937,7 @@ export default function EmployerComplianceScreen({
           ]}
           value={form[key]}
           placeholder={placeholder}
-          placeholderTextColor="#91A0AA"
+          placeholderTextColor={colors.textTertiary}
           multiline={multiline}
           editable={
             editableField
@@ -1165,7 +1169,7 @@ export default function EmployerComplianceScreen({
               <Ionicons
                 name="add"
                 size={18}
-                color="#FFFFFF"
+                color={colors.textInverse}
               />
 
               <Text
@@ -1220,9 +1224,7 @@ export default function EmployerComplianceScreen({
 
           {claims.map((claim) => {
             const tone =
-              statusTone(
-                claim.status
-              );
+              statusTone(claim.status, colors, isDark);
 
             const active =
               claim.id === selectedId
@@ -1815,7 +1817,7 @@ export default function EmployerComplianceScreen({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors, isDark) => StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor:
@@ -1900,7 +1902,7 @@ const styles = StyleSheet.create({
     gap: 10,
     padding: 14,
     borderRadius: 14,
-    backgroundColor: '#EAF7F5',
+    backgroundColor: colors.accentSoft,
     marginBottom:
       spacing.md || 16,
   },
@@ -1909,18 +1911,18 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 13,
     lineHeight: 19,
-    color: '#235B55',
+    color: colors.accentStrong,
   },
 
   errorCard: {
     padding: 12,
     borderRadius: 12,
-    backgroundColor: '#FDECEC',
+    backgroundColor: colors.dangerSoft,
     marginBottom: 12,
   },
 
   errorText: {
-    color: '#943636',
+    color: isDark ? colors.danger : '#943636',
     fontSize: 13,
     lineHeight: 19,
   },
@@ -1928,12 +1930,12 @@ const styles = StyleSheet.create({
   successCard: {
     padding: 12,
     borderRadius: 12,
-    backgroundColor: '#E8F7F1',
+    backgroundColor: colors.successSoft,
     marginBottom: 12,
   },
 
   successText: {
-    color: '#156B50',
+    color: isDark ? colors.success : '#156B50',
     fontSize: 13,
     lineHeight: 19,
   },
@@ -1981,7 +1983,7 @@ const styles = StyleSheet.create({
   },
 
   newButtonText: {
-    color: '#FFFFFF',
+    color: colors.textInverse,
     fontWeight: '800',
     fontSize: 13,
   },
@@ -2115,20 +2117,20 @@ const styles = StyleSheet.create({
   readOnlyNotice: {
     padding: 10,
     borderRadius: 10,
-    backgroundColor: '#EEF2F4',
+    backgroundColor: colors.surfaceMuted,
     fontSize: 12,
     lineHeight: 18,
-    color: '#52616B',
+    color: colors.textSecondary,
     marginBottom: 12,
   },
 
   immutableNotice: {
     padding: 10,
     borderRadius: 10,
-    backgroundColor: '#FFF5DD',
+    backgroundColor: colors.warningSoft,
     fontSize: 12,
     lineHeight: 18,
-    color: '#765200',
+    color: isDark ? colors.warning : '#765200',
     marginBottom: 12,
   },
 
@@ -2155,7 +2157,7 @@ const styles = StyleSheet.create({
       colors.border
       || 'rgba(22,35,46,0.13)',
     backgroundColor:
-      colors.backgroundSecondary
+      colors.surfaceSubtle
       || '#F7F9FA',
     color:
       colors.textPrimary
@@ -2176,7 +2178,7 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 12,
     backgroundColor:
-      colors.backgroundSecondary
+      colors.surfaceSubtle
       || '#F7F9FA',
     marginBottom: 12,
   },
@@ -2205,7 +2207,7 @@ const styles = StyleSheet.create({
       colors.border
       || 'rgba(22,35,46,0.13)',
     backgroundColor:
-      colors.backgroundSecondary
+      colors.surfaceSubtle
       || '#F7F9FA',
   },
 
@@ -2230,7 +2232,7 @@ const styles = StyleSheet.create({
   },
 
   typeChipTextActive: {
-    color: '#FFFFFF',
+    color: colors.textInverse,
   },
 
   dateRow: {
@@ -2297,7 +2299,7 @@ const styles = StyleSheet.create({
     padding: 11,
     borderRadius: 12,
     backgroundColor:
-      colors.backgroundSecondary
+      colors.surfaceSubtle
       || '#F7F9FA',
     marginBottom: 8,
     gap: 10,
@@ -2326,7 +2328,7 @@ const styles = StyleSheet.create({
     borderRadius: 19,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#E8F7F5',
+    backgroundColor: colors.accentSoft,
   },
 
   noEvidenceText: {
@@ -2350,19 +2352,19 @@ const styles = StyleSheet.create({
     marginTop: 14,
     padding: 12,
     borderRadius: 12,
-    backgroundColor: '#FDECEC',
+    backgroundColor: colors.dangerSoft,
   },
 
   reviewReasonLabel: {
     fontSize: 11,
     fontWeight: '800',
-    color: '#943636',
+    color: isDark ? colors.danger : '#943636',
   },
 
   reviewReasonText: {
     marginTop: 4,
     fontSize: 13,
-    color: '#782B2B',
+    color: isDark ? colors.danger : '#943636',
   },
 
   centerCard: {

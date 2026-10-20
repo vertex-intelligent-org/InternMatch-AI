@@ -107,33 +107,33 @@ export const darkThemeColors = {
   ...colors,
 
   // Semantic surfaces
-  background: '#07171D',
-  screenBg: '#07171D',
-  authGradientStart: '#061419',
-  authGradientMid: '#0A2027',
-  authGradientEnd: '#0D2931',
-  surface: '#0D232A',
-  surfaceElevated: '#112B33',
-  surfaceSubtle: '#10262D',
-  surfaceMuted: '#16313A',
+  background: '#06191F',
+  screenBg: '#06191F',
+  authGradientStart: '#06191F',
+  authGradientMid: '#0B252C',
+  authGradientEnd: '#10323A',
+  surface: '#0B252C',
+  surfaceElevated: '#10323A',
+  surfaceSubtle: '#0D2A32',
+  surfaceMuted: '#143942',
 
   // Semantic text
-  textPrimary: '#F2F7F8',
-  textSecondary: '#C0D0D5',
-  textTertiary: '#94A9B0',
-  textDark: '#F2F7F8',
-  textMuted: '#A7BBC1',
-  textInverse: '#07171D',
+  textPrimary: '#F4FBFC',
+  textSecondary: '#B8C9CD',
+  textTertiary: '#8FA5AA',
+  textDark: '#F4FBFC',
+  textMuted: '#8FA5AA',
+  textInverse: '#06191F',
 
   // Accent
-  accent: '#20B9D2',
-  accentStrong: '#5AD4E5',
-  accentSoft: '#113A43',
+  accent: '#22B8CF',
+  accentStrong: '#55D1E1',
+  accentSoft: '#123B44',
 
   // Borders
-  border: '#27434B',
-  borderSubtle: '#24414A',
-  borderStrong: '#36545D',
+  border: '#28545E',
+  borderSubtle: '#214650',
+  borderStrong: '#396873',
 
   // Status
   success: '#34D399',
@@ -152,16 +152,16 @@ export const darkThemeColors = {
   redBg: '#3C1719',
 
   // Inputs
-  inputBg: '#112B33',
+  inputBg: '#10323A',
 
   // Glass
   glass: {
     ...colors.glass,
-    bgLight: 'rgba(13, 35, 42, 0.72)',
-    bgFallback: 'rgba(13, 35, 42, 0.96)',
-    borderLight: 'rgba(255, 255, 255, 0.10)',
-    borderHairline: 'rgba(255, 255, 255, 0.08)',
-    activePill: 'rgba(32, 185, 210, 0.14)',
+    bgLight: 'rgba(11, 37, 44, 0.94)',
+    bgFallback: 'rgba(11, 37, 44, 0.98)',
+    borderLight: 'rgba(85, 209, 225, 0.18)',
+    borderHairline: 'rgba(85, 209, 225, 0.14)',
+    activePill: 'rgba(85, 209, 225, 0.20)',
     shadow: 'rgba(0, 0, 0, 0.32)',
   },
 };

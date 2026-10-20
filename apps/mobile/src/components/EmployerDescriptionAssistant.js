@@ -15,7 +15,7 @@ import {
 } from '../services/api';
 import Card from './Card';
 import { useTranslation } from 'react-i18next';
-import colors from '../theme/colors';
+import { useAppTheme } from '../context/ThemeProvider';
 import { spacing } from '../theme/spacing';
 
 
@@ -94,6 +94,7 @@ export default function EmployerDescriptionAssistant({
   navigation,
   isRTL = false,
 }) {
+  const { colors } = useAppTheme();
   const { t } = useTranslation();
 
   const [draft, setDraft] = useState(null);

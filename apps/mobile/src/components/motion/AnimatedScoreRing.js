@@ -7,7 +7,7 @@ import Animated, {
   withTiming,
   Easing,
 } from 'react-native-reanimated';
-import colors from '../../theme/colors';
+import { useAppTheme } from '../../context/ThemeProvider';
 import { typography } from '../../theme/typography';
 import motionTokens from '../../motion/motionTokens';
 import useReducedMotion from '../../hooks/useReducedMotion';
@@ -18,10 +18,14 @@ export default function AnimatedScoreRing({
   score = 0,
   size = 140,
   strokeWidth = 12,
-  trackColor = '#E1EEF0',
-  progressColor = colors.accentStrong || colors.tealDark,
+  trackColor,
+  progressColor,
   style,
 }) {
+  const { colors } = useAppTheme();
+  const styles = createStyles(colors);
+  const effectiveTrackColor = trackColor ?? colors.borderSubtle;
+  const effectiveProgressColor = progressColor ?? colors.accentStrong;
   const isReducedMotion = useReducedMotion();
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
@@ -65,7 +69,7 @@ export default function AnimatedScoreRing({
           cx={size / 2}
           cy={size / 2}
           r={radius}
-          stroke={trackColor}
+          stroke={effectiveTrackColor}
           strokeWidth={strokeWidth}
           fill="none"
         />
@@ -74,7 +78,7 @@ export default function AnimatedScoreRing({
           cx={size / 2}
           cy={size / 2}
           r={radius}
-          stroke={progressColor}
+          stroke={effectiveProgressColor}
           strokeWidth={strokeWidth}
           fill="none"
           strokeDasharray={circumference}
@@ -92,7 +96,7 @@ export default function AnimatedScoreRing({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors) => StyleSheet.create({
   container: {
     alignItems: 'center',
     justifyContent: 'center',

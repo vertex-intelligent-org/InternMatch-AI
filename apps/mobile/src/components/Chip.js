@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import colors from '../theme/colors';
+import { useAppTheme } from '../context/ThemeProvider';
 import { spacing } from '../theme/spacing';
 import { typography } from '../theme/typography';
 import motionTokens from '../motion/motionTokens';
@@ -9,6 +9,7 @@ import PressableScale from './PressableScale';
 
 // variant: 'skill' (mint green) | 'gap' (orange outline) | 'neutral'
 export default function Chip({ label, variant = 'skill', onRemove, selected, onPress }) {
+  const { colors } = useAppTheme();
   const palette = {
     skill: { bg: colors.greenBg, fg: '#0F8A5F' },
     gap: { bg: colors.white, fg: colors.orange, border: colors.orange },

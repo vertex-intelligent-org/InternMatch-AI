@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
-import colors from '../theme/colors';
+import { useAppTheme } from '../context/ThemeProvider';
 import { spacing } from '../theme/spacing';
 import { typography } from '../theme/typography';
 import motionTokens from '../motion/motionTokens';
@@ -28,6 +28,8 @@ import useSmoothAIProgress from '../hooks/useSmoothAIProgress';
 import { useCancellableAIJob } from '../hooks/useCancellableAIJob';
 
 export default function WhyYouMatchScreen({ route, navigation }) {
+  const { colors } = useAppTheme();
+  const styles = createStyles(colors);
   const { t } = useTranslation();
   const {
     refreshAIUsage,
@@ -740,7 +742,7 @@ export default function WhyYouMatchScreen({ route, navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors) => StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: colors.background || colors.screenBg,

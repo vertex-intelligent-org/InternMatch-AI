@@ -19,7 +19,7 @@ import ScreenContainer from '../components/ScreenContainer';
 import ScreenHeader from '../components/ScreenHeader';
 import Card from '../components/Card';
 import Chip from '../components/Chip';
-import colors from '../theme/colors';
+import { useAppTheme } from '../context/ThemeProvider';
 import { spacing } from '../theme/spacing';
 import { typography } from '../theme/typography';
 import {
@@ -64,6 +64,8 @@ function DetailField({
   value,
   isRTL,
 }) {
+  const { colors } = useAppTheme();
+  const styles = createStyles(colors);
   if (
     value === null
     || value === undefined
@@ -101,6 +103,8 @@ export default function EmployerOpportunityDetailScreen({
   navigation,
   route,
 }) {
+  const { colors } = useAppTheme();
+  const styles = createStyles(colors);
   const { t } = useTranslation();
   const { isRTL } = useLocalization();
 
@@ -475,7 +479,7 @@ export default function EmployerOpportunityDetailScreen({
 }
 
 
-const styles = StyleSheet.create({
+const createStyles = (colors) => StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor:

@@ -15,7 +15,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useScrollToTop } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import colors from '../theme/colors';
+import { useAppTheme } from '../context/ThemeProvider';
 import { spacing } from '../theme/spacing';
 import { typography } from '../theme/typography';
 import motionTokens from '../motion/motionTokens';
@@ -39,6 +39,8 @@ import { useMatchCalculation } from '../hooks/useMatchCalculation';
 import EmployerWorkspaceSummary from '../components/EmployerWorkspaceSummary';
 
 export default function HomeScreen({ navigation }) {
+  const { colors } = useAppTheme();
+  const styles = createStyles(colors);
   const { profile, refreshProfile } = useProfile();
   const { t } = useTranslation();
   const { isRTL } = useLocalization();
@@ -864,7 +866,7 @@ export default function HomeScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors) => StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: colors.background || colors.screenBg,

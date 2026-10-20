@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import BackButton from './BackButton';
-import colors from '../theme/colors';
+
 import { useAppTheme } from '../context/ThemeProvider';
 import { spacing } from '../theme/spacing';
 import { typography } from '../theme/typography';
@@ -22,6 +22,7 @@ export default function ScreenHeader({
   const isStart = alignment === 'start';
   const { isRTL } = useLocalization();
   const { colors } = useAppTheme();
+  const styles = createStyles(colors);
 
   return (
     <View
@@ -92,7 +93,7 @@ export default function ScreenHeader({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors) => StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',

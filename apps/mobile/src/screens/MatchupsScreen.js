@@ -13,7 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { useIsFocused, useScrollToTop } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import colors from '../theme/colors';
+import { useAppTheme } from '../context/ThemeProvider';
 import { spacing } from '../theme/spacing';
 import { typography } from '../theme/typography';
 import { getTabScreenBottomPadding } from '../theme/tabBarLayout';
@@ -37,6 +37,8 @@ import { useLocalization } from '../localization/LocalizationContext';
 import { getLocalizedErrorMessage } from '../localization/errorMessages';
 
 export default function MatchupsScreen({ navigation }) {
+  const { colors } = useAppTheme();
+  const styles = createStyles(colors);
   const { t } = useTranslation();
   const { isRTL } = useLocalization();
   const insets = useSafeAreaInsets();
@@ -558,7 +560,7 @@ export default function MatchupsScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors) => StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: colors.background || colors.screenBg,

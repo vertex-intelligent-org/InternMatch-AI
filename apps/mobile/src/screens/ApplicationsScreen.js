@@ -13,7 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { useScrollToTop, useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import colors from '../theme/colors';
+import { useAppTheme } from '../context/ThemeProvider';
 import { spacing } from '../theme/spacing';
 import { typography } from '../theme/typography';
 import { getTabScreenBottomPadding } from '../theme/tabBarLayout';
@@ -37,17 +37,20 @@ import { useTabScroll, useTabScrollReporter } from '../context/TabScrollContext'
 import { useLocalization } from '../localization/LocalizationContext';
 import { formatLocalizedDate } from '../localization/formatters';
 
-const STATUS_THEME = {
+const createStatusTheme = (colors) => ({
   saved: { bg: colors.surfaceMuted || '#F1F5F9', fg: colors.textSecondary || '#475569' },
   applied: { bg: colors.infoSoft || '#E0F2FE', fg: colors.info || '#0284C7' },
   interviewing: { bg: colors.warningSoft || '#FEF3C7', fg: colors.warning || '#D97706' },
   rejected: { bg: colors.dangerSoft || '#FEE2E2', fg: colors.danger || '#DC2626' },
   accepted: { bg: colors.successSoft || '#DCFCE7', fg: colors.success || '#16A34A' },
-};
+});
 
 function StatusPill({ status }) {
   const { t } = useTranslation();
-  const theme = STATUS_THEME[status] || STATUS_THEME.saved;
+  const { colors } = useAppTheme();
+  const styles = createStyles(colors);
+  const statusTheme = createStatusTheme(colors);
+  const theme = statusTheme[status] || statusTheme.saved;
   const label = t(`applications.statuses.${status}`, { defaultValue: status });
   return (
     <View style={[styles.pill, { backgroundColor: theme.bg }]}>
@@ -59,6 +62,8 @@ function StatusPill({ status }) {
 export default function ApplicationsScreen({ navigation }) {
   const { t } = useTranslation();
   const { locale, isRTL } = useLocalization();
+  const { colors } = useAppTheme();
+  const styles = createStyles(colors);
   const insets = useSafeAreaInsets();
   const bottomPadding = getTabScreenBottomPadding(insets.bottom);
   const scrollViewRef = useRef(null);
@@ -450,7 +455,7 @@ export default function ApplicationsScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors) => StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: colors.background || colors.screenBg,

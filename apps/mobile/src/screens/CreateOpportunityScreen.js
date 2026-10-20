@@ -15,7 +15,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import colors from '../theme/colors';
+import { useAppTheme } from '../context/ThemeProvider';
 import { spacing } from '../theme/spacing';
 import { typography } from '../theme/typography';
 import { useLocalization } from '../localization/LocalizationContext';
@@ -103,6 +103,8 @@ function normalizeSkillsInput(rawText) {
 }
 
 export default function CreateOpportunityScreen({ navigation, route }) {
+  const { colors } = useAppTheme();
+  const styles = createStyles(colors);
   const { t } = useTranslation();
   const { isRTL } = useLocalization();
   const insets = useSafeAreaInsets();
@@ -1000,7 +1002,7 @@ export default function CreateOpportunityScreen({ navigation, route }) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors) => StyleSheet.create({
   flex: {
     flex: 1,
   },

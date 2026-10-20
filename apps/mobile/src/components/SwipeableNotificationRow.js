@@ -17,7 +17,7 @@ import {
   Ionicons,
 } from '@expo/vector-icons';
 
-import colors from '../theme/colors';
+import { useAppTheme } from '../context/ThemeProvider';
 import { spacing } from '../theme/spacing';
 import { typography } from '../theme/typography';
 
@@ -37,6 +37,8 @@ export default function SwipeableNotificationRow({
   markUnreadLabel,
   deleteLabel,
 }) {
+  const { colors } = useAppTheme();
+  const styles = createStyles(colors);
   const translateX =
     useRef(
       new Animated.Value(0)
@@ -326,8 +328,7 @@ export default function SwipeableNotificationRow({
 }
 
 
-const styles =
-  StyleSheet.create({
+const createStyles = (colors) => StyleSheet.create({
     shell: {
       position: 'relative',
       overflow: 'hidden',

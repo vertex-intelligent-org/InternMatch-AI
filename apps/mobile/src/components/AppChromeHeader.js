@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
-import colors from '../theme/colors';
+
 import { useAppTheme } from '../context/ThemeProvider';
 import { spacing } from '../theme/spacing';
 import InternMatchLogo from './InternMatchLogo';
@@ -9,6 +9,7 @@ import PlanBadge from './PlanBadge';
 import NotificationBell from './NotificationBell';
 export default function AppChromeHeader({ style, rightAction, plan = 'free', onPlanPress }) {
   const { colors } = useAppTheme();
+  const styles = createStyles(colors);
   return (
     <View
       style={[
@@ -32,7 +33,7 @@ export default function AppChromeHeader({ style, rightAction, plan = 'free', onP
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors) => StyleSheet.create({
   headerContainer: {
     height: 92,
     justifyContent: 'center',

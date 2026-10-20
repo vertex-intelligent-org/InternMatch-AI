@@ -8,7 +8,7 @@ import Animated, {
   withTiming,
   cancelAnimation,
 } from 'react-native-reanimated';
-import colors from '../../theme/colors';
+import { useAppTheme } from '../../context/ThemeProvider';
 import { spacing } from '../../theme/spacing';
 import motionTokens from '../../motion/motionTokens';
 import useReducedMotion from '../../hooks/useReducedMotion';
@@ -17,9 +17,12 @@ export default function AIPulse({
   active = true,
   children,
   style,
-  haloColor = colors.accentSoft || '#E6F4F6',
-  borderColor = colors.accent || colors.teal,
+  haloColor,
+  borderColor,
 }) {
+  const { colors } = useAppTheme();
+  const effectiveHaloColor = haloColor ?? colors.accentSoft;
+  const effectiveBorderColor = borderColor ?? colors.accent;
   const isReducedMotion = useReducedMotion();
   const opacity = useSharedValue(1);
   const scale = useSharedValue(1);
@@ -76,7 +79,7 @@ export default function AIPulse({
           accessible={false}
           style={[
             styles.halo,
-            { backgroundColor: haloColor, borderColor: borderColor },
+            { backgroundColor: effectiveHaloColor, borderColor: effectiveBorderColor },
             animatedHaloStyle,
           ]}
         />

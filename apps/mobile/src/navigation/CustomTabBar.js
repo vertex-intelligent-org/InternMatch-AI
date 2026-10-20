@@ -15,7 +15,6 @@ import Animated, {
   withSpring,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import colors from '../theme/colors';
 import { useAppTheme } from '../context/ThemeProvider';
 import { spacing } from '../theme/spacing';
 import motionTokens from '../motion/motionTokens';
@@ -125,8 +124,8 @@ export default function CustomTabBar({ state, descriptors, navigation }) {
             colorScheme={isDark ? "dark" : "light"}
             tintColor={
               isScrolled
-                ? 'rgba(14, 116, 144, 0.40)'
-                : 'rgba(7, 43, 56, 0.75)'
+                ? 'rgba(11, 37, 44, 0.98)'
+                : 'rgba(7, 94, 110, 0.96)'
             }
           />
           <View
@@ -134,8 +133,8 @@ export default function CustomTabBar({ state, descriptors, navigation }) {
               StyleSheet.absoluteFillObject,
               {
                 backgroundColor: isScrolled
-                  ? 'rgba(15, 76, 92, 0.25)'
-                  : 'rgba(7, 43, 56, 0.50)',
+                  ? 'rgba(11, 37, 44, 0.96)'
+                  : 'rgba(7, 94, 110, 0.94)',
               },
             ]}
           />
@@ -144,7 +143,7 @@ export default function CustomTabBar({ state, descriptors, navigation }) {
         <>
           <BlurView
             style={StyleSheet.absoluteFillObject}
-            tint="systemUltraThinMaterialLight"
+            tint={isDark ? "systemUltraThinMaterialDark" : "systemUltraThinMaterialLight"}
             intensity={85}
           />
           <View
@@ -152,8 +151,8 @@ export default function CustomTabBar({ state, descriptors, navigation }) {
               StyleSheet.absoluteFillObject,
               {
                 backgroundColor: isScrolled
-                  ? 'rgba(15, 76, 92, 0.32)'
-                  : 'rgba(7, 43, 56, 0.60)',
+                  ? 'rgba(11, 37, 44, 0.97)'
+                  : 'rgba(7, 94, 110, 0.95)',
               },
             ]}
           />
@@ -164,8 +163,8 @@ export default function CustomTabBar({ state, descriptors, navigation }) {
             StyleSheet.absoluteFillObject,
             {
               backgroundColor: isScrolled
-                ? 'rgba(15, 76, 92, 0.88)'
-                : 'rgba(7, 43, 56, 0.94)',
+                ? 'rgba(11, 37, 44, 0.98)'
+                : 'rgba(7, 94, 110, 0.97)',
             },
           ]}
         />
@@ -254,7 +253,7 @@ export default function CustomTabBar({ state, descriptors, navigation }) {
                   <Ionicons
                     name={iconName}
                     size={22}
-                    color={focused ? '#FFFFFF' : 'rgba(255, 255, 255, 0.65)'}
+                    color={focused ? '#FFFFFF' : 'rgba(255, 255, 255, 0.78)'}
                   />
                 )}
                 {focused && <View style={styles.dot} />}

@@ -11,7 +11,7 @@ import { useTranslation } from 'react-i18next';
 import ScreenContainer from '../components/ScreenContainer';
 import ScreenHeader from '../components/ScreenHeader';
 import Card from '../components/Card';
-import colors from '../theme/colors';
+import { useAppTheme } from '../context/ThemeProvider';
 import { spacing } from '../theme/spacing';
 import { typography } from '../theme/typography';
 import { useLocalization } from '../localization/LocalizationContext';
@@ -23,6 +23,8 @@ function GuidanceSection({
   bullets = [],
   isRTL,
 }) {
+  const { colors } = useAppTheme();
+  const styles = createStyles(colors);
   return (
     <Card style={styles.card} padding="lg">
       <View
@@ -90,6 +92,8 @@ export default function EmployerGuidanceScreen({
   navigation,
   route,
 }) {
+  const { colors } = useAppTheme();
+  const styles = createStyles(colors);
   const { t } = useTranslation();
   const { isRTL } = useLocalization();
 
@@ -248,7 +252,7 @@ export default function EmployerGuidanceScreen({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors) => StyleSheet.create({
   content: {
     paddingHorizontal: spacing.screenHorizontalPadding,
     paddingVertical: spacing.md,

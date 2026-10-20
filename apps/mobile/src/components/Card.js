@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
-import colors from '../theme/colors';
+
 import { useAppTheme } from '../context/ThemeProvider';
 import { spacing } from '../theme/spacing';
 
@@ -11,6 +11,7 @@ export default function Card({
   variant = 'default',
 }) {
   const { colors } = useAppTheme();
+  const styles = createStyles(colors);
   const paddingValue = {
     none: 0,
     sm: spacing.sm,
@@ -49,7 +50,7 @@ export default function Card({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors) => StyleSheet.create({
   base: {
     backgroundColor: colors.surface || colors.cardBg,
     borderRadius: spacing.radii.lg,

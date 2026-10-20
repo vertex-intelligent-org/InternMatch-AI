@@ -3,7 +3,7 @@ import { View, Text, StyleSheet } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import Svg, { Path } from 'react-native-svg';
 import { Ionicons } from '@expo/vector-icons';
-import colors from '../theme/colors';
+import { useAppTheme } from '../context/ThemeProvider';
 import { spacing } from '../theme/spacing';
 import { typography } from '../theme/typography';
 import motionTokens from '../motion/motionTokens';
@@ -48,6 +48,8 @@ export default function SocialAuthButton({
   label,
   style,
 }) {
+  const { colors, isDark } = useAppTheme();
+  const styles = createStyles(colors, isDark);
   const { t } = useTranslation();
   const isGoogle = provider === 'google';
   const resolvedLabel = label || (isGoogle ? t('auth.continueWithGoogle') : t('auth.continueWithApple'));
@@ -84,7 +86,7 @@ export default function SocialAuthButton({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors, isDark) => StyleSheet.create({
   button: {
     height: 48,
     minHeight: spacing.minimumTouchTarget,
@@ -96,10 +98,10 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   googleButton: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: isDark ? colors.surfaceElevated : '#FFFFFF',
     borderWidth: 1,
-    borderColor: 'rgba(14, 116, 144, 0.18)',
-    shadowColor: 'rgba(7, 43, 56, 0.08)',
+    borderColor: isDark ? colors.borderStrong : 'rgba(14, 116, 144, 0.18)',
+    shadowColor: isDark ? colors.glass.shadow : 'rgba(7, 43, 56, 0.08)',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 1,
     shadowRadius: 4,
@@ -128,7 +130,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   googleText: {
-    color: colors.textDark,
+    color: isDark ? colors.textPrimary : colors.textDark,
   },
   appleText: {
     color: '#FFFFFF',

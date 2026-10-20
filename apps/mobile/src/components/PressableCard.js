@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet } from 'react-native';
-import colors from '../theme/colors';
+import { useAppTheme } from '../context/ThemeProvider';
 import { spacing } from '../theme/spacing';
 import motionTokens from '../motion/motionTokens';
 import PressableScale from './PressableScale';
@@ -16,6 +16,8 @@ export default function PressableCard({
   accessibilityHint,
   hitSlop,
 }) {
+  const { colors } = useAppTheme();
+  const styles = createStyles(colors);
   const paddingValue = {
     none: 0,
     sm: spacing.sm,
@@ -48,7 +50,7 @@ export default function PressableCard({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors) => StyleSheet.create({
   base: {
     backgroundColor: colors.surface || colors.cardBg,
     borderRadius: spacing.radii.lg,

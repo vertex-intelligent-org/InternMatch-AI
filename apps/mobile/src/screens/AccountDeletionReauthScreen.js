@@ -24,7 +24,7 @@ import {
 import { deleteAccount } from '../services/api';
 import { signInWithGoogle } from '../services/googleAuth';
 import haptics from '../services/haptics';
-import colors from '../theme/colors';
+import { useAppTheme } from '../context/ThemeProvider';
 import { spacing } from '../theme/spacing';
 import { typography } from '../theme/typography';
 import ScreenContainer from '../components/ScreenContainer';
@@ -35,6 +35,8 @@ import { useLocalization } from '../localization/LocalizationContext';
 
 
 export default function AccountDeletionReauthScreen({ navigation }) {
+  const { colors } = useAppTheme();
+  const styles = createStyles(colors);
   const { t } = useTranslation();
   const { isRTL } = useLocalization();
   const { clearProfile } = useProfile();
@@ -375,7 +377,7 @@ export default function AccountDeletionReauthScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors) => StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: colors.background || colors.screenBg,

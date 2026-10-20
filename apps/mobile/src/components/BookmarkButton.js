@@ -2,7 +2,7 @@ import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
-import colors from '../theme/colors';
+import { useAppTheme } from '../context/ThemeProvider';
 import { spacing } from '../theme/spacing';
 import PressableScale from './PressableScale';
 
@@ -14,6 +14,7 @@ export default function BookmarkButton({
   style,
   hitSlop = { top: 8, bottom: 8, left: 8, right: 8 },
 }) {
+  const { colors } = useAppTheme();
   const { t } = useTranslation();
   const iconColor = isSaved ? colors.accentStrong : colors.textTertiary;
 

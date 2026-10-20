@@ -15,7 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Sharing from 'expo-sharing';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import colors from '../theme/colors';
+import { useAppTheme } from '../context/ThemeProvider';
 import { spacing } from '../theme/spacing';
 import { typography } from '../theme/typography';
 import { useLocalization } from '../localization/LocalizationContext';
@@ -34,7 +34,7 @@ import {
   updateEmployerApplicantStatus,
 } from '../services/api';
 
-function getStatusBadgeStyle(status) {
+function getStatusBadgeStyle(status, colors) {
   switch (status) {
     case 'applied':
       return {
@@ -58,13 +58,15 @@ function getStatusBadgeStyle(status) {
       };
     default:
       return {
-        bg: '#EDEDED',
+        bg: colors.surfaceMuted,
         fg: colors.textMuted,
       };
   }
 }
 
 export default function EmployerApplicantDetailScreen({ route, navigation }) {
+  const { colors } = useAppTheme();
+  const styles = createStyles(colors);
   const { t } = useTranslation();
   const { locale, isRTL } = useLocalization();
   const insets = useSafeAreaInsets();
@@ -363,7 +365,7 @@ export default function EmployerApplicantDetailScreen({ route, navigation }) {
   }, [applicationId, internshipId, openingCV, t]);
 
   const candidate = applicant?.candidate;
-  const statusStyle = getStatusBadgeStyle(applicant?.status);
+  const statusStyle = getStatusBadgeStyle(applicant?.status, colors);
   const appliedDateStr = applicant?.applied_date
     ? formatLocalizedDate(applicant.applied_date, locale)
     : '';
@@ -1326,7 +1328,7 @@ export default function EmployerApplicantDetailScreen({ route, navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors) => StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: colors.background || colors.screenBg,

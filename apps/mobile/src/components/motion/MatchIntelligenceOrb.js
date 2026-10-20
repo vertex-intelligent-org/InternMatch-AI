@@ -9,7 +9,7 @@ import Animated, {
   withSpring,
   withTiming,
 } from 'react-native-reanimated';
-import colors from '../../theme/colors';
+import { useAppTheme } from '../../context/ThemeProvider';
 import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
 import motionTokens from '../../motion/motionTokens';
@@ -24,6 +24,8 @@ export default function MatchIntelligenceOrb({
   progressPercent = 0,
   style,
 }) {
+  const { colors, isDark } = useAppTheme();
+  const styles = createStyles(colors, isDark);
   const { t } = useTranslation();
   const isReducedMotion = useReducedMotion();
   const scale = useSharedValue(isReducedMotion ? 1 : motionTokens.scales.orbSettleStart);
@@ -108,7 +110,7 @@ export default function MatchIntelligenceOrb({
         accessibilityLabel={accessibilityLabelText}
       >
         <LinearGradient
-          colors={['#FFFFFF', '#F0F9FA']}
+          colors={isDark ? [colors.surfaceElevated, colors.surface] : ['#FFFFFF', '#F0F9FA']}
           start={{ x: 0, y: 0 }}
           end={{ x: 0, y: 1 }}
           style={styles.cardGradient}
@@ -125,7 +127,7 @@ export default function MatchIntelligenceOrb({
             <View style={styles.outerRing}>
               {/* Inner Surface */}
               <LinearGradient
-                colors={['#E6F4F6', '#D1EDF2']}
+                colors={isDark ? [colors.accentSoft, colors.surfaceMuted] : ['#E6F4F6', '#D1EDF2']}
                 style={styles.innerCircle}
               >
                 {primaryContent}
@@ -142,7 +144,7 @@ export default function MatchIntelligenceOrb({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors, isDark) => StyleSheet.create({
   container: {
     width: '100%',
     marginBottom: spacing.lg,
@@ -150,8 +152,8 @@ const styles = StyleSheet.create({
   orbCard: {
     borderRadius: spacing.radii.lg,
     borderWidth: 1,
-    borderColor: 'rgba(14, 116, 144, 0.18)',
-    shadowColor: colors.teal,
+    borderColor: isDark ? colors.border : 'rgba(14, 116, 144, 0.18)',
+    shadowColor: isDark ? colors.background : colors.teal,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.08,
     shadowRadius: 12,
@@ -171,7 +173,7 @@ const styles = StyleSheet.create({
   badge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(14, 116, 144, 0.08)',
+    backgroundColor: isDark ? colors.accentSoft : 'rgba(14, 116, 144, 0.08)',
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xxs + 1,
     borderRadius: spacing.radii.pill,
@@ -199,10 +201,10 @@ const styles = StyleSheet.create({
     height: 124,
     borderRadius: 62,
     borderWidth: 2,
-    borderColor: 'rgba(14, 116, 144, 0.22)',
+    borderColor: isDark ? colors.borderStrong : 'rgba(14, 116, 144, 0.22)',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.6)',
+    backgroundColor: isDark ? colors.surfaceElevated : 'rgba(255, 255, 255, 0.6)',
   },
   innerCircle: {
     width: 104,
@@ -211,7 +213,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.8)',
+    borderColor: isDark ? colors.borderStrong : 'rgba(255, 255, 255, 0.8)',
   },
   centerScoreWrap: {
     alignItems: 'center',

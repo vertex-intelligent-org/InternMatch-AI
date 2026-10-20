@@ -16,7 +16,7 @@ import { useTranslation } from 'react-i18next';
 
 import GlassSurface from './GlassSurface';
 import GradientButton from './GradientButton';
-import colors from '../theme/colors';
+import { useAppTheme } from '../context/ThemeProvider';
 import { spacing } from '../theme/spacing';
 import { typography } from '../theme/typography';
 import {
@@ -59,6 +59,8 @@ export default function PromoCodePanel({
   reconcileSubscription,
   onInputFocus,
 }) {
+  const { colors } = useAppTheme();
+  const styles = createStyles(colors);
   const { t } = useTranslation();
 
   const [expanded, setExpanded] =
@@ -493,7 +495,7 @@ export default function PromoCodePanel({
 }
 
 
-const styles = StyleSheet.create({
+const createStyles = (colors) => StyleSheet.create({
   container: {
     marginTop: spacing.lg,
     padding: spacing.md,

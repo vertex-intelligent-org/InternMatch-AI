@@ -19,9 +19,11 @@ import {
 import {
   useNotifications,
 } from '../context/NotificationContext';
+import { useAppTheme } from '../context/ThemeProvider';
 
 
 export default function NotificationBell() {
+  const { colors } = useAppTheme();
   const navigation =
     useNavigation();
 
@@ -57,7 +59,7 @@ export default function NotificationBell() {
             : 'notifications-outline'
         }
         size={22}
-        color="#0B5F70"
+        color={colors.accentStrong || colors.accent}
       />
 
       {unreadCount > 0 ? (

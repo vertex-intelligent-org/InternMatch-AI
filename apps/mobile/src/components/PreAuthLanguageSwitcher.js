@@ -267,7 +267,7 @@ const createStyles = (colors) => StyleSheet.create({
       colors.glass.bgLight,
     borderWidth: 1,
     borderColor:
-      colors.glass.borderHairline,
+      colors.borderSubtle,
     overflow: 'hidden',
     direction: 'ltr',
   },
@@ -297,7 +297,7 @@ const createStyles = (colors) => StyleSheet.create({
 
   optionSelected: {
     backgroundColor:
-      colors.glass.activePill,
+      colors.accentSoft,
   },
 
   optionDisabled: {
