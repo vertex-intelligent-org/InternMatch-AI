@@ -24,7 +24,8 @@
         "buildType": "app-bundle"
       },
       "env": {
-        "APP_VARIANT": "production"
+        "APP_VARIANT": "production",
+        "EXPO_PUBLIC_USE_RN_FETCH": "1"
       }
     }
   },

@@ -27,7 +27,7 @@ import PressableScale from '../components/PressableScale';
 import MatchBadge from '../components/MatchBadge';
 import GradientButton from '../components/GradientButton';
 import Reveal from '../components/motion/Reveal';
-import AIPulse from '../components/motion/AIPulse';
+
 import BrandedAILoader from '../components/motion/BrandedAILoader';
 import { getMatches } from '../services/api';
 import { useProfile } from '../context/ProfileContext';
@@ -309,9 +309,9 @@ export default function MatchupsScreen({ navigation }) {
           />
         }
       >
-        {/* Calculating Status Banner with Ambient AIPulse */}
+        {/* Calculating status banner */}
         {isCalculating && (
-          <AIPulse active={isCalculating} style={styles.calculatingPulseWrap}>
+          <View style={styles.calculatingPulseWrap}>
             <Card style={styles.calculatingCard} padding="md">
               <BrandedAILoader
                 size={28}
@@ -347,7 +347,7 @@ export default function MatchupsScreen({ navigation }) {
                 <Text style={styles.cancelCalcText}>{t('matchups.stopChecking')}</Text>
               </TouchableOpacity>
             </Card>
-          </AIPulse>
+          </View>
         )}
 
         {/* Match Calculation Error */}
