@@ -37,6 +37,14 @@ export default function GlassSurface({
     subtle: styles.subtleContainer,
   }[variant] ?? styles.panelContainer;
 
+  // The container itself must be opaque: native blur and glass can otherwise
+  // reveal text and cards behind the surface on either theme.
+  const opaqueSurfaceColor = variant === 'subtle'
+    ? colors.surfaceSubtle
+    : variant === 'control'
+      ? colors.surfaceElevated
+      : colors.surface;
+
   const defaultTintColor = isDark
     ? {
         panel: 'rgba(11, 37, 44, 0.94)',
@@ -71,12 +79,17 @@ export default function GlassSurface({
         styles.baseContainer,
         variantContainerStyle,
         {
+          backgroundColor: opaqueSurfaceColor,
           borderColor: effectiveBorderColor,
           shadowColor: effectiveShadowColor,
         },
         style,
       ]}
     >
+      <View
+        pointerEvents="none"
+        style={[StyleSheet.absoluteFillObject, { backgroundColor: opaqueSurfaceColor }]}
+      />
       {/* Background layer */}
       {isLiquidSupported ? (
         <>

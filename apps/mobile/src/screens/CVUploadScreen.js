@@ -49,8 +49,8 @@ const getCVJobErrorCode = (jobError) =>
     : 'CV_EXTRACTION_FAILED';
 
 export default function CVUploadScreen({ route, navigation }) {
-  const { colors } = useAppTheme();
-  const styles = createStyles(colors);
+  const { colors, isDark } = useAppTheme();
+  const styles = createStyles(colors, isDark);
   const { t } = useTranslation();
   const {
     refreshAIUsage,
@@ -1150,7 +1150,7 @@ export default function CVUploadScreen({ route, navigation }) {
   );
 }
 
-const createStyles = (colors) => StyleSheet.create({
+const createStyles = (colors, isDark) => StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: colors.background || colors.screenBg,
@@ -1176,7 +1176,7 @@ const createStyles = (colors) => StyleSheet.create({
     paddingHorizontal: spacing.xl,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.6)',
+    backgroundColor: colors.surfaceElevated,
   },
   dropText: {
     marginTop: spacing.md,
@@ -1259,14 +1259,14 @@ const createStyles = (colors) => StyleSheet.create({
   },
   warningCard: {
     alignItems: 'center',
-    borderColor: '#FDE68A',
-    backgroundColor: '#FFFBEB',
+    borderColor: isDark ? colors.warning : '#FDE68A',
+    backgroundColor: isDark ? colors.warningSoft : '#FFFBEB',
   },
   warningIconCircle: {
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: '#FEF3C7',
+    backgroundColor: isDark ? '#4A3511' : '#FEF3C7',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.md,
@@ -1274,21 +1274,21 @@ const createStyles = (colors) => StyleSheet.create({
   warningTitle: {
     ...typography.cardTitle,
     fontSize: 18,
-    color: '#92400E',
+    color: isDark ? colors.warning : '#92400E',
     textAlign: 'center',
     marginTop: spacing.xs,
   },
   warningDescription: {
     ...typography.body,
     fontSize: 14,
-    color: '#78350F',
+    color: isDark ? '#F9D48A' : '#78350F',
     textAlign: 'center',
     marginTop: spacing.sm,
     lineHeight: 20,
   },
   warningHelper: {
     ...typography.caption,
-    color: '#92400E',
+    color: isDark ? '#F9D48A' : '#92400E',
     textAlign: 'center',
     marginTop: spacing.md,
     lineHeight: 18,
@@ -1313,7 +1313,7 @@ const createStyles = (colors) => StyleSheet.create({
   errorCard: {
     alignItems: 'center',
     borderColor: colors.dangerSoft || '#FEE2E2',
-    backgroundColor: '#FEF2F2',
+    backgroundColor: isDark ? colors.dangerSoft : '#FEF2F2',
   },
   errorTitle: {
     ...typography.cardTitle,

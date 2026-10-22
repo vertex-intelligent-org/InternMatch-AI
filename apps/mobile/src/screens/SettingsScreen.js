@@ -56,12 +56,17 @@ const APPEARANCE_OPTIONS = [
 
 function PickerGlassSheet({ children, style, isDark }) {
   return (
-    <View style={style}>
+    <View
+      style={[
+        style,
+        { backgroundColor: isDark ? '#0B252C' : '#EAF5F7' },
+      ]}
+    >
       <BlurView
         pointerEvents="none"
         style={StyleSheet.absoluteFillObject}
         tint={isDark ? 'dark' : 'light'}
-        intensity={65}
+        intensity={35}
       />
       <View
         pointerEvents="none"
@@ -69,8 +74,8 @@ function PickerGlassSheet({ children, style, isDark }) {
           StyleSheet.absoluteFillObject,
           {
             backgroundColor: isDark
-              ? 'rgba(11, 37, 44, 0.96)'
-              : 'rgba(247, 252, 253, 0.96)',
+              ? 'rgba(11, 37, 44, 0.98)'
+              : 'rgba(234, 245, 247, 0.98)',
           },
         ]}
       />
@@ -1011,7 +1016,7 @@ const createStyles = (colors) => StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     paddingHorizontal: spacing.xl,
-    backgroundColor: 'rgba(2, 8, 23, 0.58)',
+    backgroundColor: 'rgba(2, 8, 23, 0.78)',
   },
   languageSheet: {
     width: '100%',

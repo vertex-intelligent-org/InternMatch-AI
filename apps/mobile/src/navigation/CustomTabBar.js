@@ -1,9 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocalization } from '../localization/LocalizationContext';
-import { View, StyleSheet, Platform, useWindowDimensions, Image } from 'react-native';
+import { View, StyleSheet, useWindowDimensions, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { BlurView } from 'expo-blur';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -61,11 +60,11 @@ export default function CustomTabBar({ state, descriptors, navigation }) {
   const { isRTL } = useLocalization();
   const { isDark } = useAppTheme();
   const barTint = isDark
-    ? (isScrolled ? 'rgba(8, 49, 61, 0.97)' : 'rgba(10, 58, 72, 0.97)')
-    : (isScrolled ? 'rgba(7, 78, 98, 0.96)' : 'rgba(7, 94, 115, 0.96)');
+    ? (isScrolled ? '#092D38' : '#0B3947')
+    : (isScrolled ? '#075069' : '#075E73');
   const lensTint = isDark
-    ? 'rgba(26, 100, 118, 0.96)'
-    : 'rgba(25, 119, 140, 0.96)';
+    ? '#17677A'
+    : '#137A92';
 
   const [avatarLoadError, setAvatarLoadError] = useState(false);
 
@@ -110,20 +109,16 @@ export default function CustomTabBar({ state, descriptors, navigation }) {
   });
 
   return (
-    <View style={[styles.floatingBar, { bottom: bottomOffset }]}>
-      {/* A subtle frosted layer sits behind a nearly opaque brand-blue surface. */}
-      {Platform.OS === 'ios' && (
-        <BlurView
-          pointerEvents="none"
-          style={StyleSheet.absoluteFillObject}
-          tint={isDark ? 'dark' : 'light'}
-          intensity={55}
-        />
-      )}
-      <View
-        pointerEvents="none"
-        style={[StyleSheet.absoluteFillObject, { backgroundColor: barTint }]}
-      />
+    <View
+      style={[
+        styles.floatingBar,
+        {
+          bottom: bottomOffset,
+          backgroundColor: barTint,
+          borderColor: isDark ? '#276C7B' : '#388EA0',
+        },
+      ]}
+    >
 
       {/* Tabs Container */}
       <View style={styles.tabsRow}>
@@ -131,13 +126,16 @@ export default function CustomTabBar({ state, descriptors, navigation }) {
         <Animated.View
           style={[
             styles.lensContainer,
-            { width: lensWidth, height: FLOATING_TAB_BAR_LENS_HEIGHT, top: FLOATING_TAB_BAR_LENS_TOP },
+            {
+              width: lensWidth,
+              height: FLOATING_TAB_BAR_LENS_HEIGHT,
+              top: FLOATING_TAB_BAR_LENS_TOP,
+              backgroundColor: lensTint,
+            },
             animatedLensStyle,
           ]}
           pointerEvents="none"
-        >
-          <View style={[StyleSheet.absoluteFillObject, { backgroundColor: lensTint }]} />
-        </Animated.View>
+        />
 
         {/* Interactive Tab Items */}
         {visualRoutes.map((route) => {
@@ -196,7 +194,7 @@ export default function CustomTabBar({ state, descriptors, navigation }) {
                   <Ionicons
                     name={iconName}
                     size={22}
-                    color={focused ? '#FFFFFF' : 'rgba(255, 255, 255, 0.78)'}
+                    color={focused ? '#FFFFFF' : 'rgba(255, 255, 255, 0.88)'}
                   />
                 )}
                 {focused && <View style={styles.dot} />}
@@ -217,8 +215,7 @@ const styles = StyleSheet.create({
     height: FLOATING_TAB_BAR_HEIGHT,
     borderRadius: FLOATING_TAB_BAR_RADIUS,
     overflow: 'hidden',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255, 255, 255, 0.35)',
+    borderWidth: 1,
     shadowColor: 'rgba(7, 43, 56, 0.35)',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 1,
