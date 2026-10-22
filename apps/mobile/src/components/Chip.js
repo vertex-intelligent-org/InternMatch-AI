@@ -9,12 +9,26 @@ import PressableScale from './PressableScale';
 
 // variant: 'skill' (mint green) | 'gap' (orange outline) | 'neutral'
 export default function Chip({ label, variant = 'skill', onRemove, selected, onPress }) {
-  const { colors } = useAppTheme();
+  const { colors, isDark } = useAppTheme();
   const palette = {
-    skill: { bg: colors.greenBg, fg: '#0F8A5F' },
-    gap: { bg: colors.white, fg: colors.orange, border: colors.orange },
-    neutral: { bg: '#EDEDED', fg: colors.textMuted },
-  }[variant] || { bg: '#EDEDED', fg: colors.textMuted };
+    skill: {
+      bg: colors.greenBg,
+      fg: isDark ? colors.success : '#0F8A5F',
+    },
+    gap: {
+      bg: isDark ? colors.warningSoft : colors.white,
+      fg: isDark ? colors.warning : colors.orange,
+      border: isDark ? colors.warning : colors.orange,
+    },
+    neutral: {
+      bg: isDark ? colors.surfaceMuted : '#EDEDED',
+      fg: isDark ? colors.textSecondary : colors.textMuted,
+    },
+  }[variant] || {
+    bg: isDark ? colors.surfaceMuted : '#EDEDED',
+    fg: isDark ? colors.textSecondary : colors.textMuted,
+  };
+  const selectedTextColor = colors.white;
 
   const content = (
     <View
@@ -24,7 +38,7 @@ export default function Chip({ label, variant = 'skill', onRemove, selected, onP
         palette.border ? { borderWidth: 1, borderColor: palette.border } : null,
       ]}
     >
-      <Text style={[styles.label, { color: selected ? colors.white : palette.fg }]}>
+      <Text style={[styles.label, { color: selected ? selectedTextColor : palette.fg }]}>
         {label}
       </Text>
       {onRemove ? (
@@ -34,7 +48,7 @@ export default function Chip({ label, variant = 'skill', onRemove, selected, onP
           accessibilityRole="button"
           accessibilityLabel={`Remove ${label}`}
         >
-          <Ionicons name="close" size={14} color={palette.fg} style={styles.removeIcon} />
+          <Ionicons name="close" size={14} color={selected ? selectedTextColor : palette.fg} style={styles.removeIcon} />
         </TouchableOpacity>
       ) : null}
     </View>

@@ -36,8 +36,8 @@ import {
 } from '../services/api';
 
 export default function EmployerOpportunitiesScreen({ navigation }) {
-  const { colors } = useAppTheme();
-  const styles = createStyles(colors);
+  const { colors, isDark } = useAppTheme();
+  const styles = createStyles(colors, isDark);
   const { t } = useTranslation();
   const { locale, isRTL } = useLocalization();
   const insets = useSafeAreaInsets();
@@ -413,8 +413,7 @@ export default function EmployerOpportunitiesScreen({ navigation }) {
                   colors.border
                   || 'rgba(22, 35, 46, 0.12)',
                 backgroundColor:
-                  colors.backgroundSecondary
-                  || '#F5F8F9',
+                  (isDark ? colors.surfaceElevated : '#F5F8F9'),
               }}
               onPress={() =>
                 navigation.navigate(
@@ -468,8 +467,7 @@ export default function EmployerOpportunitiesScreen({ navigation }) {
                   colors.border
                   || 'rgba(22, 35, 46, 0.12)',
                 backgroundColor:
-                  colors.backgroundSecondary
-                  || '#F5F8F9',
+                  (isDark ? colors.surfaceElevated : '#F5F8F9'),
               }}
               onPress={() =>
                 navigation.navigate(
@@ -856,7 +854,7 @@ export default function EmployerOpportunitiesScreen({ navigation }) {
   );
 }
 
-const createStyles = (colors) => StyleSheet.create({
+const createStyles = (colors, isDark) => StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: colors.background || colors.screenBg,
@@ -1026,7 +1024,7 @@ const createStyles = (colors) => StyleSheet.create({
     color: colors.accentStrong || colors.tealDark,
   },
   publishedBadge: {
-    backgroundColor: '#ECFDF5',
+    backgroundColor: isDark ? colors.successSoft : '#ECFDF5',
   },
   publishedDot: {
     backgroundColor: '#10B981',
@@ -1034,11 +1032,11 @@ const createStyles = (colors) => StyleSheet.create({
   publishedBadgeText: {
     ...typography.badge,
     fontSize: 10,
-    color: '#065F46',
+    color: isDark ? colors.success : '#065F46',
     fontWeight: '600',
   },
   pendingBadge: {
-    backgroundColor: '#FFFBEB',
+    backgroundColor: isDark ? colors.warningSoft : '#FFFBEB',
   },
   pendingDot: {
     backgroundColor: '#F59E0B',
@@ -1046,11 +1044,11 @@ const createStyles = (colors) => StyleSheet.create({
   pendingBadgeText: {
     ...typography.badge,
     fontSize: 10,
-    color: '#92400E',
+    color: isDark ? colors.warning : '#92400E',
     fontWeight: '600',
   },
   closedBadge: {
-    backgroundColor: '#F3F4F6',
+    backgroundColor: isDark ? colors.surfaceMuted : '#F3F4F6',
   },
   closedDot: {
     backgroundColor: '#9CA3AF',
@@ -1058,7 +1056,7 @@ const createStyles = (colors) => StyleSheet.create({
   closedBadgeText: {
     ...typography.badge,
     fontSize: 10,
-    color: '#6B7280',
+    color: isDark ? colors.textSecondary : '#6B7280',
     fontWeight: '600',
   },
   statusBadgeText: {
@@ -1094,7 +1092,7 @@ const createStyles = (colors) => StyleSheet.create({
     marginBottom: spacing.xs,
   },
   moreSkillsBadge: {
-    backgroundColor: '#EDEDED',
+    backgroundColor: isDark ? colors.surfaceMuted : '#EDEDED',
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs + 2,
     borderRadius: spacing.radii.pill,

@@ -39,8 +39,8 @@ import { useMatchCalculation } from '../hooks/useMatchCalculation';
 import EmployerWorkspaceSummary from '../components/EmployerWorkspaceSummary';
 
 export default function HomeScreen({ navigation }) {
-  const { colors } = useAppTheme();
-  const styles = createStyles(colors);
+  const { colors, isDark } = useAppTheme();
+  const styles = createStyles(colors, isDark);
   const { profile, refreshProfile } = useProfile();
   const { t } = useTranslation();
   const { isRTL } = useLocalization();
@@ -866,7 +866,7 @@ export default function HomeScreen({ navigation }) {
   );
 }
 
-const createStyles = (colors) => StyleSheet.create({
+const createStyles = (colors, isDark) => StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: colors.background || colors.screenBg,
@@ -1330,7 +1330,7 @@ const createStyles = (colors) => StyleSheet.create({
     marginEnd: 4,
   },
   publishedBadge: {
-    backgroundColor: '#ECFDF5',
+    backgroundColor: isDark ? colors.successSoft : '#ECFDF5',
   },
   publishedDot: {
     backgroundColor: '#10B981',
@@ -1338,11 +1338,11 @@ const createStyles = (colors) => StyleSheet.create({
   publishedBadgeText: {
     ...typography.badge,
     fontSize: 10,
-    color: '#065F46',
+    color: isDark ? colors.success : '#065F46',
     fontWeight: '600',
   },
   pendingBadge: {
-    backgroundColor: '#FFFBEB',
+    backgroundColor: isDark ? colors.warningSoft : '#FFFBEB',
   },
   pendingDot: {
     backgroundColor: '#F59E0B',
@@ -1350,11 +1350,11 @@ const createStyles = (colors) => StyleSheet.create({
   pendingBadgeText: {
     ...typography.badge,
     fontSize: 10,
-    color: '#92400E',
+    color: isDark ? colors.warning : '#92400E',
     fontWeight: '600',
   },
   closedBadge: {
-    backgroundColor: '#F3F4F6',
+    backgroundColor: isDark ? colors.surfaceMuted : '#F3F4F6',
   },
   closedDot: {
     backgroundColor: '#9CA3AF',
@@ -1362,7 +1362,7 @@ const createStyles = (colors) => StyleSheet.create({
   closedBadgeText: {
     ...typography.badge,
     fontSize: 10,
-    color: '#6B7280',
+    color: isDark ? colors.textSecondary : '#6B7280',
     fontWeight: '600',
   },
   statusBadgeText: {

@@ -279,12 +279,12 @@ const createStyles = (colors) => StyleSheet.create({
   },
 
   optionsLayer: {
-    flex: 1,
+    ...StyleSheet.absoluteFillObject,
     flexDirection: 'row',
     direction: 'ltr',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 2,
+    justifyContent: 'space-evenly',
+    paddingHorizontal: 4,
   },
 
   option: {
@@ -307,6 +307,9 @@ const createStyles = (colors) => StyleSheet.create({
   optionText: {
     ...typography.caption,
     fontSize: 12,
+    lineHeight: 16,
+    textAlign: 'center',
+    includeFontPadding: false,
     fontWeight: '600',
     color:
       colors.textSecondary ||

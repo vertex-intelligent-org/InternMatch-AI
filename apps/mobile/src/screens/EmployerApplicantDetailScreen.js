@@ -65,8 +65,8 @@ function getStatusBadgeStyle(status, colors) {
 }
 
 export default function EmployerApplicantDetailScreen({ route, navigation }) {
-  const { colors } = useAppTheme();
-  const styles = createStyles(colors);
+  const { colors, isDark } = useAppTheme();
+  const styles = createStyles(colors, isDark);
   const { t } = useTranslation();
   const { locale, isRTL } = useLocalization();
   const insets = useSafeAreaInsets();
@@ -1328,7 +1328,7 @@ export default function EmployerApplicantDetailScreen({ route, navigation }) {
   );
 }
 
-const createStyles = (colors) => StyleSheet.create({
+const createStyles = (colors, isDark) => StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: colors.background || colors.screenBg,
@@ -1554,9 +1554,9 @@ const createStyles = (colors) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#ECFDF5',
+    backgroundColor: isDark ? colors.successSoft : '#ECFDF5',
     borderWidth: 1,
-    borderColor: '#A7F3D0',
+    borderColor: isDark ? colors.success : '#A7F3D0',
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.sm,
     borderRadius: spacing.radii.sm,
@@ -1565,7 +1565,7 @@ const createStyles = (colors) => StyleSheet.create({
   },
   acceptBtnText: {
     ...typography.button,
-    color: '#065F46',
+    color: isDark ? colors.success : '#065F46',
     fontSize: 13,
   },
   rejectBtn: {
@@ -1573,9 +1573,9 @@ const createStyles = (colors) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FEF2F2',
+    backgroundColor: isDark ? colors.dangerSoft : '#FEF2F2',
     borderWidth: 1,
-    borderColor: '#FECACA',
+    borderColor: isDark ? colors.danger : '#FECACA',
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.sm,
     borderRadius: spacing.radii.sm,
@@ -1584,15 +1584,15 @@ const createStyles = (colors) => StyleSheet.create({
   },
   rejectBtnText: {
     ...typography.button,
-    color: '#991B1B',
+    color: isDark ? colors.danger : '#991B1B',
     fontSize: 13,
   },
   interviewingBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFBEB',
+    backgroundColor: isDark ? colors.warningSoft : '#FFFBEB',
     borderWidth: 1,
-    borderColor: '#FDE68A',
+    borderColor: isDark ? colors.warning : '#FDE68A',
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     borderRadius: spacing.radii.sm,
@@ -1601,15 +1601,15 @@ const createStyles = (colors) => StyleSheet.create({
   interviewingBannerText: {
     flex: 1,
     ...typography.caption,
-    color: '#92400E',
+    color: isDark ? colors.warning : '#92400E',
     fontWeight: '600',
   },
   terminalBannerAccepted: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#ECFDF5',
+    backgroundColor: isDark ? colors.successSoft : '#ECFDF5',
     borderWidth: 1,
-    borderColor: '#A7F3D0',
+    borderColor: isDark ? colors.success : '#A7F3D0',
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
     borderRadius: spacing.radii.sm,
@@ -1618,9 +1618,9 @@ const createStyles = (colors) => StyleSheet.create({
   terminalBannerRejected: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FEF2F2',
+    backgroundColor: isDark ? colors.dangerSoft : '#FEF2F2',
     borderWidth: 1,
-    borderColor: '#FECACA',
+    borderColor: isDark ? colors.danger : '#FECACA',
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
     borderRadius: spacing.radii.sm,
@@ -1633,13 +1633,13 @@ const createStyles = (colors) => StyleSheet.create({
     ...typography.label,
     fontSize: 14,
     fontWeight: '700',
-    color: '#065F46',
+    color: isDark ? colors.success : '#065F46',
   },
   terminalRejectedTitle: {
     ...typography.label,
     fontSize: 14,
     fontWeight: '700',
-    color: '#991B1B',
+    color: isDark ? colors.danger : '#991B1B',
   },
   terminalSubtitle: {
     ...typography.caption,

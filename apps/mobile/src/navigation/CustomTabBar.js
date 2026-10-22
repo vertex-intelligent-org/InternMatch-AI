@@ -65,6 +65,12 @@ export default function CustomTabBar({ state, descriptors, navigation }) {
   const { t } = useTranslation();
   const { isRTL } = useLocalization();
   const { isDark } = useAppTheme();
+  const barTint = isDark
+    ? (isScrolled ? 'rgba(9, 47, 57, 0.94)' : 'rgba(11, 58, 69, 0.94)')
+    : (isScrolled ? 'rgba(7, 82, 98, 0.94)' : 'rgba(7, 94, 110, 0.94)');
+  const lensTint = isDark
+    ? 'rgba(32, 91, 104, 0.88)'
+    : 'rgba(35, 112, 129, 0.88)';
 
   const [avatarLoadError, setAvatarLoadError] = useState(false);
 
@@ -122,19 +128,13 @@ export default function CustomTabBar({ state, descriptors, navigation }) {
             style={StyleSheet.absoluteFillObject}
             glassEffectStyle="regular"
             colorScheme={isDark ? "dark" : "light"}
-            tintColor={
-              isScrolled
-                ? 'rgba(11, 37, 44, 0.98)'
-                : 'rgba(7, 94, 110, 0.96)'
-            }
+            tintColor={barTint}
           />
           <View
             style={[
               StyleSheet.absoluteFillObject,
               {
-                backgroundColor: isScrolled
-                  ? 'rgba(11, 37, 44, 0.96)'
-                  : 'rgba(7, 94, 110, 0.94)',
+                backgroundColor: barTint,
               },
             ]}
           />
@@ -150,9 +150,7 @@ export default function CustomTabBar({ state, descriptors, navigation }) {
             style={[
               StyleSheet.absoluteFillObject,
               {
-                backgroundColor: isScrolled
-                  ? 'rgba(11, 37, 44, 0.97)'
-                  : 'rgba(7, 94, 110, 0.95)',
+                backgroundColor: barTint,
               },
             ]}
           />
@@ -162,9 +160,7 @@ export default function CustomTabBar({ state, descriptors, navigation }) {
           style={[
             StyleSheet.absoluteFillObject,
             {
-              backgroundColor: isScrolled
-                ? 'rgba(11, 37, 44, 0.98)'
-                : 'rgba(7, 94, 110, 0.97)',
+              backgroundColor: barTint,
             },
           ]}
         />
@@ -187,12 +183,12 @@ export default function CustomTabBar({ state, descriptors, navigation }) {
                 style={StyleSheet.absoluteFillObject}
                 glassEffectStyle="regular"
                 colorScheme={isDark ? "dark" : "light"}
-                tintColor="rgba(255, 255, 255, 0.75)"
+                tintColor={lensTint}
               />
-              <View style={[StyleSheet.absoluteFillObject, styles.liquidLensOverlay]} />
+              <View style={[StyleSheet.absoluteFillObject, { backgroundColor: lensTint }]} />
             </>
           ) : (
-            <View style={[StyleSheet.absoluteFillObject, styles.fallbackLens]} />
+            <View style={[StyleSheet.absoluteFillObject, { backgroundColor: lensTint }]} />
           )}
         </Animated.View>
 
@@ -294,18 +290,12 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.90)',
-    shadowColor: 'rgba(255, 255, 255, 0.35)',
+    borderColor: 'rgba(190, 232, 238, 0.45)',
+    shadowColor: 'rgba(0, 22, 29, 0.45)',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 1,
     shadowRadius: 4,
     elevation: 4,
-  },
-  liquidLensOverlay: {
-    backgroundColor: 'rgba(255, 255, 255, 0.22)',
-  },
-  fallbackLens: {
-    backgroundColor: 'rgba(255, 255, 255, 0.22)',
   },
   tabItem: {
     height: FLOATING_TAB_BAR_HEIGHT,

@@ -28,8 +28,8 @@ import useSmoothAIProgress from '../hooks/useSmoothAIProgress';
 import { useCancellableAIJob } from '../hooks/useCancellableAIJob';
 
 export default function WhyYouMatchScreen({ route, navigation }) {
-  const { colors } = useAppTheme();
-  const styles = createStyles(colors);
+  const { colors, isDark } = useAppTheme();
+  const styles = createStyles(colors, isDark);
   const { t } = useTranslation();
   const {
     refreshAIUsage,
@@ -666,7 +666,7 @@ export default function WhyYouMatchScreen({ route, navigation }) {
                     <Ionicons
                       name="bulb-outline"
                       size={18}
-                      color="#B45309"
+                      color={isDark ? colors.warning : '#B45309'}
                       style={styles.headerIcon}
                     />
                     <Text style={styles.recBoxTitle}>{t('whyYouMatch.gapAnalysisAndRecs')}</Text>
@@ -742,7 +742,7 @@ export default function WhyYouMatchScreen({ route, navigation }) {
   );
 }
 
-const createStyles = (colors) => StyleSheet.create({
+const createStyles = (colors, isDark) => StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: colors.background || colors.screenBg,
@@ -853,12 +853,12 @@ const createStyles = (colors) => StyleSheet.create({
     marginBottom: spacing.md,
   },
   recommendationsBox: {
-    backgroundColor: '#FFFBEB',
+    backgroundColor: isDark ? colors.warningSoft : '#FFFBEB',
     borderRadius: spacing.radii.md,
     padding: spacing.md,
     marginVertical: spacing.md,
     borderWidth: 1,
-    borderColor: '#FDE68A',
+    borderColor: isDark ? colors.warning : '#FDE68A',
   },
   recHeaderRow: {
     flexDirection: 'row',
@@ -867,12 +867,12 @@ const createStyles = (colors) => StyleSheet.create({
   },
   recBoxTitle: {
     ...typography.bodyEmphasis,
-    color: '#92400E',
+    color: isDark ? colors.warning : '#92400E',
     fontSize: 13,
   },
   recSummaryText: {
     ...typography.caption,
-    color: '#78350F',
+    color: isDark ? colors.textPrimary : '#78350F',
     lineHeight: 18,
     marginTop: spacing.xxs,
   },
@@ -891,7 +891,7 @@ const createStyles = (colors) => StyleSheet.create({
   recItemText: {
     flex: 1,
     ...typography.caption,
-    color: '#78350F',
+    color: isDark ? colors.textPrimary : '#78350F',
     lineHeight: 18,
   },
   generateCtaCard: {

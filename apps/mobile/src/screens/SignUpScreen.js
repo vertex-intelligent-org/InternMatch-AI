@@ -55,6 +55,7 @@ export default function SignUpScreen({ navigation }) {
   const [loading, setLoading] = useState(false);
   const [loadingSource, setLoadingSource] = useState(null);
   const [fieldErrors, setFieldErrors] = useState({});
+  const [roleHintActive, setRoleHintActive] = useState(false);
 
   const scrollRef = useRef(null);
   const fullNameRef = useRef(null);
@@ -112,16 +113,35 @@ export default function SignUpScreen({ navigation }) {
     return true;
   };
 
+  const promptRoleSelection = () => {
+    haptics.error();
+    setRoleHintActive(true);
+
+    const position = fieldPositions.current.accountType;
+    if (typeof position === 'number') {
+      scrollRef.current?.scrollTo({
+        y: Math.max(position - spacing.lg, 0),
+        animated: true,
+      });
+    }
+  };
+
+  const renderRoleGate = (fieldLabel) => accountType ? null : (
+    <TouchableOpacity
+      style={StyleSheet.absoluteFillObject}
+      onPress={promptRoleSelection}
+      activeOpacity={1}
+      accessibilityRole="button"
+      accessibilityLabel={`${fieldLabel}. ${t('auth.selectAccountType')}`}
+    />
+  );
+
   const ensureAccountTypeSelected = () => {
     if (accountType === 'intern' || accountType === 'employer') {
       return true;
     }
 
-    haptics.error();
-    Alert.alert(
-      t('common.error'),
-      t('auth.selectAccountType')
-    );
+    promptRoleSelection();
     return false;
   };
 
@@ -442,7 +462,15 @@ export default function SignUpScreen({ navigation }) {
             />
 
             {/* Role / Account Type Selector */}
-            <View style={styles.fieldGroup}>
+            <View
+              style={[
+                styles.fieldGroup,
+                roleHintActive && styles.roleFieldHighlighted,
+              ]}
+              onLayout={(event) => {
+                fieldPositions.current.accountType = event.nativeEvent.layout.y;
+              }}
+            >
               <Text style={styles.fieldLabel}>{t('auth.accountType')}</Text>
               <View style={styles.typeRow} accessibilityRole="radiogroup">
                 {/* Intern Option */}
@@ -451,7 +479,10 @@ export default function SignUpScreen({ navigation }) {
                     styles.typeCard,
                     accountType === 'intern' ? styles.typeCardActive : styles.typeCardInactive,
                   ]}
-                  onPress={() => setAccountType('intern')}
+                  onPress={() => {
+                    setAccountType('intern');
+                    setRoleHintActive(false);
+                  }}
                   scaleTo={
                     accountType === 'intern'
                       ? 1
@@ -497,7 +528,10 @@ export default function SignUpScreen({ navigation }) {
                     styles.typeCard,
                     accountType === 'employer' ? styles.typeCardActive : styles.typeCardInactive,
                   ]}
-                  onPress={() => setAccountType('employer')}
+                  onPress={() => {
+                    setAccountType('employer');
+                    setRoleHintActive(false);
+                  }}
                   scaleTo={
                     accountType === 'employer'
                       ? 1
@@ -537,6 +571,18 @@ export default function SignUpScreen({ navigation }) {
                   </Text>
                 </PressableScale>
               </View>
+              {!accountType ? (
+                <Text
+                  style={[
+                    styles.roleHint,
+                    roleHintActive && styles.roleHintActive,
+                    { textAlign: isRTL ? 'right' : 'left' },
+                  ]}
+                  accessibilityLiveRegion="polite"
+                >
+                  {t('auth.selectAccountType')}
+                </Text>
+              ) : null}
             </View>
 
             {/* Full Name */}
@@ -547,13 +593,16 @@ export default function SignUpScreen({ navigation }) {
               }}
             >
               <Text style={styles.fieldLabel}>{t('auth.fullName')}</Text>
-              <TextInput
+              <View style={styles.lockedFieldWrap}>
+                <TextInput
                 style={[
                   styles.input,
                   focusedField === 'fullName' && styles.inputFocused,
+                  !accountType && styles.inputLocked,
                   fieldErrors.fullName && styles.inputError,
                 ]}
                 placeholder={t('auth.fullNamePlaceholder')}
+                editable={Boolean(accountType) && !loading}
                 placeholderTextColor={colors.textTertiary}
                 ref={fullNameRef}
                 value={fullName}
@@ -565,6 +614,8 @@ export default function SignUpScreen({ navigation }) {
                 onBlur={() => setFocusedField(null)}
                 accessibilityLabel={t('auth.fullName')}
               />
+                {renderRoleGate(t('auth.fullName'))}
+              </View>
               {fieldErrors.fullName ? (
                 <Text
                   style={[
@@ -586,13 +637,16 @@ export default function SignUpScreen({ navigation }) {
               }}
             >
               <Text style={styles.fieldLabel}>{t('auth.email')}</Text>
-              <TextInput
+              <View style={styles.lockedFieldWrap}>
+                <TextInput
                 style={[
                   styles.input,
                   focusedField === 'email' && styles.inputFocused,
+                  !accountType && styles.inputLocked,
                   fieldErrors.email && styles.inputError,
                 ]}
                 placeholder={t('auth.emailPlaceholder')}
+                editable={Boolean(accountType) && !loading}
                 placeholderTextColor={colors.textTertiary}
                 autoCapitalize="none"
                 autoCorrect={false}
@@ -607,6 +661,8 @@ export default function SignUpScreen({ navigation }) {
                 onBlur={() => setFocusedField(null)}
                 accessibilityLabel={t('auth.email')}
               />
+                {renderRoleGate(t('auth.email'))}
+              </View>
               {fieldErrors.email ? (
                 <Text
                   style={[
@@ -634,10 +690,12 @@ export default function SignUpScreen({ navigation }) {
                     styles.input,
                     styles.passwordInput,
                     focusedField === 'password' && styles.inputFocused,
+                  !accountType && styles.inputLocked,
                     fieldErrors.password && styles.inputError,
                     isRTL && styles.passwordInputRTL,
                   ]}
                   placeholder={t('auth.passwordMin')}
+                editable={Boolean(accountType) && !loading}
                   placeholderTextColor={colors.textTertiary}
                   secureTextEntry={!passwordVisible}
                   ref={passwordRef}
@@ -667,6 +725,7 @@ export default function SignUpScreen({ navigation }) {
                     color={colors.textSecondary || colors.textMuted}
                   />
                 </TouchableOpacity>
+                {renderRoleGate(t('auth.password'))}
               </View>
               {fieldErrors.password ? (
                 <Text
@@ -684,12 +743,15 @@ export default function SignUpScreen({ navigation }) {
             {/* Department Field */}
             <View style={styles.fieldGroup}>
               <Text style={styles.fieldLabel}>{t('auth.departmentField')}</Text>
-              <TextInput
+              <View style={styles.lockedFieldWrap}>
+                <TextInput
                 style={[
                   styles.input,
                   focusedField === 'department' && styles.inputFocused,
+                  !accountType && styles.inputLocked,
                 ]}
                 placeholder={t('auth.departmentPlaceholder')}
+                editable={Boolean(accountType) && !loading}
                 placeholderTextColor={colors.textTertiary}
                 value={department}
                 onChangeText={setDepartment}
@@ -697,6 +759,8 @@ export default function SignUpScreen({ navigation }) {
                 onBlur={() => setFocusedField(null)}
                 accessibilityLabel={t('auth.departmentField')}
               />
+                {renderRoleGate(t('auth.departmentField'))}
+              </View>
             </View>
 
             {/* Primary CTA */}
@@ -899,6 +963,30 @@ const createStyles = (colors) => StyleSheet.create({
   },
   fieldGroup: {
     marginBottom: spacing.md,
+  },
+  roleFieldHighlighted: {
+    backgroundColor: colors.accentSoft,
+    borderColor: colors.accentStrong || colors.accent,
+    borderWidth: 1,
+    borderRadius: spacing.radii.md,
+    padding: spacing.sm,
+  },
+  roleHint: {
+    ...typography.caption,
+    fontSize: 12,
+    lineHeight: 18,
+    color: colors.textSecondary || colors.textMuted,
+    marginTop: spacing.sm,
+  },
+  roleHintActive: {
+    color: colors.accentStrong || colors.accent,
+    fontWeight: '700',
+  },
+  lockedFieldWrap: {
+    position: 'relative',
+  },
+  inputLocked: {
+    opacity: 0.62,
   },
   fieldLabel: {
     ...typography.caption,
