@@ -158,7 +158,7 @@ def test_raw_code_is_never_persisted(
     admin_id = uuid4()
 
     raw_code = (
-        "SHIPATON-STUDENT-2026"
+        "TEST-STUDENT-2026"
     )
 
     with TestingSessionLocal() as db:
@@ -218,7 +218,7 @@ def test_student_and_employer_codes_are_isolated(
             db,
             audience="student",
             code=(
-                "STUDENT-JUDGES-2026"
+                "STUDENT-TRIAL-2026"
             ),
             admin_user_id=admin_id,
             publish=True,
@@ -228,7 +228,7 @@ def test_student_and_employer_codes_are_isolated(
             db,
             audience="employer",
             code=(
-                "EMPLOYER-JUDGES-2026"
+                "EMPLOYER-TRIAL-2026"
             ),
             admin_user_id=admin_id,
             publish=True,
@@ -241,7 +241,7 @@ def test_student_and_employer_codes_are_isolated(
                 db,
                 user_id=student_id,
                 code=(
-                    "EMPLOYER-JUDGES-2026"
+                    "EMPLOYER-TRIAL-2026"
                 ),
             )
 

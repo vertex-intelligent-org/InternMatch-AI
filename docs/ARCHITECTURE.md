@@ -71,10 +71,10 @@ The public product site is `https://internmatch.college`; the production API ori
 
 Current mobile baseline:
 
-- Expo SDK `54`
-- React Native `0.81.5`
-- React `19.1.0`
-- TypeScript `~5.9`
+- Expo SDK `57`
+- React Native `0.86.3`
+- React `19.2.3`
+- TypeScript `~6.0`
 - React Navigation
 - Supabase JS `^2.45.0`
 - `react-native-purchases` `10.7.2`
@@ -320,8 +320,6 @@ At the 2026-09-24 checkpoint, Build 9 is associated with App Review and Build 10
 
 ## 20. Related Documentation
 
-- [Judge Runbook](JUDGE_RUNBOOK.md)
-- [Shipaton Submission](SHIPATON_2026_SUBMISSION.md)
 - [Security](SECURITY.md)
 - [API Contract](API_CONTRACT.md)
 - [Database](DATABASE.md)

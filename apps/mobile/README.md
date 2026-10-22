@@ -2,15 +2,12 @@
 
 Expo / React Native application for both **Student / Candidate** and **Employer** product surfaces.
 
-**Shipaton 2026 submission:** Next Gen Award
-**App version:** `1.0.0`
-
 ## Current Stack
 
-- Expo SDK `54`
-- React Native `0.81.5`
-- React `19.1.0`
-- TypeScript `~5.9`
+- Expo SDK `57`
+- React Native `0.86.3`
+- React `19.2.3`
+- TypeScript `~6.0`
 - Supabase JS `^2.45.0`
 - RevenueCat `react-native-purchases` `10.7.2`
 - Expo Notifications
@@ -130,21 +127,9 @@ npm ci
 npx tsc --noEmit
 ```
 
-## Shipaton 2026 Submission Checkpoint
-
-InternMatch AI is submitted through the **RevenueCat Shipaton 2026 Next Gen
-Award** path.
-
-At the 2026-09-30 submission checkpoint, public iOS and Android store
-publication remains under review.
-
-The public repository and Judge Runbook provide the technical reproduction
-path. Public store links may be added later when available.
-
 ## Full Project Documentation
 
 - [Project README](../../README.md)
-- [Judge Runbook](../../docs/JUDGE_RUNBOOK.md)
 - [Architecture](../../docs/ARCHITECTURE.md)
 - [API Contract](../../docs/API_CONTRACT.md)
 - [Security](../../docs/SECURITY.md)

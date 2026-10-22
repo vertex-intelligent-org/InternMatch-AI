@@ -3,8 +3,6 @@
 </p>
 # InternMatch AI
 
-> **RevenueCat Shipaton 2026 — Next Gen Award**
-
 InternMatch AI is a multilingual internship platform connecting **students**,
 **employers**, and a human-operated **administrative trust layer** in one
 end-to-end workflow.
@@ -16,25 +14,12 @@ subscription surfaces.
 
 **Product website:** https://internmatch.college/
 
-**Judge shortcuts:** [Shipaton Submission](docs/SHIPATON_2026_SUBMISSION.md) ·
-[Judge Runbook](docs/JUDGE_RUNBOOK.md) ·
-[Architecture](docs/ARCHITECTURE.md) ·
+**Technical documentation:** [Architecture](docs/ARCHITECTURE.md) ·
 [Security](docs/SECURITY.md)
-
-**Submission checkpoint — September 30, 2026**
-
-- Apple App Store: **Public review pending**
-- Google Play: **Public review pending at submission checkpoint**
-- Public source repository: **Available**
-- MIT license: **Available**
-
-### Post-Submission Live Store Availability
 
 **Apple App Store:** https://apps.apple.com/us/app/internmatch-ai/id6809902796
 
 **Google Play:** https://play.google.com/store/apps/details?id=com.aissclub.internmatchai
-
-The public Apple App Store and Google Play releases became available after the Shipaton submission deadline, following the timing of our release and store-review processes. We are providing these live links solely so judges can experience the finished product directly in its current live state. They do not change or retroactively modify the original submission state. InternMatch AI is being evaluated through the **Next Gen Award** path.
 
 ## Why InternMatch AI
 
@@ -157,7 +142,7 @@ For faithful full-stack development, the application depends on Supabase-managed
 
 | Domain | Current Stack |
 |---|---|
-| Mobile | Expo SDK 54, React Native 0.81.5, React 19.1, TypeScript ~5.9, React Navigation |
+| Mobile | Expo SDK 57, React Native 0.86.3, React 19.2.3, TypeScript ~6.0, React Navigation |
 | Admin | Next.js 15.5.x, React 18, TypeScript |
 | Authentication | Supabase Auth / JWT |
 | Backend | FastAPI, Python 3.13 CI reference runtime, SQLAlchemy, Pydantic |
@@ -240,8 +225,6 @@ npm run typecheck
 
 ## Documentation
 
-- [Shipaton 2026 Submission](docs/SHIPATON_2026_SUBMISSION.md)
-- [Judge Runbook](docs/JUDGE_RUNBOOK.md)
 - [System Architecture](docs/ARCHITECTURE.md)
 - [API Contract](docs/API_CONTRACT.md)
 - [Database](docs/DATABASE.md)
@@ -254,26 +237,21 @@ npm run typecheck
 | Resource | Link / Status |
 |---|---|
 | Product website | https://internmatch.college/ |
-| Public repository | https://github.com/vertex-intelligent-org/InternMatch-AI |
+| Source repository | Access by invitation |
 | Demo video | https://youtu.be/FOoJVTpqCOg?feature=shared |
-| Apple App Store | https://apps.apple.com/us/app/internmatch-ai/id6809902796 *(post-submission live reference)* |
-| Google Play | https://play.google.com/store/apps/details?id=com.aissclub.internmatchai *(post-submission live reference)* |
+| Apple App Store | https://apps.apple.com/us/app/internmatch-ai/id6809902796 |
+| Google Play | https://play.google.com/store/apps/details?id=com.aissclub.internmatchai |
 
-The short demo cannot show every implemented Student, Employer, Admin,
-matching, AI, trust, and monetization workflow. The repository and Judge
-Runbook provide the extended technical evaluation path.
+The demo is a brief product overview. The technical documentation describes the implementation in more detail.
 ## Team
 
-InternMatch AI was conceived and developed by a two-person student product team: **Mohamad Barakat** and **Selenur Yurdakul**, Software / Computer Engineering students at Üsküdar University.
+InternMatch AI was conceived and developed by **Mohamad Barakat** and **Selenur Yurdakul**.
 
 **Selenur Yurdakul** originated the InternMatch AI product concept and created the initial frontend prototype, mobile screen layouts, visual direction, and UI foundation.
 
 **Mohamad Barakat** led the technical architecture and end-to-end engineering, transformed and substantially expanded the initial prototype into the final product, designed the product UX flows, and built the backend, database/vector systems, AI and matching systems, RevenueCat integration, Employer platform, Admin Trust & Safety Console, email automation, infrastructure, security, testing, and release workflows.
 
-Both contributed to shaping and refining the overall product.
-### Demo Video Production
-
-**Atallah Cazbah** — Chemical Engineering student who contributed to the RevenueCat Shipaton 2026 submission through demo video production, filming, and editing.
+Both contributed to shaping and refining the overall product. Any commercial proceeds allocation is a separate agreement between the contributors; code similarity and this credit do not define ownership shares.
 
 ## License
 

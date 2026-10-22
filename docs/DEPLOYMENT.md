@@ -239,4 +239,3 @@ Replace checkpoint language with verified public store URL(s) only after those r
 - [Security](SECURITY.md)
 - [Database](DATABASE.md)
 - [API Contract](API_CONTRACT.md)
-- [Judge Runbook](JUDGE_RUNBOOK.md)

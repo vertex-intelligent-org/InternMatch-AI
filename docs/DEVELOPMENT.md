@@ -215,4 +215,3 @@ Swagger/ReDoc/OpenAPI are available only when enabled by non-production configur
 - [Database](DATABASE.md)
 - [Security](SECURITY.md)
 - [Deployment](DEPLOYMENT.md)
-- [Judge Runbook](JUDGE_RUNBOOK.md)
