@@ -13,6 +13,7 @@ import {
   Switch,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { BlurView } from 'expo-blur';
 import { useAppTheme } from '../context/ThemeProvider';
 import { spacing } from '../theme/spacing';
 import { typography } from '../theme/typography';
@@ -52,6 +53,31 @@ const APPEARANCE_OPTIONS = [
   { code: 'light', icon: 'sunny-outline' },
   { code: 'dark', icon: 'moon-outline' },
 ];
+
+function PickerGlassSheet({ children, style, isDark }) {
+  return (
+    <View style={style}>
+      <BlurView
+        pointerEvents="none"
+        style={StyleSheet.absoluteFillObject}
+        tint={isDark ? 'dark' : 'light'}
+        intensity={65}
+      />
+      <View
+        pointerEvents="none"
+        style={[
+          StyleSheet.absoluteFillObject,
+          {
+            backgroundColor: isDark
+              ? 'rgba(11, 37, 44, 0.96)'
+              : 'rgba(247, 252, 253, 0.96)',
+          },
+        ]}
+      />
+      {children}
+    </View>
+  );
+}
 
 function SettingsRow({
   icon,
@@ -126,7 +152,7 @@ export default function SettingsScreen({ navigation }) {
   const { backendSubscription } = useSubscription();
   const { t } = useTranslation();
   const { locale, isRTL, setLocale } = useLocalization();
-  const { appearance, colors, setAppearance } = useAppTheme();
+  const { appearance, colors, isDark, setAppearance } = useAppTheme();
   const styles = createStyles(colors);
 
   const [languagePickerVisible, setLanguagePickerVisible] = useState(false);
@@ -709,7 +735,7 @@ export default function SettingsScreen({ navigation }) {
         onRequestClose={() => setAppearancePickerVisible(false)}
       >
         <View style={styles.languageModalBackdrop}>
-          <GlassSurface variant="card" style={styles.languageSheet}>
+          <PickerGlassSheet style={styles.languageSheet} isDark={isDark}>
             <Text style={[styles.languageTitle, isRTL && styles.textRTL]}>
               {t('settings.appearance.title')}
             </Text>
@@ -780,7 +806,7 @@ export default function SettingsScreen({ navigation }) {
                 {t('common.cancel')}
               </Text>
             </TouchableOpacity>
-          </GlassSurface>
+          </PickerGlassSheet>
         </View>
       </Modal>
 
@@ -791,7 +817,7 @@ export default function SettingsScreen({ navigation }) {
         onRequestClose={() => setSupportFallbackVisible(false)}
       >
         <View style={styles.languageModalBackdrop}>
-          <GlassSurface variant="card" style={styles.languageSheet}>
+          <PickerGlassSheet style={styles.languageSheet} isDark={isDark}>
             <Text style={[styles.languageTitle, isRTL && styles.textRTL]}>
               {t('settings.supportUnavailableTitle')}
             </Text>
@@ -838,7 +864,7 @@ export default function SettingsScreen({ navigation }) {
                 {t('settings.supportClose')}
               </Text>
             </TouchableOpacity>
-          </GlassSurface>
+          </PickerGlassSheet>
         </View>
       </Modal>
 
@@ -849,7 +875,7 @@ export default function SettingsScreen({ navigation }) {
         onRequestClose={() => setLanguagePickerVisible(false)}
       >
         <View style={styles.languageModalBackdrop}>
-          <GlassSurface variant="card" style={styles.languageSheet}>
+          <PickerGlassSheet style={styles.languageSheet} isDark={isDark}>
             <Text style={[styles.languageTitle, isRTL && styles.textRTL]}>{t('settings.languagePicker.title')}</Text>
             <Text style={[styles.languageMessage, isRTL && styles.textRTL]}>{t('settings.languagePicker.message')}</Text>
 
@@ -901,7 +927,7 @@ export default function SettingsScreen({ navigation }) {
             >
               <Text style={[styles.languageCancelText, isRTL && styles.textRTL]}>{t('common.cancel')}</Text>
             </TouchableOpacity>
-          </GlassSurface>
+          </PickerGlassSheet>
         </View>
       </Modal>
     </ScreenContainer>
@@ -985,7 +1011,7 @@ const createStyles = (colors) => StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     paddingHorizontal: spacing.xl,
-    backgroundColor: 'rgba(2, 8, 23, 0.46)',
+    backgroundColor: 'rgba(2, 8, 23, 0.58)',
   },
   languageSheet: {
     width: '100%',
@@ -994,6 +1020,8 @@ const createStyles = (colors) => StyleSheet.create({
     padding: spacing.lg,
     borderRadius: spacing.radii.lg,
     overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
   },
   languageTitle: {
     ...typography.body,

@@ -2,8 +2,6 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Animated,
-  Easing,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -12,7 +10,6 @@ import {
 import { useTranslation } from 'react-i18next';
 import { useLocalization } from '../localization/LocalizationContext';
 import { useAppTheme } from '../context/ThemeProvider';
-import { spacing } from '../theme/spacing';
 import { typography } from '../theme/typography';
 import haptics from '../services/haptics';
 
@@ -23,9 +20,8 @@ const LANGUAGE_OPTIONS = [
 ];
 
 const CIRCLE_SIZE = 36;
-const COLLAPSED_WIDTH = 40;
+const COLLAPSED_WIDTH = 44;
 const EXPANDED_WIDTH = 124;
-const ANIMATION_DURATION_MS = 180;
 
 export default function PreAuthLanguageSwitcher({
   disabled = false,
@@ -39,19 +35,6 @@ export default function PreAuthLanguageSwitcher({
   const [expanded, setExpanded] = useState(false);
   const [changingLocale, setChangingLocale] = useState(null);
   const localeChangeInFlightRef = useRef(false);
-
-  const expansion = useRef(
-    new Animated.Value(0)
-  ).current;
-
-  useEffect(() => {
-    Animated.timing(expansion, {
-      toValue: expanded ? 1 : 0,
-      duration: ANIMATION_DURATION_MS,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: false,
-    }).start();
-  }, [expanded, expansion]);
 
   useEffect(() => {
     if (disabled && expanded) {
@@ -113,48 +96,55 @@ export default function PreAuthLanguageSwitcher({
     }
   };
 
-  const animatedWidth = expansion.interpolate({
-    inputRange: [0, 1],
-    outputRange: [
-      COLLAPSED_WIDTH,
-      EXPANDED_WIDTH,
-    ],
-  });
-
-  const optionsOpacity = expansion.interpolate({
-    inputRange: [0, 0.35, 1],
-    outputRange: [0, 0, 1],
-  });
-
-  const collapsedOpacity = expansion.interpolate({
-    inputRange: [0, 0.65, 1],
-    outputRange: [1, 0, 0],
-  });
-
   const currentOption =
     LANGUAGE_OPTIONS.find(
       (option) => option.code === locale
     ) || LANGUAGE_OPTIONS[0];
 
   return (
-    <Animated.View
+    <View
       style={[
         styles.wrapper,
         {
-          width: animatedWidth,
+          width: expanded ? EXPANDED_WIDTH : COLLAPSED_WIDTH,
         },
         style,
       ]}
     >
-      <Animated.View
-        pointerEvents={expanded ? 'none' : 'auto'}
-        style={[
-          styles.collapsedLayer,
-          {
-            opacity: collapsedOpacity,
-          },
-        ]}
-      >
+      {expanded ? (
+        <View style={styles.optionsLayer} accessibilityRole="radiogroup">
+          {LANGUAGE_OPTIONS.map((option) => {
+            const selected = locale === option.code;
+            const changing = changingLocale === option.code;
+            const optionDisabled = disabled || Boolean(changingLocale);
+
+            return (
+              <TouchableOpacity
+                key={option.code}
+                style={[
+                  styles.option,
+                  selected && styles.optionSelected,
+                  optionDisabled && styles.optionDisabled,
+                ]}
+                onPress={() => handleChange(option.code)}
+                disabled={optionDisabled}
+                activeOpacity={0.72}
+                accessibilityRole="radio"
+                accessibilityState={{ selected, disabled: optionDisabled }}
+                accessibilityLabel={t(`languages.${option.code}`)}
+              >
+                {changing ? (
+                  <ActivityIndicator size="small" color={colors.accentStrong || colors.tealDark} />
+                ) : (
+                  <Text style={[styles.optionText, selected && styles.optionTextSelected]}>
+                    {option.label}
+                  </Text>
+                )}
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      ) : (
         <TouchableOpacity
           style={[
             styles.option,
@@ -185,76 +175,8 @@ export default function PreAuthLanguageSwitcher({
             {currentOption.label}
           </Text>
         </TouchableOpacity>
-      </Animated.View>
-
-      <Animated.View
-        pointerEvents={expanded ? 'auto' : 'none'}
-        style={[
-          styles.optionsLayer,
-          {
-            opacity: optionsOpacity,
-          },
-        ]}
-        accessibilityRole="radiogroup"
-      >
-        {LANGUAGE_OPTIONS.map((option) => {
-          const selected =
-            locale === option.code;
-
-          const changing =
-            changingLocale === option.code;
-
-          const optionDisabled =
-            disabled ||
-            Boolean(changingLocale);
-
-          return (
-            <TouchableOpacity
-              key={option.code}
-              style={[
-                styles.option,
-                selected && styles.optionSelected,
-                optionDisabled &&
-                  styles.optionDisabled,
-              ]}
-              onPress={() =>
-                handleChange(option.code)
-              }
-              disabled={optionDisabled}
-              activeOpacity={0.72}
-              accessibilityRole="radio"
-              accessibilityState={{
-                selected,
-                disabled: optionDisabled,
-              }}
-              accessibilityLabel={t(
-                `languages.${option.code}`
-              )}
-            >
-              {changing ? (
-                <ActivityIndicator
-                  size="small"
-                  color={
-                    colors.accentStrong ||
-                    colors.tealDark
-                  }
-                />
-              ) : (
-                <Text
-                  style={[
-                    styles.optionText,
-                    selected &&
-                      styles.optionTextSelected,
-                  ]}
-                >
-                  {option.label}
-                </Text>
-              )}
-            </TouchableOpacity>
-          );
-        })}
-      </Animated.View>
-    </Animated.View>
+      )}
+    </View>
   );
 }
 
@@ -263,27 +185,23 @@ const createStyles = (colors) => StyleSheet.create({
     alignSelf: 'flex-end',
     height: COLLAPSED_WIDTH,
     borderRadius: COLLAPSED_WIDTH / 2,
-    backgroundColor:
-      colors.glass.bgLight,
+    backgroundColor: colors.surfaceElevated,
     borderWidth: 1,
     borderColor:
       colors.borderSubtle,
     overflow: 'hidden',
     direction: 'ltr',
-  },
-
-  collapsedLayer: {
-    ...StyleSheet.absoluteFillObject,
     alignItems: 'center',
     justifyContent: 'center',
   },
 
   optionsLayer: {
-    ...StyleSheet.absoluteFillObject,
+    flex: 1,
+    alignSelf: 'stretch',
     flexDirection: 'row',
     direction: 'ltr',
     alignItems: 'center',
-    justifyContent: 'space-evenly',
+    justifyContent: 'space-between',
     paddingHorizontal: 4,
   },
 

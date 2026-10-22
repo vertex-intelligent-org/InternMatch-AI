@@ -4,11 +4,6 @@ import { useLocalization } from '../localization/LocalizationContext';
 import { View, StyleSheet, Platform, useWindowDimensions, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
-import {
-  GlassView,
-  isLiquidGlassAvailable,
-  isGlassEffectAPIAvailable,
-} from 'expo-glass-effect';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -66,22 +61,17 @@ export default function CustomTabBar({ state, descriptors, navigation }) {
   const { isRTL } = useLocalization();
   const { isDark } = useAppTheme();
   const barTint = isDark
-    ? (isScrolled ? 'rgba(9, 47, 57, 0.94)' : 'rgba(11, 58, 69, 0.94)')
-    : (isScrolled ? 'rgba(7, 82, 98, 0.94)' : 'rgba(7, 94, 110, 0.94)');
+    ? (isScrolled ? 'rgba(8, 49, 61, 0.97)' : 'rgba(10, 58, 72, 0.97)')
+    : (isScrolled ? 'rgba(7, 78, 98, 0.96)' : 'rgba(7, 94, 115, 0.96)');
   const lensTint = isDark
-    ? 'rgba(32, 91, 104, 0.88)'
-    : 'rgba(35, 112, 129, 0.88)';
+    ? 'rgba(26, 100, 118, 0.96)'
+    : 'rgba(25, 119, 140, 0.96)';
 
   const [avatarLoadError, setAvatarLoadError] = useState(false);
 
   useEffect(() => {
     setAvatarLoadError(false);
   }, [profile?.avatar_url]);
-
-  const isLiquidSupported =
-    Platform.OS === 'ios' &&
-    ((typeof isLiquidGlassAvailable === 'function' && isLiquidGlassAvailable()) &&
-      (typeof isGlassEffectAPIAvailable === 'function' && isGlassEffectAPIAvailable()));
 
   const bottomOffset = Math.max(insets.bottom, FLOATING_TAB_BAR_MIN_BOTTOM_INSET);
   const routeCount = state.routes.length || 5;
@@ -121,54 +111,23 @@ export default function CustomTabBar({ state, descriptors, navigation }) {
 
   return (
     <View style={[styles.floatingBar, { bottom: bottomOffset }]}>
-      {/* Dynamic Base Layer: Darker Teal Glass near Top -> Lighter Glass when Scrolled */}
-      {isLiquidSupported ? (
-        <>
-          <GlassView
-            style={StyleSheet.absoluteFillObject}
-            glassEffectStyle="regular"
-            colorScheme={isDark ? "dark" : "light"}
-            tintColor={barTint}
-          />
-          <View
-            style={[
-              StyleSheet.absoluteFillObject,
-              {
-                backgroundColor: barTint,
-              },
-            ]}
-          />
-        </>
-      ) : Platform.OS === 'ios' ? (
-        <>
-          <BlurView
-            style={StyleSheet.absoluteFillObject}
-            tint={isDark ? "systemUltraThinMaterialDark" : "systemUltraThinMaterialLight"}
-            intensity={85}
-          />
-          <View
-            style={[
-              StyleSheet.absoluteFillObject,
-              {
-                backgroundColor: barTint,
-              },
-            ]}
-          />
-        </>
-      ) : (
-        <View
-          style={[
-            StyleSheet.absoluteFillObject,
-            {
-              backgroundColor: barTint,
-            },
-          ]}
+      {/* A subtle frosted layer sits behind a nearly opaque brand-blue surface. */}
+      {Platform.OS === 'ios' && (
+        <BlurView
+          pointerEvents="none"
+          style={StyleSheet.absoluteFillObject}
+          tint={isDark ? 'dark' : 'light'}
+          intensity={55}
         />
       )}
+      <View
+        pointerEvents="none"
+        style={[StyleSheet.absoluteFillObject, { backgroundColor: barTint }]}
+      />
 
       {/* Tabs Container */}
       <View style={styles.tabsRow}>
-        {/* ONE Moving Clear Liquid Glass Lens */}
+        {/* One clearly visible active tab lens. */}
         <Animated.View
           style={[
             styles.lensContainer,
@@ -177,19 +136,7 @@ export default function CustomTabBar({ state, descriptors, navigation }) {
           ]}
           pointerEvents="none"
         >
-          {isLiquidSupported ? (
-            <>
-              <GlassView
-                style={StyleSheet.absoluteFillObject}
-                glassEffectStyle="regular"
-                colorScheme={isDark ? "dark" : "light"}
-                tintColor={lensTint}
-              />
-              <View style={[StyleSheet.absoluteFillObject, { backgroundColor: lensTint }]} />
-            </>
-          ) : (
-            <View style={[StyleSheet.absoluteFillObject, { backgroundColor: lensTint }]} />
-          )}
+          <View style={[StyleSheet.absoluteFillObject, { backgroundColor: lensTint }]} />
         </Animated.View>
 
         {/* Interactive Tab Items */}
