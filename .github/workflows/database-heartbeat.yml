@@ -121,9 +121,9 @@ jobs:
 
           body="Supabase heartbeat has failed on two or more consecutive scheduled runs.
 
-Latest run: https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}
+          Latest run: https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}
 
-The workflow will close this alert automatically after a successful recovery."
+          The workflow will close this alert automatically after a successful recovery."
 
           if [ -z "$issue_number" ]; then
             jq -n \
