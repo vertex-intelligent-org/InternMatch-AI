@@ -70,13 +70,13 @@
         }
       ],
       "expo-apple-authentication",
+      "./plugins/with-android-modernization",
       [
         "expo-splash-screen",
         {
           "backgroundColor": "#0B5F70"
         }
-      ],
-      "./plugins/with-android-modernization"
+      ]
     ],
     "extra": {
       "eas": {

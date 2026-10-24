@@ -48,6 +48,15 @@ const withAndroidModernization = (config) => {
       style.item = style.item.filter(
         (item) => !DEPRECATED_STYLE_ITEMS.has(item?.$?.name)
       );
+
+      if (style.$?.name === 'Theme.App.SplashScreen') {
+        style.item = style.item.map((item) =>
+          item?.$?.name === 'windowSplashScreenAnimatedIcon' &&
+          item._ === '@drawable/splashscreen_logo'
+            ? { ...item, _: '@android:color/transparent' }
+            : item
+        );
+      }
     }
 
     return stylesConfig;
