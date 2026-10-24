@@ -16,28 +16,11 @@ jobs:
     timeout-minutes: 2
 
     env:
-      HEARTBEAT_URL: ${{ secrets.INTERNMATCH_HEARTBEAT_URL }}
-      HEARTBEAT_SECRET: ${{ secrets.INTERNMATCH_HEARTBEAT_SECRET }}
+      HEARTBEAT_URL: https://api.internmatch.college/api/v1/health
       GH_TOKEN: ${{ github.token }}
 
     steps:
-      - name: Validate heartbeat secrets
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          test -n "$HEARTBEAT_URL"
-          test -n "$HEARTBEAT_SECRET"
-
-          case "$HEARTBEAT_URL" in
-            https://*) ;;
-            *)
-              echo "Heartbeat URL must use HTTPS."
-              exit 1
-              ;;
-          esac
-
-      - name: Execute database heartbeat
+      - name: Execute production readiness heartbeat
         shell: bash
         run: |
           set -euo pipefail
@@ -49,29 +32,29 @@ jobs:
             curl \
               --silent \
               --show-error \
-              --location \
               --connect-timeout 5 \
-              --max-time 15 \
-              -X POST \
-              "$HEARTBEAT_URL" \
-              -H "X-Heartbeat-Secret: $HEARTBEAT_SECRET" \
-              -H "Cache-Control: no-store" \
-              -H "Content-Type: application/json" \
+              --max-time 20 \
+              -X GET \
+              "${HEARTBEAT_URL}?heartbeat=${GITHUB_RUN_ID}" \
+              -H "Cache-Control: no-cache, no-store" \
+              -H "Accept: application/json" \
               -o "$response_file" \
               -w "%{http_code}"
           )"
 
           if [ "$http_code" != "200" ]; then
-            echo "::error::Supabase heartbeat failed with HTTP $http_code."
+            echo "::error::Production readiness failed with HTTP $http_code."
             exit 1
           fi
 
-          if ! grep -q '"database":"connected"' "$response_file"; then
-            echo "::error::Heartbeat returned HTTP 200 without database=connected."
+          if ! jq -e \
+            '.database == "connected" and .redis == "connected" and .worker == "ready"' \
+            "$response_file" > /dev/null; then
+            echo "::error::Production readiness dependencies are not healthy."
             exit 1
           fi
 
-          echo "Supabase heartbeat succeeded: database=connected."
+          echo "Heartbeat succeeded: database=connected, redis=connected, worker=ready."
 
       - name: Alert after consecutive failures
         if: failure()
