@@ -1,0 +1,13 @@
+@layer auth {
+ .real-auth { padding-top: max(20px, env(safe-area-inset-top)); }
+ .real-auth-tabs > a { display: flex; align-items: center; justify-content: center; flex: 1; min-height: 44px; padding: 8px; border-radius: 9999px; font-size: 13px; font-weight: 600; color: var(--secondary); text-decoration: none; }
+ .real-auth-tabs > a[aria-current='page'] { color: var(--on-accent); background: var(--accent-strong); }
+ .auth-config-note { padding: 12px; margin: 0 0 20px; background: var(--accent-soft); color: var(--text); border: 1px solid var(--border); border-radius: 10px; font-size: 13px; line-height: 1.8; }
+ .real-auth .native-forgot { text-align: end; width: fit-content; display: flex; align-items: center; text-decoration: none; }
+ .auth-message { color: var(--accent-strong); font-size: 13px; line-height: 1.8; margin-top: 14px; overflow-wrap: anywhere; }
+ .auth-message:empty { margin: 0; }
+ .text-action { display: flex; align-items: center; min-height: 44px; margin-top: 10px; padding: 8px 0; background: transparent; border: 0; color: var(--accent-strong); font-size: 12px; line-height: 1.7; text-align: start; }
+ .native-social:disabled, .text-action:disabled { opacity: .6; cursor: not-allowed; }
+ .account-role { display: inline-flex; padding: 6px 12px; border-radius: 8px; background: var(--accent-soft); color: var(--accent-strong); font-weight: 600; }
+ .account-stage-note { margin-block: 18px; line-height: 1.8; color: var(--secondary); }
+}

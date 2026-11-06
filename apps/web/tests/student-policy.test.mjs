@@ -1,0 +1,10 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import ts from 'typescript';
+const output=ts.transpileModule(readFileSync(new URL('../src/lib/student/contracts.ts',import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText;
+const c=await import('data:text/javascript;base64,'+Buffer.from(output).toString('base64'));
+test('student IDs reject paths, URLs and non UUID selectors',()=>{for(const id of ['../../profile','https://example.test','mine','user@example.test','%2F','',undefined])assert.equal(c.uuid(id),false);assert.equal(c.uuid('11111111-1111-4111-8111-111111111111'),true);});
+test('catalog query accepts bounded filters and rejects unsupported selectors',()=>{assert.equal(c.pagination(new URLSearchParams('work_type=remote&location=İstanbul&skill=Python')).get('location'),'İstanbul');for(const query of ['limit=0','limit=51','offset=-1','offset=1000001','limit=2&limit=3','work_type=any','user_id=other','url=https://example.test'])assert.throws(()=>c.pagination(new URLSearchParams(query)),{code:'invalid'});});
+test('submission never accepts owner or employer-controlled status',()=>{for(const value of [{status:'accepted'},{user_id:'other'},{internship_id:'other'},{cover_letter:5},{notes:'x'.repeat(4001)}])assert.throws(()=>c.submission(value),{code:'invalid'});assert.deepEqual(c.submission({cover_letter:'Çağrı الطالب',notes:''}),{cover_letter:'Çağrı الطالب',notes:''});});
+test('malformed upstream objects fail closed',()=>{assert.equal(c.internship({id:'bad'}),false);assert.equal(c.application({id:'bad',status:'admin'}),false);assert.equal(c.applications({applications:[{id:'bad'}]}),false);assert.equal(c.pageOf({items:[],total:-1,limit:12,offset:0},c.internship),false);});

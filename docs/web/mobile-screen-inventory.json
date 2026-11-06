@@ -1,0 +1,177 @@
+{
+  "sourceCommit": "4ad7dc023ac09866b7b09e85c4f3d4ec8948d28b",
+  "stackScreens": 28,
+  "uniqueTabDestinations": 6,
+  "inventory": [
+    {
+      "mobileScreen": "Splash",
+      "phase": "W2",
+      "webStatus": "browser-adaptation-pending"
+    },
+    {
+      "mobileScreen": "SignIn",
+      "phase": "W2",
+      "webStatus": "visual-preview-only"
+    },
+    {
+      "mobileScreen": "AccountDeletionReauth",
+      "phase": "W2",
+      "webStatus": "not-implemented"
+    },
+    {
+      "mobileScreen": "SignUp",
+      "phase": "W2",
+      "webStatus": "visual-preview-only"
+    },
+    {
+      "mobileScreen": "ForgotPassword",
+      "phase": "W2",
+      "webStatus": "not-implemented"
+    },
+    {
+      "mobileScreen": "ResetPassword",
+      "phase": "W2",
+      "webStatus": "not-implemented"
+    },
+    {
+      "mobileScreen": "OnboardingProfile",
+      "phase": "W2",
+      "webStatus": "not-implemented"
+    },
+    {
+      "mobileScreen": "MainTabs",
+      "phase": "W2",
+      "webStatus": "browser-adaptation-pending"
+    },
+    {
+      "mobileScreen": "InternshipDetail",
+      "phase": "W4",
+      "webStatus": "not-implemented"
+    },
+    {
+      "mobileScreen": "WhyYouMatch",
+      "phase": "W4",
+      "webStatus": "not-implemented"
+    },
+    {
+      "mobileScreen": "CoverLetterDraft",
+      "phase": "W4",
+      "webStatus": "not-implemented"
+    },
+    {
+      "mobileScreen": "CoverLetter",
+      "phase": "W4",
+      "webStatus": "not-implemented"
+    },
+    {
+      "mobileScreen": "ApplicationDetail",
+      "phase": "W4",
+      "webStatus": "not-implemented"
+    },
+    {
+      "mobileScreen": "EditProfile",
+      "phase": "W4",
+      "webStatus": "not-implemented"
+    },
+    {
+      "mobileScreen": "Settings",
+      "phase": "W5",
+      "webStatus": "not-implemented; shared preferences available"
+    },
+    {
+      "mobileScreen": "Plans",
+      "phase": "W5",
+      "webStatus": "not-implemented"
+    },
+    {
+      "mobileScreen": "SavedInternships",
+      "phase": "W4",
+      "webStatus": "not-implemented"
+    },
+    {
+      "mobileScreen": "CVUpload",
+      "phase": "W4",
+      "webStatus": "not-implemented"
+    },
+    {
+      "mobileScreen": "EmployerVerification",
+      "phase": "W3",
+      "webStatus": "not-implemented"
+    },
+    {
+      "mobileScreen": "EmployerCompliance",
+      "phase": "W3",
+      "webStatus": "not-implemented"
+    },
+    {
+      "mobileScreen": "CreateOpportunity",
+      "phase": "W3",
+      "webStatus": "not-implemented"
+    },
+    {
+      "mobileScreen": "EmployerOpportunityDetail",
+      "phase": "W3",
+      "webStatus": "not-implemented"
+    },
+    {
+      "mobileScreen": "EmployerApplicants",
+      "phase": "W3",
+      "webStatus": "not-implemented"
+    },
+    {
+      "mobileScreen": "EmployerApplicantDetail",
+      "phase": "W3",
+      "webStatus": "not-implemented"
+    },
+    {
+      "mobileScreen": "EmployerGuidance",
+      "phase": "W3",
+      "webStatus": "not-implemented"
+    },
+    {
+      "mobileScreen": "PrivacyPolicy",
+      "phase": "W2",
+      "webStatus": "existing-marketing-link; verify account navigation"
+    },
+    {
+      "mobileScreen": "TermsOfUse",
+      "phase": "W2",
+      "webStatus": "existing-marketing-link; verify account navigation"
+    },
+    {
+      "mobileScreen": "Notifications",
+      "phase": "W5",
+      "webStatus": "not-implemented"
+    },
+    {
+      "mobileScreen": "Home",
+      "phase": "W4",
+      "webStatus": "not-implemented"
+    },
+    {
+      "mobileScreen": "Internships",
+      "phase": "W4",
+      "webStatus": "not-implemented"
+    },
+    {
+      "mobileScreen": "Matchups",
+      "phase": "W4",
+      "webStatus": "not-implemented"
+    },
+    {
+      "mobileScreen": "Applications",
+      "phase": "W4",
+      "webStatus": "not-implemented"
+    },
+    {
+      "mobileScreen": "Opportunities",
+      "phase": "W3",
+      "webStatus": "not-implemented"
+    },
+    {
+      "mobileScreen": "Profile",
+      "phase": "W4",
+      "webStatus": "not-implemented"
+    }
+  ]
+}

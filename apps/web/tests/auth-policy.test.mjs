@@ -1,0 +1,11 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import ts from 'typescript';
+const source=readFileSync(new URL('../src/lib/auth/policy.ts',import.meta.url),'utf8');
+const output=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText;
+const policy=await import('data:text/javascript;base64,'+Buffer.from(output).toString('base64'));
+test('roles have no implicit default',()=>{for(const input of [null,undefined,'student','admin','',{},true])assert.equal(policy.roleOf(input),null);assert.equal(policy.roleOf('intern'),'intern');assert.equal(policy.roleOf('employer'),'employer');});
+test('confirmation metadata is provisioning input only for confirmed email identities',()=>{const user={email_confirmed_at:'yes',app_metadata:{provider:'email'},user_metadata:{full_name:'Çağrı الطالب',account_type:'employer'}};assert.equal(policy.emailSignupIntent(user).account_type,'employer');assert.equal(policy.emailSignupIntent({...user,email_confirmed_at:undefined}),null);assert.equal(policy.emailSignupIntent({...user,app_metadata:{provider:'google'}}),null);assert.equal(policy.emailSignupIntent({...user,user_metadata:{...user.user_metadata,account_type:'admin'}}),null);});
+test('mutations require configured origin and reject cross-site requests',()=>{policy.checkOrigin('https://internmatch.college','https://internmatch.college','same-origin');for(const args of [[null,'https://internmatch.college',null],['https://evil.example','https://internmatch.college','same-origin'],['https://internmatch.college','https://internmatch.college','cross-site']])assert.throws(()=>policy.checkOrigin(...args),{code:'csrf',status:403});});
+test('bounded Unicode names and email normalization',()=>{assert.equal(policy.stringValue('  Çağrı الطالب  '),'Çağrı الطالب');assert.equal(policy.emailValue(' User@Example.com '),'user@example.com');assert.equal(policy.emailValue('bad@'),'');assert.equal(policy.stringValue('a'.repeat(201)),'');});

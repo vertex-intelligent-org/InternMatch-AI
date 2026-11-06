@@ -1,0 +1,123 @@
+{
+  "schema": 1,
+  "sourceRepository": "vertex-intelligent-org/InternMatch-AI",
+  "sourceCommit": "4ad7dc023ac09866b7b09e85c4f3d4ec8948d28b",
+  "reviewedAt": "2026-10-30",
+  "fontPolicy": "No font files in mobile Git tree; typography.js defines native system-font sizes, weights and line heights. Browser uses platform system fonts.",
+  "referenceFiles": [
+    {
+      "path": "apps/mobile/src/components/AuthGlassPanel.js",
+      "gitBlobSha": "c9dd588d498cf49313bdbb8482621d54c1a75f9c"
+    },
+    {
+      "path": "apps/mobile/src/components/AuthSegmentedControl.js",
+      "gitBlobSha": "e6a7691189c775b8be9814895bd418ca70fe6ba7"
+    },
+    {
+      "path": "apps/mobile/src/components/Card.js",
+      "gitBlobSha": "edc3cc99e9153c82780aa390e6b33dc03e65ed2b"
+    },
+    {
+      "path": "apps/mobile/src/components/GlassSurface.js",
+      "gitBlobSha": "1bc188155c522a0959cde57d95e4f4d69b74e2d9"
+    },
+    {
+      "path": "apps/mobile/src/components/InternMatchLogo.js",
+      "gitBlobSha": "697d1f30ace057850c413c745841c24bfa375709"
+    },
+    {
+      "path": "apps/mobile/src/components/PreAuthLanguageSwitcher.js",
+      "gitBlobSha": "de2463544a1be40f99bd7469d275694156a22b51"
+    },
+    {
+      "path": "apps/mobile/src/components/PressableCard.js",
+      "gitBlobSha": "21d11cef022239d8d8d9eb5f6b9edb1499c1509c"
+    },
+    {
+      "path": "apps/mobile/src/components/PressableScale.js",
+      "gitBlobSha": "32c7d078fc2632b5ccd1e3731820904563df92a4"
+    },
+    {
+      "path": "apps/mobile/src/components/SocialAuthButton.js",
+      "gitBlobSha": "15bef3392df6c9124084fe91149462f97df174f0"
+    },
+    {
+      "path": "apps/mobile/src/components/motion/AIPulse.js",
+      "gitBlobSha": "d60749effab37312dc2f4ed7675a60ea18d73c58"
+    },
+    {
+      "path": "apps/mobile/src/components/motion/AnimatedScoreRing.js",
+      "gitBlobSha": "010751bfbd9845623ee8d02bfab3878746c857b2"
+    },
+    {
+      "path": "apps/mobile/src/components/motion/BrandedAILoader.js",
+      "gitBlobSha": "0796eb39a37f5a747436a84029d463d3344e9b48"
+    },
+    {
+      "path": "apps/mobile/src/components/motion/MatchIntelligenceOrb.js",
+      "gitBlobSha": "30496d00eb151aa027b16e20a060a8a67dd8cce0"
+    },
+    {
+      "path": "apps/mobile/src/components/motion/Reveal.js",
+      "gitBlobSha": "211f9d09afc5c9017d7236e6b672baef6ddbf8b9"
+    },
+    {
+      "path": "apps/mobile/src/components/motion/SplashBowArrowAnimation.js",
+      "gitBlobSha": "a415669502f0ad2bd0ab01a2761e5bc95f4313bb"
+    },
+    {
+      "path": "apps/mobile/src/motion/motionTokens.js",
+      "gitBlobSha": "5618f646fdcbd7f29d87a791320717dc8e2f1c13"
+    },
+    {
+      "path": "apps/mobile/src/navigation/MainTabs.js",
+      "gitBlobSha": "75936e77a7e943d85ed96fb124060bfb7540b5a8"
+    },
+    {
+      "path": "apps/mobile/src/navigation/RootNavigator.js",
+      "gitBlobSha": "986723e60bfa3ae41058bc51fab8287d4f428118"
+    },
+    {
+      "path": "apps/mobile/src/screens/CVUploadScreen.js",
+      "gitBlobSha": "6a13713cd5f564061b986875c939ab7b8ba5f608"
+    },
+    {
+      "path": "apps/mobile/src/screens/HomeScreen.js",
+      "gitBlobSha": "afe5feb6bca4af0151c73e3cd7e9df81d0b94018"
+    },
+    {
+      "path": "apps/mobile/src/screens/SettingsScreen.js",
+      "gitBlobSha": "b498d52a538c888e96130f3e5e98a97d00fb577f"
+    },
+    {
+      "path": "apps/mobile/src/screens/SignInScreen.js",
+      "gitBlobSha": "bb1ceff66b224a257e1456b4386b5fb2d9b9d15d"
+    },
+    {
+      "path": "apps/mobile/src/screens/SignUpScreen.js",
+      "gitBlobSha": "5f175a1eb05a9d1b4e68b0f35a2fa102d721160d"
+    },
+    {
+      "path": "apps/mobile/src/theme/colors.js",
+      "gitBlobSha": "2013115a01bdbe4635837fcd8cfe23abd4e134fe"
+    },
+    {
+      "path": "apps/mobile/src/theme/spacing.js",
+      "gitBlobSha": "60d4fe05ad3467ce7c3bb434eb711ec23ff80ef2"
+    },
+    {
+      "path": "apps/mobile/src/theme/tabBarLayout.js",
+      "gitBlobSha": "fc4f1add6b8967ccd19d630b7aacb0190df566de"
+    },
+    {
+      "path": "apps/mobile/src/theme/typography.js",
+      "gitBlobSha": "b7d04c1d927a9dbe8c79e0d29db3152cc58ae507"
+    }
+  ],
+  "notImplemented": [
+    "Authentication, OAuth, recovery and canonical role lookups",
+    "Functional student/employer pages and live data",
+    "Payments and device-native services",
+    "Domain integration and deployment"
+  ]
+}
